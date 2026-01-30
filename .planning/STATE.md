@@ -10,17 +10,17 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 3 of 6 (Style System)
-Plan: 1 of 4 in current phase
+Plan: 2 of 4 in current phase
 Status: In progress
-Last activity: 2026-01-30 - Completed 03-01-PLAN.md
+Last activity: 2026-01-30 - Completed 03-02-PLAN.md
 
-Progress: [████░░░░░░] 37.5% (9/24 plans)
+Progress: [████░░░░░░] 41.7% (10/24 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 9
-- Total execution time: ~1 hour 42 min
+- Total plans completed: 10
+- Total execution time: ~1 hour 45 min
 
 **By Phase:**
 
@@ -28,7 +28,7 @@ Progress: [████░░░░░░] 37.5% (9/24 plans)
 |-------|-------|--------|
 | 1. Editor Foundation | 4/4 | Complete |
 | 2. File Management | 4/4 | Complete |
-| 3. Style System | 1/4 | In progress |
+| 3. Style System | 2/4 | In progress |
 
 ## Accumulated Context
 
@@ -60,6 +60,10 @@ Progress: [████░░░░░░] 37.5% (9/24 plans)
 | D-03-01-002 | data-theme attribute on documentElement for dark mode | CSS selector :root[data-theme="dark"] for variant switching |
 | D-03-01-003 | Preset objects use exact CSS variable names as keys | Direct mapping to setProperty calls, no translation needed |
 | D-03-01-004 | Dynamic Tauri import with media query fallback | Supports browser dev mode without Tauri context |
+| D-03-02-001 | Style changes call markDirty() on editorStore | Ensures document dirty state tracks style changes for save prompts |
+| D-03-02-002 | Individual preset changes clear currentMasterTheme | Mixing presets means no longer using a master theme |
+| D-03-02-003 | StyleMetadata shared interface between store and serqFormat | Single source of truth for style data shape |
+| D-03-02-004 | Recents vs Defaults distinction | Recents = last 5 used (quick access), Defaults = explicit user choice (new docs) |
 
 ### Technical Patterns Established
 
@@ -89,7 +93,7 @@ tauri::Builder::default()
 **.serq.html Format:**
 ```html
 <script type="application/json" id="serq-metadata">
-{ "version": "1.0", "created": "...", "modified": "...", "wordCount": N }
+{ "version": "1.0", "created": "...", "modified": "...", "wordCount": N, "presets": {...} }
 </script>
 <body class="serq-document">
   <!-- TipTap HTML content -->
@@ -153,6 +157,27 @@ const { effectiveTheme, toggleTheme, setUserOverride } = useSystemTheme()
 // Updates document.documentElement.dataset.theme = 'light' | 'dark'
 ```
 
+**Style Store Pattern (Phase 3):**
+```typescript
+// Zustand store for style state
+const useStyleStore = create<StyleState>((set, get) => ({
+  currentTypography: 'serq-default',
+  currentColor: 'default',
+  currentCanvas: 'white',
+  currentLayout: 'default',
+  currentMasterTheme: null,
+
+  setTypography: (presetId) => {
+    applyTypographyPreset(presetId)  // Update CSS
+    set({ currentTypography: presetId, currentMasterTheme: null })  // Update state
+    useEditorStore.getState().markDirty()  // Mark document dirty
+  },
+
+  loadFromDocument: (metadata) => { /* Apply presets from document */ },
+  getStyleMetadata: () => { /* Return current presets for serialization */ }
+}))
+```
+
 ### Design Reference
 
 See `.planning/DESIGN-REFERENCE.md` for UI/UX inspiration from:
@@ -176,7 +201,7 @@ None.
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Completed 03-01-PLAN.md (CSS Variable Foundation)
+Stopped at: Completed 03-02-PLAN.md (Style State & Persistence)
 Resume file: None
 
 ---
@@ -184,3 +209,4 @@ Resume file: None
 *Phase 1 complete: 2026-01-30 (human verified)*
 *Phase 2 complete: 2026-01-30 (human verified)*
 *Plan 03-01 complete: 2026-01-30*
+*Plan 03-02 complete: 2026-01-30*
