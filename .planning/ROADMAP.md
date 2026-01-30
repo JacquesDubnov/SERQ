@@ -31,12 +31,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. User can click anywhere in empty space and cursor appears there
   4. User can resize browser window and content reflows responsively
   5. User can undo/redo with full history preservation
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
-- [ ] 01-03: TBD
+- [ ] 01-01-PLAN.md — Tauri + React project scaffold with TipTap core and critical performance config
+- [ ] 01-02-PLAN.md — Formatting toolbar with useEditorState and keyboard shortcuts
+- [ ] 01-03-PLAN.md — Responsive canvas layout with click-anywhere cursor placement
+- [ ] 01-04-PLAN.md — Zustand integration and human verification of all success criteria
 
 **Critical Research Constraints (from research/SUMMARY.md):**
 - MUST create single editor instance at startup, reuse via `setContent()` - never recreate
@@ -172,7 +173,7 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Editor Foundation | 0/3 | Not started | - |
+| 1. Editor Foundation | 0/4 | Planned | - |
 | 2. File Management | 0/2 | Not started | - |
 | 3. Style System | 0/2 | Not started | - |
 | 4. Extended Features | 0/3 | Not started | - |
@@ -181,5 +182,6 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6
 
 ---
 *Roadmap created: 2026-01-30*
+*Phase 1 planned: 2026-01-30*
 *Depth: comprehensive*
 *Coverage: 99/99 v1 requirements mapped*
