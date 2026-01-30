@@ -1,0 +1,1 @@
+export { FormatPainter } from './FormatPainter'
