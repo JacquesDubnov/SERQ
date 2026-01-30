@@ -8,6 +8,8 @@ import {
   parseSerqDocument,
   type SerqMetadata,
 } from '../lib/serqFormat'
+import { addRecentFile } from '../lib/recentFiles'
+import { getWorkingFolder, updateWorkingFolderFromFile } from '../lib/workingFolder'
 import type { EditorCoreRef } from '../components/Editor/EditorCore'
 
 /**
@@ -57,10 +59,14 @@ export function useFileOperations(editorRef: RefObject<EditorCoreRef | null>) {
    * Returns the parsed content and metadata, or null if cancelled
    */
   const openFile = useCallback(async (): Promise<OpenFileResult | null> => {
+    // Get default path from working folder preference
+    const defaultPath = await getWorkingFolder()
+
     // Show native file picker
     const selected = await open({
       multiple: false,
       filters: FILE_FILTERS,
+      defaultPath,
     })
 
     // User cancelled
@@ -81,6 +87,10 @@ export function useFileOperations(editorRef: RefObject<EditorCoreRef | null>) {
     const name = extractFileName(selected)
     setDocument(selected, name)
     markSaved()
+
+    // Add to recent files and update working folder
+    await addRecentFile(selected, name)
+    await updateWorkingFolderFromFile(selected)
 
     return {
       html,
@@ -123,10 +133,13 @@ export function useFileOperations(editorRef: RefObject<EditorCoreRef | null>) {
    * Returns the new file path, or null if cancelled
    */
   const saveFileAs = useCallback(async (): Promise<string | null> => {
+    // Get default path from working folder preference
+    const workingFolder = await getWorkingFolder()
+
     // Show native save dialog
     const filePath = await save({
       filters: FILE_FILTERS,
-      defaultPath: `${document.name}.serq.html`,
+      defaultPath: `${workingFolder}/${document.name}.serq.html`,
     })
 
     // User cancelled
@@ -152,6 +165,10 @@ export function useFileOperations(editorRef: RefObject<EditorCoreRef | null>) {
     // Update store with new path/name
     setDocument(filePath, name)
     markSaved()
+
+    // Add to recent files and update working folder
+    await addRecentFile(filePath, name)
+    await updateWorkingFolderFromFile(filePath)
 
     return filePath
   }, [document.name, editorRef, setDocument, markSaved])
