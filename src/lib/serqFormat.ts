@@ -16,8 +16,23 @@ export interface SerqMetadata {
   presets?: {
     typography?: string
     colors?: string
+    canvas?: string
     layout?: string
+    masterTheme?: string | null
+    themeMode?: 'light' | 'dark' | 'system'
   }
+}
+
+/**
+ * Style metadata for serialization
+ */
+export interface StyleMetadataInput {
+  typography: string
+  colors: string
+  canvas: string
+  layout: string
+  masterTheme: string | null
+  themeMode: 'light' | 'dark' | 'system'
 }
 
 /**
@@ -110,11 +125,13 @@ function getBaseStyles(): string {
  *
  * @param html - The HTML content from the TipTap editor
  * @param documentMeta - Document information (name and optional path)
+ * @param styleMetadata - Optional style preset information to persist
  * @returns A complete HTML document string
  */
 export function serializeSerqDocument(
   html: string,
-  documentMeta: { name: string; path?: string | null }
+  documentMeta: { name: string; path?: string | null },
+  styleMetadata?: StyleMetadataInput
 ): string {
   const now = new Date().toISOString()
 
@@ -123,7 +140,16 @@ export function serializeSerqDocument(
     created: now,
     modified: now,
     wordCount: countWords(html),
-    presets: undefined,
+    presets: styleMetadata
+      ? {
+          typography: styleMetadata.typography,
+          colors: styleMetadata.colors,
+          canvas: styleMetadata.canvas,
+          layout: styleMetadata.layout,
+          masterTheme: styleMetadata.masterTheme,
+          themeMode: styleMetadata.themeMode,
+        }
+      : undefined,
   }
 
   const escapedMetadata = escapeScriptClose(JSON.stringify(metadata, null, 2))
@@ -202,16 +228,32 @@ export function parseSerqDocument(content: string): {
  *
  * @param content - The existing document content
  * @param newHtml - The updated HTML content
+ * @param styleMetadata - Optional new style metadata (if not provided, preserves existing)
  * @returns Updated document string
  */
-export function updateSerqDocument(content: string, newHtml: string): string {
+export function updateSerqDocument(
+  content: string,
+  newHtml: string,
+  styleMetadata?: StyleMetadataInput
+): string {
   const { metadata } = parseSerqDocument(content)
 
   // Preserve created timestamp, update modified
+  // Update presets if new style metadata provided, otherwise preserve existing
   const updatedMetadata: SerqMetadata = {
     ...metadata,
     modified: new Date().toISOString(),
     wordCount: countWords(newHtml),
+    presets: styleMetadata
+      ? {
+          typography: styleMetadata.typography,
+          colors: styleMetadata.colors,
+          canvas: styleMetadata.canvas,
+          layout: styleMetadata.layout,
+          masterTheme: styleMetadata.masterTheme,
+          themeMode: styleMetadata.themeMode,
+        }
+      : metadata.presets,
   }
 
   // Extract title from existing document
