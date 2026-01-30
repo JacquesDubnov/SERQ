@@ -1,0 +1,331 @@
+/* ========================================
+   SERQ Theme System - CSS Custom Properties
+   Phase 3: Style System Foundation
+   ======================================== */
+
+:root {
+  /* ========================================
+     Typography Variables
+     Used by all 23 typography presets
+     ======================================== */
+
+  /* Font families */
+  --font-body: Georgia, "Times New Roman", serif;
+  --font-heading: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Font sizes */
+  --font-size-base: 16px;
+  --font-size-h1: 2rem;
+  --font-size-h2: 1.5rem;
+  --font-size-h3: 1.25rem;
+  --font-size-small: 0.875rem;
+  --font-size-code: 0.875em;
+
+  /* Line heights */
+  --line-height-body: 1.6;
+  --line-height-heading: 1.2;
+  --line-height-tight: 1.3;
+  --line-height-relaxed: 1.75;
+
+  /* Letter spacing */
+  --letter-spacing-body: 0;
+  --letter-spacing-heading: -0.02em;
+  --letter-spacing-wide: 0.025em;
+
+  /* Font weights */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* ========================================
+     Color Variables - Light Mode (Default)
+     ======================================== */
+
+  /* Text colors */
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #4b5563;
+  --color-text-muted: #9ca3af;
+  --color-text-inverted: #ffffff;
+
+  /* Background colors */
+  --color-bg-page: #fafafa;
+  --color-bg-canvas: #ffffff;
+  --color-bg-surface: #f3f4f6;
+  --color-bg-elevated: #ffffff;
+
+  /* Accent colors */
+  --color-accent: #2563eb;
+  --color-accent-hover: #1d4ed8;
+  --color-accent-light: #dbeafe;
+
+  /* Border colors */
+  --color-border: #e5e7eb;
+  --color-border-strong: #d1d5db;
+  --color-border-focus: #2563eb;
+
+  /* Semantic colors */
+  --color-highlight: #fef08a;
+  --color-link: #2563eb;
+  --color-link-hover: #1d4ed8;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+
+  /* Code colors */
+  --color-code-bg: #f3f4f6;
+  --color-code-text: #1a1a1a;
+  --color-code-block-bg: #1e1e1e;
+  --color-code-block-text: #f8f8f2;
+
+  /* Quote colors */
+  --color-blockquote-border: #d1d5db;
+  --color-blockquote-text: #4b5563;
+
+  /* Selection */
+  --color-selection: #dbeafe;
+
+  /* ========================================
+     Canvas Background Variables
+     Supports solid, gradient, and pattern backgrounds
+     ======================================== */
+
+  --canvas-bg-color: var(--color-bg-canvas);
+  --canvas-bg-image: none;
+  --canvas-bg-size: auto;
+  --canvas-bg-position: center;
+  --canvas-bg-repeat: no-repeat;
+  --canvas-bg-attachment: scroll;
+
+  /* Canvas opacity for layered effects */
+  --canvas-bg-opacity: 1;
+
+  /* ========================================
+     Layout Variables
+     Used by all 25 layout presets
+     ======================================== */
+
+  /* Text alignment and spacing */
+  --layout-text-align: left;
+  --layout-paragraph-spacing: 1rem;
+  --layout-paragraph-indent: 0;
+  --layout-line-spacing: 1.6;
+
+  /* Page margins */
+  --layout-margin-top: 2rem;
+  --layout-margin-bottom: 2rem;
+  --layout-margin-left: 2rem;
+  --layout-margin-right: 2rem;
+
+  /* Page dimensions */
+  --layout-page-max-width: 720px;
+  --layout-page-padding: 1.5rem;
+
+  /* List styling */
+  --layout-list-indent: 1.5rem;
+  --layout-list-marker-spacing: 0.5rem;
+
+  /* Block element spacing */
+  --layout-blockquote-indent: 1rem;
+  --layout-blockquote-padding: 1rem;
+  --layout-heading-margin-top: 1.5em;
+  --layout-heading-margin-bottom: 0.5em;
+
+  /* Code block spacing */
+  --layout-code-padding: 1rem;
+  --layout-code-border-radius: 0.5rem;
+
+  /* Horizontal rule */
+  --layout-hr-margin: 1.5rem;
+
+  /* ========================================
+     Canvas Width Presets (from Phase 1)
+     ======================================== */
+
+  --canvas-width-narrow: 576px;
+  --canvas-width-normal: 768px;
+  --canvas-width-wide: 1024px;
+  --canvas-width-full: 100%;
+}
+
+/* ========================================
+   Dark Mode Overrides
+   Applied via data-theme="dark" on :root
+   ======================================== */
+
+:root[data-theme="dark"] {
+  /* Text colors */
+  --color-text-primary: #f5f5f5;
+  --color-text-secondary: #a1a1aa;
+  --color-text-muted: #71717a;
+  --color-text-inverted: #1a1a1a;
+
+  /* Background colors */
+  --color-bg-page: #0a0a0a;
+  --color-bg-canvas: #171717;
+  --color-bg-surface: #262626;
+  --color-bg-elevated: #1f1f1f;
+
+  /* Accent colors */
+  --color-accent: #3b82f6;
+  --color-accent-hover: #60a5fa;
+  --color-accent-light: #1e3a5f;
+
+  /* Border colors */
+  --color-border: #3f3f46;
+  --color-border-strong: #52525b;
+  --color-border-focus: #3b82f6;
+
+  /* Semantic colors */
+  --color-highlight: #854d0e;
+  --color-link: #60a5fa;
+  --color-link-hover: #93c5fd;
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-error: #f87171;
+
+  /* Code colors */
+  --color-code-bg: #262626;
+  --color-code-text: #f5f5f5;
+  --color-code-block-bg: #1e1e1e;
+  --color-code-block-text: #f8f8f2;
+
+  /* Quote colors */
+  --color-blockquote-border: #52525b;
+  --color-blockquote-text: #a1a1aa;
+
+  /* Selection */
+  --color-selection: #1e3a5f;
+
+  /* Canvas default for dark mode */
+  --canvas-bg-color: var(--color-bg-canvas);
+}
+
+/* ========================================
+   Theme Transition (smooth mode switching)
+   ======================================== */
+
+:root {
+  color-scheme: light dark;
+}
+
+/* Apply CSS variables to base elements */
+body {
+  background-color: var(--color-bg-page);
+  color: var(--color-text-primary);
+}
+
+/* ========================================
+   Editor Integration
+   Apply theme variables to editor content
+   ======================================== */
+
+.editor-content .tiptap {
+  font-family: var(--font-body);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-body);
+  letter-spacing: var(--letter-spacing-body);
+  color: var(--color-text-primary);
+  text-align: var(--layout-text-align);
+}
+
+.editor-content .tiptap h1,
+.editor-content .tiptap h2,
+.editor-content .tiptap h3 {
+  font-family: var(--font-heading);
+  line-height: var(--line-height-heading);
+  letter-spacing: var(--letter-spacing-heading);
+  margin-top: var(--layout-heading-margin-top);
+  margin-bottom: var(--layout-heading-margin-bottom);
+}
+
+.editor-content .tiptap h1 {
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-bold);
+}
+
+.editor-content .tiptap h2 {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-semibold);
+}
+
+.editor-content .tiptap h3 {
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-semibold);
+}
+
+.editor-content .tiptap p {
+  color: var(--color-text-primary);
+  margin-bottom: var(--layout-paragraph-spacing);
+  text-indent: var(--layout-paragraph-indent);
+}
+
+/* Code styling with variables */
+.editor-content .tiptap code {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-code);
+  background-color: var(--color-code-bg);
+  color: var(--color-code-text);
+}
+
+.editor-content .tiptap pre {
+  background-color: var(--color-code-block-bg);
+  color: var(--color-code-block-text);
+  padding: var(--layout-code-padding);
+  border-radius: var(--layout-code-border-radius);
+}
+
+/* Lists with layout variables */
+.editor-content .tiptap ul,
+.editor-content .tiptap ol {
+  padding-left: var(--layout-list-indent);
+}
+
+/* Blockquote with variables */
+.editor-content .tiptap blockquote {
+  border-left: 3px solid var(--color-blockquote-border);
+  padding-left: var(--layout-blockquote-padding);
+  margin-left: var(--layout-blockquote-indent);
+  color: var(--color-blockquote-text);
+}
+
+/* Links */
+.editor-content .tiptap a {
+  color: var(--color-link);
+}
+
+.editor-content .tiptap a:hover {
+  color: var(--color-link-hover);
+}
+
+/* Highlight */
+.editor-content .tiptap mark {
+  background-color: var(--color-highlight);
+}
+
+/* Horizontal rule */
+.editor-content .tiptap hr {
+  border-color: var(--color-border);
+  margin: var(--layout-hr-margin) 0;
+}
+
+/* Selection */
+.editor-content .tiptap ::selection {
+  background-color: var(--color-selection);
+}
+
+/* Placeholder */
+.editor-content .tiptap p.is-editor-empty:first-child::before {
+  color: var(--color-text-muted);
+}
+
+/* Canvas background application */
+.canvas-container {
+  background-color: var(--canvas-bg-color);
+  background-image: var(--canvas-bg-image);
+  background-size: var(--canvas-bg-size);
+  background-position: var(--canvas-bg-position);
+  background-repeat: var(--canvas-bg-repeat);
+  background-attachment: var(--canvas-bg-attachment);
+}
