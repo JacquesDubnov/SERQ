@@ -5,42 +5,33 @@
 See: .planning/PROJECT.md (updated 2026-01-30)
 
 **Core value:** Documents that work everywhere, created by writers who write - not format.
-**Current focus:** Phase 1 - Editor Foundation
+**Current focus:** Phase 2 - File Management
 
 ## Current Position
 
-Phase: 1 of 6 (Editor Foundation)
-Plan: 3 of 4 in current phase
-Status: In progress
-Last activity: 2026-01-30 - Completed 01-03-PLAN.md
+Phase: 2 of 6 (File Management)
+Plan: 0 of TBD in current phase
+Status: Ready to plan
+Last activity: 2026-01-30 - Phase 1 complete (human verified)
 
-Progress: [███░░░░░░░] 30%
+Progress: [██░░░░░░░░] 17% (1/6 phases)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
-- Average duration: 4.7m
-- Total execution time: 0.23 hours
+- Total plans completed: 4
+- Total execution time: ~1 hour (including click-anywhere debugging)
 
 **By Phase:**
 
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 1 | 3 | 14m | 4.7m |
-
-**Recent Trend:**
-- Last 5 plans: 01-01 (9m), 01-02 (2m), 01-03 (3m)
-- Trend: accelerating
-
-*Updated after each plan completion*
+| Phase | Plans | Status |
+|-------|-------|--------|
+| 1. Editor Foundation | 4/4 | Complete |
+| 2. File Management | 0/? | Not started |
 
 ## Accumulated Context
 
 ### Decisions
-
-Decisions are logged in PROJECT.md Key Decisions table.
-Recent decisions affecting current work:
 
 | ID | Decision | Rationale |
 |----|----------|-----------|
@@ -49,28 +40,49 @@ Recent decisions affecting current work:
 | D-01-02-001 | useEditorState with selector pattern | Prevents re-render avalanche on every transaction |
 | D-01-02-002 | setTimeout for editor ref access | Editor ref set asynchronously after mount |
 | D-01-03-001 | CSS custom properties for canvas widths | Future theming support in Phase 3 |
-| D-01-03-002 | Click target check in EditorWrapper | Avoid interfering with content clicks |
+| D-01-04-001 | Document-level click listener with capture | Required to intercept clicks before ProseMirror |
+| D-01-04-002 | Coordinate-based click detection | Padding clicks still target contenteditable element |
+| D-01-04-003 | Insert paragraphs via insertContentAt | createParagraphNear doesn't create multiple paragraphs reliably |
+
+### Technical Patterns Established
+
+**Click-Anywhere Implementation:**
+```typescript
+// Document-level listener (capture phase)
+document.addEventListener('click', handler, true)
+
+// Coordinate-based detection for clicks below content
+const contentElements = proseMirror.querySelectorAll('p, h1, h2, ...')
+const contentBottom = lastElement.getBoundingClientRect().bottom
+
+// Insert paragraphs to reach click position
+const paragraphs = Array(count).fill({ type: 'paragraph' })
+editor.chain().insertContentAt(endPos, paragraphs).focus('end').run()
+```
+
+### Design Reference
+
+See `.planning/DESIGN-REFERENCE.md` for UI/UX inspiration from:
+- iA Writer (radical simplicity, typography as UI)
+- Minimal | Writing + Notes (meditation-inspired, single focus)
 
 ### Pending Todos
 
-None yet.
+None.
 
 ### Blockers/Concerns
 
-**From Research (addressed in 01-01):**
-- Memory leak prevention: Single editor instance pattern required - DONE (EditorCore uses forwardRef pattern)
-- Re-render avalanche: `shouldRerenderOnTransaction: false` required - DONE
-- Schema validation: `enableContentCheck: true` required - DONE
-- Tauri permissions: `$HOME/**` access required before file code - PENDING (Phase 1 Plan 4)
-
-**Environment:**
-- Rust not installed in execution environment - full Tauri dev requires manual Rust installation
+**For Phase 2:**
+- Tauri permissions: `$HOME/**` access required before writing file code
+- Test production build early (dev mode more permissive than release)
+- Rust installation required for full Tauri dev
 
 ## Session Continuity
 
-Last session: 2026-01-30 02:48 UTC
-Stopped at: Completed 01-03-PLAN.md
-Resume file: .planning/phases/01-editor-foundation/01-04-PLAN.md
+Last session: 2026-01-30
+Stopped at: Phase 1 complete, ready for Phase 2 planning
+Resume file: None
 
 ---
 *State updated: 2026-01-30*
+*Phase 1 complete: 2026-01-30 (human verified)*
