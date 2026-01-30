@@ -10,24 +10,24 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 2 of 6 (File Management)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-01-30 - Phase 1 complete (human verified)
+Plan: 1 of 4 in current phase
+Status: In progress
+Last activity: 2026-01-30 - Completed 02-01-PLAN.md
 
-Progress: [██░░░░░░░░] 17% (1/6 phases)
+Progress: [███░░░░░░░] 25% (5/20 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
-- Total execution time: ~1 hour (including click-anywhere debugging)
+- Total plans completed: 5
+- Total execution time: ~1 hour 6 min
 
 **By Phase:**
 
 | Phase | Plans | Status |
 |-------|-------|--------|
 | 1. Editor Foundation | 4/4 | Complete |
-| 2. File Management | 0/? | Not started |
+| 2. File Management | 1/4 | In progress |
 
 ## Accumulated Context
 
@@ -43,6 +43,11 @@ Progress: [██░░░░░░░░] 17% (1/6 phases)
 | D-01-04-001 | Document-level click listener with capture | Required to intercept clicks before ProseMirror |
 | D-01-04-002 | Coordinate-based click detection | Padding clicks still target contenteditable element |
 | D-01-04-003 | Insert paragraphs via insertContentAt | createParagraphNear doesn't create multiple paragraphs reliably |
+| D-02-01-001 | Install Rust 1.93.0 toolchain | Required for tauri add CLI commands |
+| D-02-01-002 | Explicit fs:allow-read/write/exists/stat permissions | Production safety - dev mode more permissive than release |
+| D-02-01-003 | Scope FS permissions to $HOME/** | Allow saving anywhere in user home directory |
+| D-02-01-004 | Embed metadata as JSON in script tag | .serq.html format - valid HTML + machine-readable metadata |
+| D-02-01-005 | Escape </script> as <\\/script> in JSON | Prevent HTML structure breaks in serialized content |
 
 ### Technical Patterns Established
 
@@ -60,6 +65,25 @@ const paragraphs = Array(count).fill({ type: 'paragraph' })
 editor.chain().insertContentAt(endPos, paragraphs).focus('end').run()
 ```
 
+**Tauri Plugin Registration:**
+```rust
+tauri::Builder::default()
+    .plugin(tauri_plugin_store::Builder::new().build())
+    .plugin(tauri_plugin_dialog::init())
+    .plugin(tauri_plugin_fs::init())
+    .plugin(tauri_plugin_shell::init())
+```
+
+**.serq.html Format:**
+```html
+<script type="application/json" id="serq-metadata">
+{ "version": "1.0", "created": "...", "modified": "...", "wordCount": N }
+</script>
+<body class="serq-document">
+  <!-- TipTap HTML content -->
+</body>
+```
+
 ### Design Reference
 
 See `.planning/DESIGN-REFERENCE.md` for UI/UX inspiration from:
@@ -72,17 +96,20 @@ None.
 
 ### Blockers/Concerns
 
-**For Phase 2:**
-- Tauri permissions: `$HOME/**` access required before writing file code
+**Resolved in 02-01:**
+- [x] Tauri permissions: `$HOME/**` access configured
+- [x] Rust installation: Rust 1.93.0 installed
+
+**Remaining for Phase 2:**
 - Test production build early (dev mode more permissive than release)
-- Rust installation required for full Tauri dev
 
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Phase 1 complete, ready for Phase 2 planning
-Resume file: None
+Stopped at: Completed 02-01-PLAN.md (Tauri Plugins & File Permissions)
+Resume file: None - ready for 02-02-PLAN.md
 
 ---
 *State updated: 2026-01-30*
 *Phase 1 complete: 2026-01-30 (human verified)*
+*Plan 02-01 complete: 2026-01-30*
