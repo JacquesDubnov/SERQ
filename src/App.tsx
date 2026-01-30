@@ -2,7 +2,20 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { EditorCore, EditorToolbar, EditorWrapper, type EditorCoreRef } from './components/Editor';
 import { Canvas, type CanvasWidth } from './components/Layout';
 import { useEditorStore } from './stores';
+import { useKeyboardShortcuts, useAutoSave } from './hooks';
 import type { Editor, JSONContent } from '@tiptap/core';
+
+/**
+ * Format a Date object as a relative time string
+ * e.g., "just now", "5m ago", "2h ago"
+ */
+function formatRelativeTime(date: Date): string {
+  const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000)
+  if (seconds < 60) return 'just now'
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
+  return date.toLocaleDateString()
+}
 
 function App() {
   const editorRef = useRef<EditorCoreRef>(null);
@@ -13,6 +26,12 @@ function App() {
   const canvasWidth = useEditorStore((state) => state.canvasWidth);
   const setCanvasWidth = useEditorStore((state) => state.setCanvasWidth);
   const markDirty = useEditorStore((state) => state.markDirty);
+
+  // Initialize keyboard shortcuts (Cmd+S, Cmd+Shift+S, Cmd+O, Cmd+N)
+  useKeyboardShortcuts(editorRef);
+
+  // Initialize auto-save (30-second debounce for existing files)
+  useAutoSave(editorRef, true);
 
   // Get editor instance after mount
   useEffect(() => {
@@ -44,11 +63,16 @@ function App() {
         <div className="flex items-center gap-4">
           <span className="text-lg font-semibold text-gray-900">SERQ</span>
           <div className="h-4 w-px bg-gray-300" />
-          <div className="flex items-center">
+          <div className="flex items-center gap-2">
             {document.isDirty && (
-              <span className="text-orange-500 text-lg mr-1.5" title="Unsaved changes">•</span>
+              <span className="text-orange-500 text-lg" title="Unsaved changes">•</span>
             )}
             <span className="text-sm text-gray-600">{document.name}</span>
+            {document.lastSaved && !document.isDirty && (
+              <span className="text-xs text-gray-400">
+                Saved {formatRelativeTime(document.lastSaved)}
+              </span>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-2">

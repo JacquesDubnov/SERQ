@@ -7,15 +7,19 @@ interface DocumentMeta {
   lastSaved: Date | null    // Timestamp of last save
 }
 
+type AutoSaveStatus = 'idle' | 'saving' | 'saved' | 'error'
+
 interface EditorState {
   document: DocumentMeta
   canvasWidth: 'narrow' | 'normal' | 'wide' | 'full'
+  autoSaveStatus: AutoSaveStatus
 
   setDocument: (path: string | null, name: string) => void
   markDirty: () => void
   markSaved: () => void
   clearDocument: () => void
   setCanvasWidth: (width: 'narrow' | 'normal' | 'wide' | 'full') => void
+  setAutoSaveStatus: (status: AutoSaveStatus) => void
 }
 
 export const useEditorStore = create<EditorState>((set) => ({
@@ -26,6 +30,7 @@ export const useEditorStore = create<EditorState>((set) => ({
     lastSaved: null,
   },
   canvasWidth: 'normal',
+  autoSaveStatus: 'idle',
 
   setDocument: (path, name) => set({
     document: { path, name, isDirty: false, lastSaved: null }
@@ -48,8 +53,10 @@ export const useEditorStore = create<EditorState>((set) => ({
   }),
 
   setCanvasWidth: (width) => set({ canvasWidth: width }),
+
+  setAutoSaveStatus: (status) => set({ autoSaveStatus: status }),
 }))
 
 // Export types for external use
-export type { DocumentMeta, EditorState }
+export type { DocumentMeta, EditorState, AutoSaveStatus }
 export type CanvasWidth = EditorState['canvasWidth']
