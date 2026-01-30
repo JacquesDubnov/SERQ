@@ -13,7 +13,7 @@ SERQ ships in 6 phases over 2 weeks. Phase 1 establishes the critical foundation
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Editor Foundation** - TipTap + Tauri scaffold with critical performance patterns
-- [ ] **Phase 2: File Management** - Native dialogs, .serq.html format, auto-save
+- [x] **Phase 2: File Management** - Native dialogs, .serq.html format, auto-save
 - [ ] **Phase 3: Style System** - CSS variables, presets, theme switching
 - [ ] **Phase 4: Extended Features** - Tables, custom blocks, media, commands
 - [ ] **Phase 5: Polish** - Version history, comments, export, UI panels
@@ -60,10 +60,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — Tauri plugins (fs, dialog, store), permissions config, .serq.html format
-- [ ] 02-02-PLAN.md — File operations hook and keyboard shortcuts (Cmd+S/Shift+S/O/N)
-- [ ] 02-03-PLAN.md — Auto-save with 30-second debounce and recent files persistence
-- [ ] 02-04-PLAN.md — UI integration and human verification of all success criteria
+- [x] 02-01-PLAN.md — Tauri plugins (fs, dialog, store), permissions config, .serq.html format
+- [x] 02-02-PLAN.md — File operations hook and keyboard shortcuts (Cmd+S/Shift+S/O/N)
+- [x] 02-03-PLAN.md — Auto-save with 30-second debounce and recent files persistence
+- [x] 02-04-PLAN.md — UI integration and human verification of all success criteria
 
 **Critical Research Constraints:**
 - MUST configure Tauri permissions for `$HOME/**` (not just AppData) before writing file code
@@ -176,7 +176,7 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Editor Foundation | 4/4 | Complete | 2026-01-30 |
-| 2. File Management | 0/4 | Planned | - |
+| 2. File Management | 4/4 | Complete | 2026-01-30 |
 | 3. Style System | 0/2 | Not started | - |
 | 4. Extended Features | 0/3 | Not started | - |
 | 5. Polish | 0/3 | Not started | - |
@@ -187,5 +187,6 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6
 *Phase 1 planned: 2026-01-30*
 *Phase 1 complete: 2026-01-30*
 *Phase 2 planned: 2026-01-30*
+*Phase 2 complete: 2026-01-30*
 *Depth: comprehensive*
 *Coverage: 99/99 v1 requirements mapped*
