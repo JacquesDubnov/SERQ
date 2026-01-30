@@ -193,3 +193,79 @@
 .editor-content .tiptap ::selection {
   background-color: #dbeafe;
 }
+
+/* ========================================
+   Canvas Layout System
+   ======================================== */
+
+/* Canvas width CSS custom properties for theme system (Phase 3) */
+:root {
+  --canvas-width-narrow: 576px;
+  --canvas-width-normal: 768px;
+  --canvas-width-wide: 1024px;
+  --canvas-width-full: 100%;
+}
+
+.canvas-container {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.canvas-content {
+  padding-left: max(1rem, env(safe-area-inset-left, 1rem));
+  padding-right: max(1rem, env(safe-area-inset-right, 1rem));
+}
+
+/* Click-anywhere wrapper - enables clicking empty space to place cursor */
+.click-anywhere-wrapper {
+  min-height: calc(100vh - 4rem);
+  cursor: text;
+}
+
+.click-anywhere-wrapper .tiptap {
+  cursor: auto;
+}
+
+/* ========================================
+   Responsive Breakpoints
+   ======================================== */
+
+@media (max-width: 640px) {
+  .canvas-content {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .editor-content .tiptap h1 {
+    font-size: 1.75rem;
+  }
+
+  .editor-content .tiptap h2 {
+    font-size: 1.375rem;
+  }
+}
+
+/* ========================================
+   Print Styles
+   ======================================== */
+
+@media print {
+  .canvas-container {
+    overflow: visible;
+  }
+
+  .editor-content .tiptap {
+    page-break-inside: auto;
+  }
+
+  .editor-content .tiptap h1,
+  .editor-content .tiptap h2,
+  .editor-content .tiptap h3 {
+    page-break-after: avoid;
+  }
+
+  .editor-content .tiptap p {
+    orphans: 3;
+    widows: 3;
+  }
+}
