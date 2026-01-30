@@ -47,26 +47,42 @@ export function useAutoSave(
   const markSaved = useEditorStore((state) => state.markSaved)
   const lastSaveRef = useRef<Date | null>(null)
 
+  // Use ref to always get current document state in debounced callback
+  // This prevents stale closure issues where the callback captures old values
+  const documentRef = useRef(document)
+  useEffect(() => {
+    documentRef.current = document
+  }, [document])
+
   const performAutoSave = useDebouncedCallback(
     async () => {
+      // Get CURRENT document state from ref (not stale closure)
+      const currentDoc = documentRef.current
+
       // Guard conditions - don't auto-save if:
       // 1. No file path (new document, use Save As instead)
       // 2. Document isn't dirty (nothing to save)
       // 3. Editor ref isn't available
-      if (!document.path || !document.isDirty) {
+      if (!currentDoc.path || !currentDoc.isDirty) {
+        console.log('[AutoSave] Skipped - no path or not dirty', {
+          path: currentDoc.path,
+          isDirty: currentDoc.isDirty,
+        })
         return
       }
       if (!editorRef.current) {
+        console.log('[AutoSave] Skipped - no editor ref')
         return
       }
 
       try {
+        console.log('[AutoSave] Starting save...')
         const html = editorRef.current.getHTML()
         const content = serializeSerqDocument(html, {
-          name: document.name,
-          path: document.path,
+          name: currentDoc.name,
+          path: currentDoc.path,
         })
-        await writeTextFile(document.path, content)
+        await writeTextFile(currentDoc.path, content)
 
         markSaved()
         lastSaveRef.current = new Date()
@@ -83,6 +99,7 @@ export function useAutoSave(
   // Trigger auto-save when document becomes dirty
   useEffect(() => {
     if (enabled && document.isDirty && document.path) {
+      console.log('[AutoSave] Document dirty, scheduling save in 30s...')
       performAutoSave()
     }
   }, [document.isDirty, document.path, enabled, performAutoSave])
