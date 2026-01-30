@@ -1,5 +1,6 @@
 import { useEditorState } from '@tiptap/react';
 import type { Editor } from '@tiptap/core';
+import { FormatPainter } from '../FormatPainter';
 
 interface ToolbarProps {
   editor: Editor;
@@ -241,6 +242,11 @@ export function EditorToolbar({ editor }: ToolbarProps) {
       >
         Justify
       </ToolbarButton>
+
+      <Divider />
+
+      {/* Format Painter */}
+      <FormatPainter editor={editor} />
     </div>
   );
 }
