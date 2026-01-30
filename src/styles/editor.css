@@ -1,8 +1,5 @@
-/* Editor wrapper */
+/* Editor wrapper - natural height, don't expand to fill parent */
 .editor-wrapper {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
   width: 100%;
 }
 
@@ -15,8 +12,9 @@
 /* ProseMirror editor styling */
 .editor-content .tiptap {
   outline: none;
-  min-height: 100%;
   padding: 1rem;
+  padding-bottom: 50vh; /* Large bottom padding for click-anywhere */
+  min-height: calc(100vh - 12rem);
 }
 
 /* Prose typography */
@@ -219,11 +217,12 @@
 /* Click-anywhere wrapper - enables clicking empty space to place cursor */
 .click-anywhere-wrapper {
   min-height: calc(100vh - 4rem);
-  cursor: text;
 }
 
+/* Editor content should NOT expand - stays natural height */
 .click-anywhere-wrapper .tiptap {
   cursor: auto;
+  min-height: auto !important; /* Override any min-height that would make it expand */
 }
 
 /* ========================================
