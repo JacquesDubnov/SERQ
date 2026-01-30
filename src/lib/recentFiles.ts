@@ -41,24 +41,30 @@ export async function getRecentFiles(): Promise<RecentFile[]> {
  * @param name - Display name for the file
  */
 export async function addRecentFile(path: string, name: string): Promise<void> {
-  const store = await getPreferencesStore()
-  let files = await getRecentFiles()
+  try {
+    const store = await getPreferencesStore()
+    let files = await getRecentFiles()
 
-  // Remove if already exists (will re-add at top)
-  files = files.filter((f) => f.path !== path)
+    // Remove if already exists (will re-add at top)
+    files = files.filter((f) => f.path !== path)
 
-  // Add to front of list
-  files.unshift({
-    path,
-    name,
-    lastOpened: new Date().toISOString(),
-  })
+    // Add to front of list
+    files.unshift({
+      path,
+      name,
+      lastOpened: new Date().toISOString(),
+    })
 
-  // Trim to max (FIFO - oldest falls off)
-  files = files.slice(0, MAX_RECENT_FILES)
+    // Trim to max (FIFO - oldest falls off)
+    files = files.slice(0, MAX_RECENT_FILES)
 
-  await store.set('recentFiles', files)
-  await store.save()
+    await store.set('recentFiles', files)
+    await store.save()
+    console.log('[RecentFiles] Added:', name)
+  } catch (error) {
+    console.error('[RecentFiles] Failed to add:', error)
+    // Don't re-throw - recent files is non-critical
+  }
 }
 
 /**

@@ -11,11 +11,15 @@ import { getPreferencesStore } from './preferencesStore'
  * @returns Path to the working folder
  */
 export async function getWorkingFolder(): Promise<string> {
-  const store = await getPreferencesStore()
-  const folder = await store.get<string>('workingFolder')
+  try {
+    const store = await getPreferencesStore()
+    const folder = await store.get<string>('workingFolder')
 
-  if (folder) {
-    return folder
+    if (folder) {
+      return folder
+    }
+  } catch (error) {
+    console.error('[WorkingFolder] Failed to get:', error)
   }
 
   // Default to home directory if not configured
@@ -32,9 +36,14 @@ export async function getWorkingFolder(): Promise<string> {
  * @param path - Directory path to set as working folder
  */
 export async function setWorkingFolder(path: string): Promise<void> {
-  const store = await getPreferencesStore()
-  await store.set('workingFolder', path)
-  await store.save()
+  try {
+    const store = await getPreferencesStore()
+    await store.set('workingFolder', path)
+    await store.save()
+  } catch (error) {
+    console.error('[WorkingFolder] Failed to set:', error)
+    // Non-critical, don't re-throw
+  }
 }
 
 /**

@@ -63,20 +63,12 @@ export function useAutoSave(
       // 1. No file path (new document, use Save As instead)
       // 2. Document isn't dirty (nothing to save)
       // 3. Editor ref isn't available
-      if (!currentDoc.path || !currentDoc.isDirty) {
-        console.log('[AutoSave] Skipped - no path or not dirty', {
-          path: currentDoc.path,
-          isDirty: currentDoc.isDirty,
-        })
-        return
-      }
-      if (!editorRef.current) {
-        console.log('[AutoSave] Skipped - no editor ref')
+      if (!currentDoc.path || !currentDoc.isDirty || !editorRef.current) {
         return
       }
 
       try {
-        console.log('[AutoSave] Starting save...')
+        console.log('[AutoSave] Saving:', currentDoc.path)
         const html = editorRef.current.getHTML()
         const content = serializeSerqDocument(html, {
           name: currentDoc.name,
@@ -86,7 +78,7 @@ export function useAutoSave(
 
         markSaved()
         lastSaveRef.current = new Date()
-        console.log('[AutoSave] Document saved at', lastSaveRef.current.toISOString())
+        console.log('[AutoSave] Saved at', lastSaveRef.current.toISOString())
       } catch (error) {
         console.error('[AutoSave] Failed:', error)
         // Don't mark as saved on error - user will see dirty indicator
@@ -99,7 +91,7 @@ export function useAutoSave(
   // Trigger auto-save when document becomes dirty
   useEffect(() => {
     if (enabled && document.isDirty && document.path) {
-      console.log('[AutoSave] Document dirty, scheduling save in 30s...')
+      console.log('[AutoSave] Scheduling save for:', document.path)
       performAutoSave()
     }
   }, [document.isDirty, document.path, enabled, performAutoSave])

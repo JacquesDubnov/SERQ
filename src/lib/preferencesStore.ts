@@ -21,10 +21,18 @@ let storeInstance: Awaited<ReturnType<typeof load>> | null = null
  */
 export async function getPreferencesStore() {
   if (!storeInstance) {
-    storeInstance = await load(STORE_FILE, {
-      defaults: {},
-      autoSave: false,
-    })
+    try {
+      storeInstance = await load(STORE_FILE, {
+        defaults: {
+          recentFiles: [],
+          workingFolder: null,
+        },
+        autoSave: false,
+      })
+    } catch (error) {
+      console.error('[PreferencesStore] Failed to load:', error)
+      throw error
+    }
   }
   return storeInstance
 }
