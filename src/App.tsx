@@ -1,12 +1,18 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { EditorCore, EditorToolbar, EditorWrapper, type EditorCoreRef } from './components/Editor';
 import { Canvas, type CanvasWidth } from './components/Layout';
+import { useEditorStore } from './stores';
 import type { Editor, JSONContent } from '@tiptap/core';
 
 function App() {
   const editorRef = useRef<EditorCoreRef>(null);
   const [editor, setEditor] = useState<Editor | null>(null);
-  const [canvasWidth, setCanvasWidth] = useState<CanvasWidth>('normal');
+
+  // Zustand store for document state
+  const document = useEditorStore((state) => state.document);
+  const canvasWidth = useEditorStore((state) => state.canvasWidth);
+  const setCanvasWidth = useEditorStore((state) => state.setCanvasWidth);
+  const markDirty = useEditorStore((state) => state.markDirty);
 
   // Get editor instance after mount
   useEffect(() => {
@@ -19,16 +25,32 @@ function App() {
     return () => clearTimeout(timer);
   }, []);
 
+  // Update window title based on document state
+  useEffect(() => {
+    const dirtyIndicator = document.isDirty ? '• ' : '';
+    window.document.title = `${dirtyIndicator}${document.name} - SERQ`;
+  }, [document.name, document.isDirty]);
+
   const handleUpdate = useCallback((content: JSONContent) => {
-    // Content update handler - will be used for autosave in future phases
+    // Mark document as dirty when content changes
+    markDirty();
     console.debug('Editor content updated:', content);
-  }, []);
+  }, [markDirty]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      {/* Header with Title and Width Selector */}
+      {/* Header with Document Title and Width Selector */}
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-xl font-semibold text-gray-900">SERQ</h1>
+        <div className="flex items-center gap-4">
+          <span className="text-lg font-semibold text-gray-900">SERQ</span>
+          <div className="h-4 w-px bg-gray-300" />
+          <div className="flex items-center">
+            {document.isDirty && (
+              <span className="text-orange-500 text-lg mr-1.5" title="Unsaved changes">•</span>
+            )}
+            <span className="text-sm text-gray-600">{document.name}</span>
+          </div>
+        </div>
         <div className="flex items-center gap-2">
           <label htmlFor="canvas-width" className="text-sm text-gray-600">
             Width:
