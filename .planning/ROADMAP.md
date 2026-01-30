@@ -81,16 +81,25 @@ Plans:
   2. User can select from 25 color schemes with light/dark mode support
   3. User can change canvas background (solid, gradient, pattern)
   4. User can copy formatting from one selection and paste to another (format painter)
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
+- [ ] 03-01-PLAN.md — CSS variable foundation, preset data definitions, system theme detection
+- [ ] 03-02-PLAN.md — Style store (Zustand), document style persistence, user defaults
+- [ ] 03-03-PLAN.md — Style panel UI components, format painter hook and button
+- [ ] 03-04-PLAN.md — App integration, editor CSS variables, human verification
 
 **Implementation Notes:**
-- CSS custom properties approach - presets update `:root` variables, no document modification
-- Style changes don't dirty the document (cosmetic, not content)
-- Pre-built preset JSON files already exist in project
+- CSS custom properties approach - presets update `:root` variables
+- Style changes mark document dirty (trigger auto-save)
+- Per-document styles saved in .serq.html metadata
+- Light/dark mode follows macOS system, user can override
+
+**Critical Context Decisions (from 03-CONTEXT.md):**
+- Slide-in panel from right, pushes content (not overlay)
+- Accordion sections (Typography | Colors | Canvas)
+- Document IS the preview - clicking preset instantly updates document
+- Format painter has toggle mode AND hold mode (like Word/Google Docs)
 
 ---
 
@@ -177,7 +186,7 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6
 |-------|----------------|--------|-----------|
 | 1. Editor Foundation | 4/4 | Complete | 2026-01-30 |
 | 2. File Management | 4/4 | Complete | 2026-01-30 |
-| 3. Style System | 0/2 | Not started | - |
+| 3. Style System | 0/4 | Planned | - |
 | 4. Extended Features | 0/3 | Not started | - |
 | 5. Polish | 0/3 | Not started | - |
 | 6. AI Integration | 0/2 | Not started | - |
@@ -188,5 +197,6 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6
 *Phase 1 complete: 2026-01-30*
 *Phase 2 planned: 2026-01-30*
 *Phase 2 complete: 2026-01-30*
+*Phase 3 planned: 2026-01-30*
 *Depth: comprehensive*
 *Coverage: 99/99 v1 requirements mapped*
