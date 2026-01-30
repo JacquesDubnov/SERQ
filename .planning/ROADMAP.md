@@ -57,11 +57,13 @@ Plans:
   3. User can save document with Cmd+S and Save As with Cmd+Shift+S
   4. User sees auto-save indicator and document saves every 30 seconds automatically
   5. User can access recent files list
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
+- [ ] 02-01-PLAN.md — Tauri plugins (fs, dialog, store), permissions config, .serq.html format
+- [ ] 02-02-PLAN.md — File operations hook and keyboard shortcuts (Cmd+S/Shift+S/O/N)
+- [ ] 02-03-PLAN.md — Auto-save with 30-second debounce and recent files persistence
+- [ ] 02-04-PLAN.md — UI integration and human verification of all success criteria
 
 **Critical Research Constraints:**
 - MUST configure Tauri permissions for `$HOME/**` (not just AppData) before writing file code
@@ -174,7 +176,7 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Editor Foundation | 4/4 | Complete | 2026-01-30 |
-| 2. File Management | 0/2 | Not started | - |
+| 2. File Management | 0/4 | Planned | - |
 | 3. Style System | 0/2 | Not started | - |
 | 4. Extended Features | 0/3 | Not started | - |
 | 5. Polish | 0/3 | Not started | - |
@@ -184,5 +186,6 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6
 *Roadmap created: 2026-01-30*
 *Phase 1 planned: 2026-01-30*
 *Phase 1 complete: 2026-01-30*
+*Phase 2 planned: 2026-01-30*
 *Depth: comprehensive*
 *Coverage: 99/99 v1 requirements mapped*
