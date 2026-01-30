@@ -1,15 +1,10 @@
-import { load } from '@tauri-apps/plugin-store'
+import { getPreferencesStore } from './preferencesStore'
 
 /**
  * Maximum number of recent files to track
  * FIFO: oldest entries are removed when limit is exceeded
  */
 const MAX_RECENT_FILES = 10
-
-/**
- * Store file name for preferences persistence
- */
-const STORE_FILE = 'preferences.json'
 
 /**
  * Recent file entry with metadata
@@ -24,31 +19,12 @@ export interface RecentFile {
 }
 
 /**
- * Singleton store instance to avoid repeated file loads
- */
-let storeInstance: Awaited<ReturnType<typeof load>> | null = null
-
-/**
- * Get or create the preferences store instance
- * Uses singleton pattern for performance
- */
-async function getStore() {
-  if (!storeInstance) {
-    storeInstance = await load(STORE_FILE, {
-      defaults: {},
-      autoSave: false,
-    })
-  }
-  return storeInstance
-}
-
-/**
  * Get the list of recently opened files
  *
  * @returns Array of recent files, most recently opened first
  */
 export async function getRecentFiles(): Promise<RecentFile[]> {
-  const store = await getStore()
+  const store = await getPreferencesStore()
   const files = await store.get<RecentFile[]>('recentFiles')
   return files ?? []
 }
@@ -65,7 +41,7 @@ export async function getRecentFiles(): Promise<RecentFile[]> {
  * @param name - Display name for the file
  */
 export async function addRecentFile(path: string, name: string): Promise<void> {
-  const store = await getStore()
+  const store = await getPreferencesStore()
   let files = await getRecentFiles()
 
   // Remove if already exists (will re-add at top)
@@ -90,7 +66,7 @@ export async function addRecentFile(path: string, name: string): Promise<void> {
  * Used for privacy or when resetting app state
  */
 export async function clearRecentFiles(): Promise<void> {
-  const store = await getStore()
+  const store = await getPreferencesStore()
   await store.set('recentFiles', [])
   await store.save()
 }
@@ -102,7 +78,7 @@ export async function clearRecentFiles(): Promise<void> {
  * @param path - Full file path to remove
  */
 export async function removeRecentFile(path: string): Promise<void> {
-  const store = await getStore()
+  const store = await getPreferencesStore()
   let files = await getRecentFiles()
   files = files.filter((f) => f.path !== path)
   await store.set('recentFiles', files)

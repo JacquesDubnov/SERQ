@@ -1,29 +1,5 @@
-import { load } from '@tauri-apps/plugin-store'
 import { homeDir } from '@tauri-apps/api/path'
-
-/**
- * Store file name for preferences persistence
- */
-const STORE_FILE = 'preferences.json'
-
-/**
- * Singleton store instance to avoid repeated file loads
- */
-let storeInstance: Awaited<ReturnType<typeof load>> | null = null
-
-/**
- * Get or create the preferences store instance
- * Uses singleton pattern for performance
- */
-async function getStore() {
-  if (!storeInstance) {
-    storeInstance = await load(STORE_FILE, {
-      defaults: {},
-      autoSave: false,
-    })
-  }
-  return storeInstance
-}
+import { getPreferencesStore } from './preferencesStore'
 
 /**
  * Get the configured working folder for file dialogs
@@ -35,7 +11,7 @@ async function getStore() {
  * @returns Path to the working folder
  */
 export async function getWorkingFolder(): Promise<string> {
-  const store = await getStore()
+  const store = await getPreferencesStore()
   const folder = await store.get<string>('workingFolder')
 
   if (folder) {
@@ -56,7 +32,7 @@ export async function getWorkingFolder(): Promise<string> {
  * @param path - Directory path to set as working folder
  */
 export async function setWorkingFolder(path: string): Promise<void> {
-  const store = await getStore()
+  const store = await getPreferencesStore()
   await store.set('workingFolder', path)
   await store.save()
 }
