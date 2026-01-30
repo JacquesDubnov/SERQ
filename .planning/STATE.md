@@ -10,24 +10,24 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 2 of 6 (File Management)
-Plan: 2 of 4 in current phase
+Plan: 3 of 4 in current phase
 Status: In progress
-Last activity: 2026-01-30 - Completed 02-02-PLAN.md
+Last activity: 2026-01-30 - Completed 02-03-PLAN.md
 
-Progress: [███░░░░░░░] 30% (6/20 plans estimated)
+Progress: [████░░░░░░] 35% (7/20 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
-- Total execution time: ~1 hour 11 min
+- Total plans completed: 7
+- Total execution time: ~1 hour 14 min
 
 **By Phase:**
 
 | Phase | Plans | Status |
 |-------|-------|--------|
 | 1. Editor Foundation | 4/4 | Complete |
-| 2. File Management | 2/4 | In progress |
+| 2. File Management | 3/4 | In progress |
 
 ## Accumulated Context
 
@@ -51,6 +51,10 @@ Progress: [███░░░░░░░] 30% (6/20 plans estimated)
 | D-02-02-001 | saveFile delegates to saveFileAs when no path | New documents without path trigger Save As dialog |
 | D-02-02-002 | Both meta+key and ctrl+key registered | Cross-platform keyboard shortcut support |
 | D-02-02-003 | enableOnContentEditable for all shortcuts | Shortcuts work inside TipTap editor |
+| D-02-03-001 | 30-second debounce with 60-second maxWait | Balance between data safety and disk wear |
+| D-02-03-002 | Singleton store pattern for preferences | Avoid repeated file loads by caching store instance |
+| D-02-03-003 | preferences.json as shared store file | Single file for all app preferences |
+| D-02-03-004 | tauri-plugin-store defaults property required | API requires {defaults: {}} even for empty defaults |
 
 ### Technical Patterns Established
 
@@ -96,6 +100,28 @@ const { openFile, saveFile, saveFileAs, newFile } = useFileOperations(editorRef)
 useKeyboardShortcuts(editorRef) // Registers Cmd+S/Shift+S/O/N
 ```
 
+**Auto-Save Pattern:**
+```typescript
+// 30-second debounce, 60-second maxWait
+const performAutoSave = useDebouncedCallback(async () => {
+  if (!document.path || !document.isDirty) return  // Guard conditions
+  const html = editorRef.current?.getHTML()
+  await writeTextFile(document.path, serializeSerqDocument(html, document))
+  markSaved()
+}, 30000, { maxWait: 60000 })
+```
+
+**Store Singleton Pattern:**
+```typescript
+let storeInstance: Awaited<ReturnType<typeof load>> | null = null
+async function getStore() {
+  if (!storeInstance) {
+    storeInstance = await load('preferences.json', { defaults: {}, autoSave: false })
+  }
+  return storeInstance
+}
+```
+
 ### Design Reference
 
 See `.planning/DESIGN-REFERENCE.md` for UI/UX inspiration from:
@@ -118,11 +144,12 @@ None.
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Completed 02-02-PLAN.md (File Operations Hooks)
-Resume file: None - ready for 02-03-PLAN.md
+Stopped at: Completed 02-03-PLAN.md (Persistence & Preferences)
+Resume file: None - ready for 02-04-PLAN.md
 
 ---
 *State updated: 2026-01-30*
 *Phase 1 complete: 2026-01-30 (human verified)*
 *Plan 02-01 complete: 2026-01-30*
 *Plan 02-02 complete: 2026-01-30*
+*Plan 02-03 complete: 2026-01-30*
