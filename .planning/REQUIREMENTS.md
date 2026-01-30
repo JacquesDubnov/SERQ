@@ -255,32 +255,149 @@ Explicitly excluded. Documented to prevent scope creep.
 
 Which phases cover which requirements. Updated during roadmap creation.
 
-| Requirement | Phase | Status |
-|-------------|-------|--------|
-| FOUND-* | Phase 1 | Pending |
-| TEXT-* | Phase 1 | Pending |
-| FMT-* | Phase 1 | Pending |
-| EDIT-* | Phase 1 | Pending |
-| FILE-* | Phase 2 | Pending |
-| STYLE-* | Phase 3 | Pending |
-| TBL-* | Phase 4 | Pending |
-| NAV-* | Phase 4 | Pending |
-| CUST-* | Phase 4 | Pending |
-| MEDIA-* | Phase 4 | Pending |
-| CMD-* | Phase 4 | Pending |
-| VER-* | Phase 5 | Pending |
-| AI-* | Phase 6 | Pending |
-| UI-* | Phase 5 | Pending |
-| MD-* | Phase 4 | Pending |
-| COMM-* | Phase 5 | Pending |
-| CANV-* | Phase 3 | Pending |
-| EXP-* | Phase 5 | Pending |
+### Phase 1: Editor Foundation (26 requirements)
 
-**Coverage:**
-- v1 requirements: 74 total
-- Mapped to phases: 74
-- Unmapped: 0 ✓
+| Requirement | Description | Status |
+|-------------|-------------|--------|
+| FOUND-01 | Continuous flow canvas | Pending |
+| FOUND-02 | Click-anywhere cursor | Pending |
+| FOUND-03 | Responsive canvas | Pending |
+| FOUND-04 | Adjustable canvas width | Pending |
+| FOUND-05 | Pagination mode toggle | Pending |
+| FOUND-06 | HTML-native document model | Pending |
+| FOUND-07 | JSON intelligence layer | Pending |
+| TEXT-01 | Paragraph block | Pending |
+| TEXT-02 | Heading blocks (H1-H6) | Pending |
+| TEXT-03 | Blockquote block | Pending |
+| TEXT-04 | Code block | Pending |
+| TEXT-05 | Bullet list | Pending |
+| TEXT-06 | Numbered list | Pending |
+| TEXT-07 | Checklist/todo | Pending |
+| FMT-01 | Bold/Italic/Underline/Strike | Pending |
+| FMT-02 | Code inline | Pending |
+| FMT-03 | Highlight/mark | Pending |
+| FMT-04 | Superscript/Subscript | Pending |
+| FMT-05 | Text/highlight color | Pending |
+| FMT-06 | Links | Pending |
+| FMT-07 | Text alignment | Pending |
+| EDIT-01 | Undo/redo | Pending |
+| EDIT-02 | Multi-cursor | Pending |
+| EDIT-03 | Select next occurrence | Pending |
+| EDIT-04 | Select all occurrences | Pending |
+| EDIT-05 | Smart selection | Pending |
+
+### Phase 2: File Management (7 requirements)
+
+| Requirement | Description | Status |
+|-------------|-------------|--------|
+| FILE-01 | New document | Pending |
+| FILE-02 | Open document | Pending |
+| FILE-03 | Save document | Pending |
+| FILE-04 | Save As | Pending |
+| FILE-05 | Auto-save | Pending |
+| FILE-06 | Working folder config | Pending |
+| FILE-07 | Recent files | Pending |
+
+### Phase 3: Style System (10 requirements)
+
+| Requirement | Description | Status |
+|-------------|-------------|--------|
+| STYLE-01 | Typography presets | Pending |
+| STYLE-02 | Color scheme presets | Pending |
+| STYLE-03 | Layout presets | Pending |
+| STYLE-04 | Master themes | Pending |
+| STYLE-05 | Style picker UI | Pending |
+| STYLE-06 | Copy/paste style | Pending |
+| CANV-01 | Background colors | Pending |
+| CANV-02 | Background gradients | Pending |
+| CANV-03 | Background patterns | Pending |
+| CANV-04 | Per-section backgrounds | Pending |
+
+### Phase 4: Extended Features (29 requirements)
+
+| Requirement | Description | Status |
+|-------------|-------------|--------|
+| TBL-01 | Table creation | Pending |
+| TBL-02 | Row/column operations | Pending |
+| TBL-03 | Cell merge/split | Pending |
+| TBL-04 | Cell background | Pending |
+| TBL-05 | Column resize | Pending |
+| TBL-06 | Header formatting | Pending |
+| NAV-01 | Table of Contents | Pending |
+| NAV-02 | Find and replace | Pending |
+| NAV-03 | Outline panel | Pending |
+| NAV-04 | Go-to navigation | Pending |
+| CUST-01 | Callout blocks | Pending |
+| CUST-02 | Divider block | Pending |
+| CUST-03 | Spacer block | Pending |
+| CUST-04 | Column layout | Pending |
+| CUST-05 | Toggle/collapsible | Pending |
+| MEDIA-01 | Image insertion | Pending |
+| MEDIA-02 | Image resize/crop | Pending |
+| MEDIA-03 | Image placement | Pending |
+| MEDIA-04 | Universal iframe | Pending |
+| MEDIA-05 | YouTube/Vimeo embed | Pending |
+| MEDIA-06 | Local video player | Pending |
+| CMD-01 | Command palette | Pending |
+| CMD-02 | Slash commands | Pending |
+| CMD-03 | Keyboard shortcuts | Pending |
+| CMD-04 | Block type conversion | Pending |
+| MD-01 | Toggle source view | Pending |
+| MD-02 | Split view | Pending |
+| MD-03 | Bidirectional sync | Pending |
+| MD-04 | Source syntax highlighting | Pending |
+
+### Phase 5: Polish (22 requirements)
+
+| Requirement | Description | Status |
+|-------------|-------------|--------|
+| VER-01 | Auto-save versions | Pending |
+| VER-02 | Named checkpoints | Pending |
+| VER-03 | Time Machine UI | Pending |
+| VER-04 | Version preview | Pending |
+| VER-05 | Restore document | Pending |
+| VER-06 | Restore sections | Pending |
+| UI-01 | Sliding panels | Pending |
+| UI-02 | Focus mode | Pending |
+| UI-03 | Typewriter mode | Pending |
+| UI-04 | Dark/light theme | Pending |
+| UI-05 | Distraction-free mode | Pending |
+| UI-06 | Status bar | Pending |
+| COMM-01 | Add comment | Pending |
+| COMM-02 | Comment indicators | Pending |
+| COMM-03 | Comment panel | Pending |
+| COMM-04 | Resolve comments | Pending |
+| EXP-01 | Export HTML | Pending |
+| EXP-02 | Export Markdown | Pending |
+| EXP-03 | Export PDF | Pending |
+| EXP-04 | Import Word | Pending |
+| EXP-05 | Import Markdown | Pending |
+| EXP-06 | Import plain text | Pending |
+
+### Phase 6: AI Integration (5 requirements)
+
+| Requirement | Description | Status |
+|-------------|-------------|--------|
+| AI-01 | Claude API integration | Pending |
+| AI-02 | AI text stylization | Pending |
+| AI-03 | Context-aware formatting | Pending |
+| AI-04 | Preview/accept/reject | Pending |
+| AI-05 | Streaming response | Pending |
+
+## Coverage Summary
+
+| Phase | Requirement Count | Categories |
+|-------|-------------------|------------|
+| Phase 1: Editor Foundation | 26 | FOUND, TEXT, FMT, EDIT |
+| Phase 2: File Management | 7 | FILE |
+| Phase 3: Style System | 10 | STYLE, CANV |
+| Phase 4: Extended Features | 29 | TBL, NAV, CUST, MEDIA, CMD, MD |
+| Phase 5: Polish | 22 | VER, UI, COMM, EXP |
+| Phase 6: AI Integration | 5 | AI |
+| **Total** | **99** | - |
+
+**Coverage:** 99/99 v1 requirements mapped. No orphans.
 
 ---
 *Requirements defined: 2026-01-30*
-*Last updated: 2026-01-30 after research synthesis*
+*Last updated: 2026-01-30 after roadmap creation*
