@@ -6,35 +6,20 @@
   "permissions": [
     "core:default",
     "shell:allow-open",
-    "fs:default",
     "dialog:default",
     "store:default",
+    "fs:default",
+    "fs:allow-read-text-file",
+    "fs:allow-write-text-file",
+    "fs:allow-exists",
+    "fs:allow-stat",
     {
-      "identifier": "fs:allow-read",
+      "identifier": "fs:scope",
       "allow": [
-        { "path": "$HOME" },
-        { "path": "$HOME/**" }
-      ]
-    },
-    {
-      "identifier": "fs:allow-write",
-      "allow": [
-        { "path": "$HOME" },
-        { "path": "$HOME/**" }
-      ]
-    },
-    {
-      "identifier": "fs:allow-exists",
-      "allow": [
-        { "path": "$HOME" },
-        { "path": "$HOME/**" }
-      ]
-    },
-    {
-      "identifier": "fs:allow-stat",
-      "allow": [
-        { "path": "$HOME" },
-        { "path": "$HOME/**" }
+        "$HOME/**",
+        "$DOCUMENT/**",
+        "$DESKTOP/**",
+        "$DOWNLOAD/**"
       ]
     }
   ]

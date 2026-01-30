@@ -7,10 +7,13 @@ import { getPreferencesStore } from './lib/preferencesStore';
 // Initialize preferences store on app start
 // This ensures the store is loaded and file is created before any file operations
 async function initializeApp() {
+  console.log('[SERQ] Initializing app...');
   try {
+    console.log('[SERQ] Loading preferences store...');
     const store = await getPreferencesStore();
-    // Ensure preferences file exists by saving defaults
+    console.log('[SERQ] Store loaded, saving to create file...');
     await store.save();
+    console.log('[SERQ] Preferences store initialized successfully');
   } catch (error) {
     console.error('[SERQ] Failed to initialize preferences store:', error);
     // Continue anyway - app can work without preferences

@@ -163,12 +163,16 @@ export function useFileOperations(editorRef: RefObject<EditorCoreRef | null>) {
     await writeTextFile(filePath, fileContent)
 
     // Update store with new path/name
+    console.log('[FileOps] SaveAs complete, setting document path:', filePath)
     setDocument(filePath, name)
     markSaved()
 
     // Add to recent files and update working folder
+    console.log('[FileOps] Adding to recent files...')
     await addRecentFile(filePath, name)
+    console.log('[FileOps] Updating working folder...')
     await updateWorkingFolderFromFile(filePath)
+    console.log('[FileOps] SaveAs finished successfully')
 
     return filePath
   }, [document.name, editorRef, setDocument, markSaved])

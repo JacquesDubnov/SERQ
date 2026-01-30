@@ -21,6 +21,7 @@ let storeInstance: Awaited<ReturnType<typeof load>> | null = null
  */
 export async function getPreferencesStore() {
   if (!storeInstance) {
+    console.log('[PreferencesStore] Creating new store instance...')
     try {
       storeInstance = await load(STORE_FILE, {
         defaults: {
@@ -29,10 +30,13 @@ export async function getPreferencesStore() {
         },
         autoSave: false,
       })
+      console.log('[PreferencesStore] Store instance created successfully')
     } catch (error) {
       console.error('[PreferencesStore] Failed to load:', error)
       throw error
     }
+  } else {
+    console.log('[PreferencesStore] Returning existing store instance')
   }
   return storeInstance
 }

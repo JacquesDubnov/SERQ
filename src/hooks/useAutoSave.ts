@@ -90,8 +90,9 @@ export function useAutoSave(
 
   // Trigger auto-save when document becomes dirty
   useEffect(() => {
+    console.log('[AutoSave] Effect triggered - enabled:', enabled, 'isDirty:', document.isDirty, 'path:', document.path)
     if (enabled && document.isDirty && document.path) {
-      console.log('[AutoSave] Scheduling save for:', document.path)
+      console.log('[AutoSave] Scheduling save in 30 seconds for:', document.path)
       performAutoSave()
     }
   }, [document.isDirty, document.path, enabled, performAutoSave])
