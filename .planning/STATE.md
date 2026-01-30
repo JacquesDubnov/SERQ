@@ -10,17 +10,17 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 3 of 6 (Style System)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-01-30 - Phase 2 complete (human verified)
+Plan: 1 of 4 in current phase
+Status: In progress
+Last activity: 2026-01-30 - Completed 03-01-PLAN.md
 
-Progress: [████░░░░░░] 33% (2/6 phases)
+Progress: [████░░░░░░] 37.5% (9/24 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 8
-- Total execution time: ~1 hour 30 min
+- Total plans completed: 9
+- Total execution time: ~1 hour 42 min
 
 **By Phase:**
 
@@ -28,7 +28,7 @@ Progress: [████░░░░░░] 33% (2/6 phases)
 |-------|-------|--------|
 | 1. Editor Foundation | 4/4 | Complete |
 | 2. File Management | 4/4 | Complete |
-| 3. Style System | 0/? | Not started |
+| 3. Style System | 1/4 | In progress |
 
 ## Accumulated Context
 
@@ -48,7 +48,7 @@ Progress: [████░░░░░░] 33% (2/6 phases)
 | D-02-01-002 | Explicit fs:allow-read/write/exists/stat permissions | Production safety - dev mode more permissive than release |
 | D-02-01-003 | Scope FS permissions to $HOME/** | Allow saving anywhere in user home directory |
 | D-02-01-004 | Embed metadata as JSON in script tag | .serq.html format - valid HTML + machine-readable metadata |
-| D-02-01-005 | Escape </script> as <\\/script> in JSON | Prevent HTML structure breaks in serialized content |
+| D-02-01-005 | Escape </script> as <\/script> in JSON | Prevent HTML structure breaks in serialized content |
 | D-02-02-001 | saveFile delegates to saveFileAs when no path | New documents without path trigger Save As dialog |
 | D-02-02-002 | Both meta+key and ctrl+key registered | Cross-platform keyboard shortcut support |
 | D-02-02-003 | enableOnContentEditable for all shortcuts | Shortcuts work inside TipTap editor |
@@ -56,6 +56,10 @@ Progress: [████░░░░░░] 33% (2/6 phases)
 | D-02-03-002 | Singleton store pattern for preferences | Avoid repeated file loads by caching store instance |
 | D-02-03-003 | preferences.json as shared store file | Single file for all app preferences |
 | D-02-03-004 | tauri-plugin-store defaults property required | API requires {defaults: {}} even for empty defaults |
+| D-03-01-001 | CSS variables on :root for instant preset switching | No class management, instant updates via setProperty |
+| D-03-01-002 | data-theme attribute on documentElement for dark mode | CSS selector :root[data-theme="dark"] for variant switching |
+| D-03-01-003 | Preset objects use exact CSS variable names as keys | Direct mapping to setProperty calls, no translation needed |
+| D-03-01-004 | Dynamic Tauri import with media query fallback | Supports browser dev mode without Tauri context |
 
 ### Technical Patterns Established
 
@@ -123,6 +127,32 @@ async function getStore() {
 }
 ```
 
+**CSS Variable Preset System (Phase 3):**
+```typescript
+// Preset definition with CSS variable keys
+interface TypographyPreset {
+  id: string
+  name: string
+  variables: Record<string, string>  // Keys are --font-*, --color-*, etc.
+}
+
+// Apply preset by updating CSS custom properties
+function applyTypographyPreset(presetId: string): void {
+  const preset = TYPOGRAPHY_PRESETS.find(p => p.id === presetId)
+  if (!preset) return
+  Object.entries(preset.variables).forEach(([prop, value]) => {
+    document.documentElement.style.setProperty(prop, value)
+  })
+}
+```
+
+**Theme Detection Hook Pattern (Phase 3):**
+```typescript
+// Tauri API with media query fallback
+const { effectiveTheme, toggleTheme, setUserOverride } = useSystemTheme()
+// Updates document.documentElement.dataset.theme = 'light' | 'dark'
+```
+
 ### Design Reference
 
 See `.planning/DESIGN-REFERENCE.md` for UI/UX inspiration from:
@@ -141,15 +171,16 @@ None.
 - [x] Production build tested and working
 
 **For Phase 3:**
-- None identified yet
+- None identified
 
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Phase 2 complete, ready for Phase 3 planning
+Stopped at: Completed 03-01-PLAN.md (CSS Variable Foundation)
 Resume file: None
 
 ---
 *State updated: 2026-01-30*
 *Phase 1 complete: 2026-01-30 (human verified)*
 *Phase 2 complete: 2026-01-30 (human verified)*
+*Plan 03-01 complete: 2026-01-30*
