@@ -3,6 +3,7 @@ import type { RefObject } from 'react'
 import { open, save } from '@tauri-apps/plugin-dialog'
 import { readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
 import { useEditorStore } from '../stores/editorStore'
+import { useStyleStore } from '../stores/styleStore'
 import {
   serializeSerqDocument,
   parseSerqDocument,
@@ -10,6 +11,7 @@ import {
 } from '../lib/serqFormat'
 import { addRecentFile } from '../lib/recentFiles'
 import { getWorkingFolder, updateWorkingFolderFromFile } from '../lib/workingFolder'
+import { getStyleDefaults } from '../lib/preferencesStore'
 import type { EditorCoreRef } from '../components/Editor/EditorCore'
 
 /**
@@ -47,6 +49,7 @@ export interface OpenFileResult {
  * - Saving documents to disk (Cmd+S)
  * - Save As to new location (Cmd+Shift+S)
  * - Creating new empty documents (Cmd+N)
+ * - Loading and saving style metadata
  */
 export function useFileOperations(editorRef: RefObject<EditorCoreRef | null>) {
   const setDocument = useEditorStore((state) => state.setDocument)
@@ -83,6 +86,32 @@ export function useFileOperations(editorRef: RefObject<EditorCoreRef | null>) {
     // Update editor content
     editorRef.current?.setContent(html)
 
+    // Load document styles (or apply defaults if none)
+    const styleStore = useStyleStore.getState()
+    if (metadata.presets) {
+      // Document has saved style presets - load them
+      styleStore.loadFromDocument({
+        typography: metadata.presets.typography ?? 'serq-default',
+        colors: metadata.presets.colors ?? 'default',
+        canvas: metadata.presets.canvas ?? 'white',
+        layout: metadata.presets.layout ?? 'default',
+        masterTheme: metadata.presets.masterTheme ?? null,
+        themeMode: metadata.presets.themeMode ?? 'system',
+      })
+    } else {
+      // Legacy document without style presets - apply user defaults
+      try {
+        const defaults = await getStyleDefaults()
+        styleStore.setTypography(defaults.defaultTypography)
+        styleStore.setColor(defaults.defaultColor)
+        styleStore.setCanvas(defaults.defaultCanvas)
+        styleStore.setLayout(defaults.defaultLayout)
+      } catch {
+        // If preferences unavailable, apply built-in defaults
+        styleStore.applyAllPresets()
+      }
+    }
+
     // Update store with file info
     const name = extractFileName(selected)
     setDocument(selected, name)
@@ -113,11 +142,18 @@ export function useFileOperations(editorRef: RefObject<EditorCoreRef | null>) {
     // Get current HTML from editor
     const html = editorRef.current?.getHTML() ?? ''
 
-    // Serialize to .serq.html format
-    const fileContent = serializeSerqDocument(html, {
-      name: document.name,
-      path: document.path,
-    })
+    // Get current style metadata for persistence
+    const styleMetadata = useStyleStore.getState().getStyleMetadata()
+
+    // Serialize to .serq.html format with style metadata
+    const fileContent = serializeSerqDocument(
+      html,
+      {
+        name: document.name,
+        path: document.path,
+      },
+      styleMetadata
+    )
 
     // Write to disk
     await writeTextFile(document.path, fileContent)
@@ -153,11 +189,18 @@ export function useFileOperations(editorRef: RefObject<EditorCoreRef | null>) {
     // Extract name from chosen path
     const name = extractFileName(filePath)
 
-    // Serialize to .serq.html format
-    const fileContent = serializeSerqDocument(html, {
-      name,
-      path: filePath,
-    })
+    // Get current style metadata for persistence
+    const styleMetadata = useStyleStore.getState().getStyleMetadata()
+
+    // Serialize to .serq.html format with style metadata
+    const fileContent = serializeSerqDocument(
+      html,
+      {
+        name,
+        path: filePath,
+      },
+      styleMetadata
+    )
 
     // Write to disk
     await writeTextFile(filePath, fileContent)
@@ -180,6 +223,7 @@ export function useFileOperations(editorRef: RefObject<EditorCoreRef | null>) {
   /**
    * Create a new empty document
    * Clears editor content and resets document state to Untitled
+   * Applies user's default style preferences
    *
    * Note: v1 does not prompt about unsaved changes - user responsible for saving
    */
@@ -189,6 +233,23 @@ export function useFileOperations(editorRef: RefObject<EditorCoreRef | null>) {
 
     // Reset document state
     clearDocument()
+
+    // Apply user's default style preferences for new document
+    const styleStore = useStyleStore.getState()
+    try {
+      const defaults = await getStyleDefaults()
+      styleStore.setTypography(defaults.defaultTypography)
+      styleStore.setColor(defaults.defaultColor)
+      styleStore.setCanvas(defaults.defaultCanvas)
+      styleStore.setLayout(defaults.defaultLayout)
+    } catch {
+      // If preferences unavailable, apply built-in defaults
+      styleStore.applyAllPresets()
+    }
+
+    // Mark document as clean after applying defaults
+    // (style setters mark dirty, but this is new doc, not user change)
+    useEditorStore.getState().markSaved()
 
     // Focus editor for immediate typing
     editorRef.current?.focus()
