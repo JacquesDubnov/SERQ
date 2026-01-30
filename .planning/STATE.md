@@ -10,24 +10,24 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 2 of 6 (File Management)
-Plan: 1 of 4 in current phase
+Plan: 2 of 4 in current phase
 Status: In progress
-Last activity: 2026-01-30 - Completed 02-01-PLAN.md
+Last activity: 2026-01-30 - Completed 02-02-PLAN.md
 
-Progress: [███░░░░░░░] 25% (5/20 plans estimated)
+Progress: [███░░░░░░░] 30% (6/20 plans estimated)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 5
-- Total execution time: ~1 hour 6 min
+- Total plans completed: 6
+- Total execution time: ~1 hour 11 min
 
 **By Phase:**
 
 | Phase | Plans | Status |
 |-------|-------|--------|
 | 1. Editor Foundation | 4/4 | Complete |
-| 2. File Management | 1/4 | In progress |
+| 2. File Management | 2/4 | In progress |
 
 ## Accumulated Context
 
@@ -48,6 +48,9 @@ Progress: [███░░░░░░░] 25% (5/20 plans estimated)
 | D-02-01-003 | Scope FS permissions to $HOME/** | Allow saving anywhere in user home directory |
 | D-02-01-004 | Embed metadata as JSON in script tag | .serq.html format - valid HTML + machine-readable metadata |
 | D-02-01-005 | Escape </script> as <\\/script> in JSON | Prevent HTML structure breaks in serialized content |
+| D-02-02-001 | saveFile delegates to saveFileAs when no path | New documents without path trigger Save As dialog |
+| D-02-02-002 | Both meta+key and ctrl+key registered | Cross-platform keyboard shortcut support |
+| D-02-02-003 | enableOnContentEditable for all shortcuts | Shortcuts work inside TipTap editor |
 
 ### Technical Patterns Established
 
@@ -84,6 +87,15 @@ tauri::Builder::default()
 </body>
 ```
 
+**File Operations Hook Pattern:**
+```typescript
+// useFileOperations accepts EditorCoreRef for content access
+const { openFile, saveFile, saveFileAs, newFile } = useFileOperations(editorRef)
+
+// useKeyboardShortcuts wraps useFileOperations
+useKeyboardShortcuts(editorRef) // Registers Cmd+S/Shift+S/O/N
+```
+
 ### Design Reference
 
 See `.planning/DESIGN-REFERENCE.md` for UI/UX inspiration from:
@@ -106,10 +118,11 @@ None.
 ## Session Continuity
 
 Last session: 2026-01-30
-Stopped at: Completed 02-01-PLAN.md (Tauri Plugins & File Permissions)
-Resume file: None - ready for 02-02-PLAN.md
+Stopped at: Completed 02-02-PLAN.md (File Operations Hooks)
+Resume file: None - ready for 02-03-PLAN.md
 
 ---
 *State updated: 2026-01-30*
 *Phase 1 complete: 2026-01-30 (human verified)*
 *Plan 02-01 complete: 2026-01-30*
+*Plan 02-02 complete: 2026-01-30*
