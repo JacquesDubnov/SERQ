@@ -119,6 +119,15 @@ export const slashCommands: SlashCommandItem[] = [
       editor.chain().focus().deleteRange(range).setHorizontalRule().run()
     },
   },
+  {
+    title: 'Callout',
+    description: 'Highlighted callout block',
+    icon: '!',
+    aliases: ['callout', 'admonition', 'note', 'alert'],
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).insertCallout({ color: 'blue' }).run()
+    },
+  },
 ]
 
 /**

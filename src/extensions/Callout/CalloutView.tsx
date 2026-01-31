@@ -1,49 +1,110 @@
+import { useState, useCallback } from 'react'
 import { NodeViewWrapper, NodeViewContent } from '@tiptap/react'
 import type { NodeViewProps } from '@tiptap/react'
+import CalloutContextMenu from './CalloutContextMenu'
 
-export default function CalloutView({ node, updateAttributes, selected }: NodeViewProps) {
+export default function CalloutView({
+  node,
+  updateAttributes,
+  selected,
+  deleteNode,
+}: NodeViewProps) {
   const { color, icon, collapsed, collapsible } = node.attrs
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
 
-  const handleToggleCollapse = (e: React.MouseEvent) => {
+  const handleToggleCollapse = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      updateAttributes({ collapsed: !collapsed })
+    },
+    [collapsed, updateAttributes]
+  )
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    updateAttributes({ collapsed: !collapsed })
-  }
+    setContextMenu({ x: e.clientX, y: e.clientY })
+  }, [])
+
+  const handleChangeColor = useCallback(
+    (newColor: string) => {
+      updateAttributes({ color: newColor })
+    },
+    [updateAttributes]
+  )
+
+  const handleChangeIcon = useCallback(
+    (newIcon: string | null) => {
+      updateAttributes({ icon: newIcon })
+    },
+    [updateAttributes]
+  )
+
+  const handleToggleCollapsible = useCallback(() => {
+    updateAttributes({ collapsible: !collapsible })
+  }, [collapsible, updateAttributes])
+
+  const handleDelete = useCallback(() => {
+    deleteNode()
+  }, [deleteNode])
+
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(null)
+  }, [])
 
   return (
-    <NodeViewWrapper
-      className={`callout ${selected ? 'callout-selected' : ''} ${collapsed ? 'callout-collapsed' : ''}`}
-      data-color={color}
-    >
-      {/* Header with icon and collapse button */}
-      {(icon || collapsible) && (
-        <div className="callout-header" contentEditable={false}>
-          {icon && <span className="callout-icon">{icon}</span>}
-          <div className="callout-header-spacer" />
-          {collapsible && (
-            <button
-              className="callout-collapse-btn"
-              onClick={handleToggleCollapse}
-              title={collapsed ? 'Expand' : 'Collapse'}
-            >
-              {collapsed ? (
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-                  <path d="M4 2l4 4-4 4V2z" />
-                </svg>
-              ) : (
-                <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
-                  <path d="M2 4l4 4 4-4H2z" />
-                </svg>
-              )}
-            </button>
-          )}
-        </div>
+    <>
+      <NodeViewWrapper
+        className={`callout ${selected ? 'callout-selected' : ''} ${collapsed ? 'callout-collapsed' : ''}`}
+        data-color={color}
+        onContextMenu={handleContextMenu}
+      >
+        {/* Header with icon and collapse button */}
+        {(icon || collapsible) && (
+          <div className="callout-header" contentEditable={false}>
+            {icon && <span className="callout-icon">{icon}</span>}
+            <div className="callout-header-spacer" />
+            {collapsible && (
+              <button
+                className="callout-collapse-btn"
+                onClick={handleToggleCollapse}
+                title={collapsed ? 'Expand' : 'Collapse'}
+              >
+                {collapsed ? (
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                    <path d="M4 2l4 4-4 4V2z" />
+                  </svg>
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor">
+                    <path d="M2 4l4 4 4-4H2z" />
+                  </svg>
+                )}
+              </button>
+            )}
+          </div>
+        )}
+        {/* Editable content */}
+        <NodeViewContent
+          className="callout-content"
+          style={{ display: collapsed ? 'none' : 'block' }}
+        />
+      </NodeViewWrapper>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <CalloutContextMenu
+          position={contextMenu}
+          currentColor={color}
+          currentIcon={icon}
+          isCollapsible={collapsible}
+          onChangeColor={handleChangeColor}
+          onChangeIcon={handleChangeIcon}
+          onToggleCollapsible={handleToggleCollapsible}
+          onDelete={handleDelete}
+          onClose={handleCloseContextMenu}
+        />
       )}
-      {/* Editable content */}
-      <NodeViewContent
-        className="callout-content"
-        style={{ display: collapsed ? 'none' : 'block' }}
-      />
-    </NodeViewWrapper>
+    </>
   )
 }
