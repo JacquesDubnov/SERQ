@@ -15,6 +15,7 @@ import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
+import { SlashCommands } from '../../extensions/SlashCommands';
 import type { Editor, JSONContent } from '@tiptap/core';
 import '../../styles/editor.css';
 import '../../styles/tables.css';
@@ -75,6 +76,7 @@ const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
         TableRow,
         TableHeader,
         TableCell,
+        SlashCommands,
       ],
       content: initialContent || '',
 
