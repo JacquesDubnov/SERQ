@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 5 of 6 (Polish) - IN PROGRESS
-Plan: 1 of 7 in current phase
+Plan: 2 of 7 in current phase
 Status: Executing
-Last activity: 2026-01-31 - Completed 05-01-PLAN.md (SQLite Version Storage)
+Last activity: 2026-01-31 - Completed 05-02-PLAN.md (Document Export)
 
-Progress: [█████████░] 87.5% (21/24 plans)
+Progress: [█████████░] 88.5% (22/24 plans)
 
 ## Performance Metrics
 
@@ -91,6 +91,9 @@ Progress: [█████████░] 87.5% (21/24 plans)
 | D-05-01-002 | Singleton DB instance pattern | Avoid reconnection overhead, consistent connection |
 | D-05-01-003 | 30s debounce + 60s maxWait for auto-snapshot | Balance between data safety and disk write frequency |
 | D-05-01-004 | Keep 50 auto-saves + all checkpoints | Reasonable history depth without unbounded growth |
+| D-05-02-001 | Manual JSON-to-Markdown conversion | More control than @tiptap/markdown extension, no extra dependency |
+| D-05-02-002 | Browser print dialog for PDF | No heavy libraries like jsPDF needed, works everywhere |
+| D-05-02-003 | Inline CSS in HTML export | Captures current CSS variables for visual fidelity |
 
 ### Technical Patterns Established
 
@@ -502,7 +505,7 @@ See `.planning/DESIGN-REFERENCE.md` for UI/UX inspiration from:
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 05-01-PLAN.md (SQLite Version Storage)
+Stopped at: Completed 05-02-PLAN.md (Document Export)
 Resume file: None
 
 ---
@@ -521,3 +524,4 @@ Resume file: None
 *Plan 04-05 complete: 2026-01-31*
 *Phase 4 complete: 2026-01-31 (human verified)*
 *Plan 05-01 complete: 2026-01-31*
+*Plan 05-02 complete: 2026-01-31*
