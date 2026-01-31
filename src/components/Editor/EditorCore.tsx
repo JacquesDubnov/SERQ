@@ -16,9 +16,11 @@ import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { SlashCommands } from '../../extensions/SlashCommands';
+import { Callout } from '../../extensions/Callout';
 import type { Editor, JSONContent } from '@tiptap/core';
 import '../../styles/editor.css';
 import '../../styles/tables.css';
+import '../../styles/callout.css';
 
 export interface EditorCoreRef {
   setContent: (content: string | JSONContent) => void;
@@ -77,6 +79,7 @@ const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
         TableHeader,
         TableCell,
         SlashCommands,
+        Callout,
       ],
       content: initialContent || '',
 

@@ -1,48 +1,43 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import { ReactNodeViewRenderer } from '@tiptap/react'
-import { TextSelection } from '@tiptap/pm/state'
 import CalloutView from './CalloutView'
 
-export interface CalloutOptions {
-  HTMLAttributes: Record<string, unknown>
-}
-
+// Extend TipTap's Commands interface
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     callout: {
+      /**
+       * Insert a callout block
+       */
       insertCallout: (attrs?: {
         color?: string
         icon?: string | null
         collapsed?: boolean
         collapsible?: boolean
       }) => ReturnType
-      toggleCalloutCollapse: () => ReturnType
     }
   }
 }
 
-export const Callout = Node.create<CalloutOptions>({
+export const Callout = Node.create({
   name: 'callout',
   group: 'block',
-  content: 'block+',
-  defining: true,
-
-  addOptions() {
-    return {
-      HTMLAttributes: {},
-    }
-  },
+  content: 'block+', // Allow any block content inside (paragraphs, lists, headings)
+  draggable: true,
+  isolating: true,
 
   addAttributes() {
     return {
       color: {
         default: 'blue',
         parseHTML: (element) => element.getAttribute('data-color') || 'blue',
-        renderHTML: (attributes) => ({ 'data-color': attributes.color }),
+        renderHTML: (attributes) => ({
+          'data-color': attributes.color,
+        }),
       },
       icon: {
         default: null,
-        parseHTML: (element) => element.getAttribute('data-icon') || null,
+        parseHTML: (element) => element.getAttribute('data-icon'),
         renderHTML: (attributes) => {
           if (!attributes.icon) return {}
           return { 'data-icon': attributes.icon }
@@ -51,12 +46,16 @@ export const Callout = Node.create<CalloutOptions>({
       collapsed: {
         default: false,
         parseHTML: (element) => element.getAttribute('data-collapsed') === 'true',
-        renderHTML: (attributes) => ({ 'data-collapsed': attributes.collapsed ? 'true' : 'false' }),
+        renderHTML: (attributes) => ({
+          'data-collapsed': attributes.collapsed ? 'true' : 'false',
+        }),
       },
       collapsible: {
         default: false,
         parseHTML: (element) => element.getAttribute('data-collapsible') === 'true',
-        renderHTML: (attributes) => ({ 'data-collapsible': attributes.collapsible ? 'true' : 'false' }),
+        renderHTML: (attributes) => ({
+          'data-collapsible': attributes.collapsible ? 'true' : 'false',
+        }),
       },
     }
   },
@@ -66,7 +65,7 @@ export const Callout = Node.create<CalloutOptions>({
   },
 
   renderHTML({ HTMLAttributes }) {
-    return ['div', mergeAttributes({ 'data-callout': '' }, this.options.HTMLAttributes, HTMLAttributes), 0]
+    return ['div', mergeAttributes({ 'data-callout': '' }, HTMLAttributes), 0]
   },
 
   addNodeView() {
@@ -75,42 +74,45 @@ export const Callout = Node.create<CalloutOptions>({
 
   addCommands() {
     return {
-      insertCallout: (attrs = {}) => ({ commands }) => {
-        return commands.insertContent({
-          type: this.name,
-          attrs: { color: 'blue', icon: null, collapsed: false, collapsible: false, ...attrs },
-          content: [{ type: 'paragraph' }],
-        })
-      },
-      toggleCalloutCollapse: () => ({ tr, state }) => {
-        const { from } = state.selection
-        const node = state.doc.nodeAt(from)
-        if (node?.type.name === this.name) {
-          tr.setNodeMarkup(from, undefined, { ...node.attrs, collapsed: !node.attrs.collapsed })
-          return true
-        }
-        return false
-      },
+      insertCallout:
+        (attrs = {}) =>
+        ({ commands }) => {
+          return commands.insertContent({
+            type: 'callout',
+            attrs: {
+              color: attrs.color ?? 'blue',
+              icon: attrs.icon ?? null,
+              collapsed: attrs.collapsed ?? false,
+              collapsible: attrs.collapsible ?? false,
+            },
+            content: [{ type: 'paragraph' }],
+          })
+        },
     }
   },
 
   addKeyboardShortcuts() {
     return {
-      Enter: ({ editor }) => {
-        const { state } = editor
-        const { $from, empty } = state.selection
-        if (!empty) return false
-        const calloutNode = $from.node(-1)
-        if (calloutNode?.type.name !== this.name) return false
-        const parentPos = $from.before(-1)
-        const calloutEnd = parentPos + calloutNode.nodeSize - 1
-        const atEnd = $from.pos === calloutEnd - 1
-        if (atEnd) {
-          const tr = state.tr
-          tr.insert(calloutEnd, state.schema.nodes.paragraph.create())
-          tr.setSelection(TextSelection.near(tr.doc.resolve(calloutEnd + 1)))
-          editor.view.dispatch(tr)
-          return true
+      // Backspace at start of empty callout removes it
+      Backspace: () => {
+        const { state, view } = this.editor
+        const { selection } = state
+        const { $from } = selection
+
+        // Only handle if we're at the start of the callout content
+        if ($from.parent.type.name === 'paragraph' && $from.parent.textContent === '') {
+          const calloutNode = $from.node(-1)
+          if (calloutNode?.type.name === 'callout' && calloutNode.childCount === 1) {
+            // Delete the callout and insert a paragraph
+            const calloutPos = $from.before(-1)
+            const tr = state.tr.replaceWith(
+              calloutPos,
+              calloutPos + calloutNode.nodeSize,
+              state.schema.nodes.paragraph.create()
+            )
+            view.dispatch(tr)
+            return true
+          }
         }
         return false
       },
