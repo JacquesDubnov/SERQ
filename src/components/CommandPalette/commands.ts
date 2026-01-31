@@ -1,4 +1,6 @@
 import type { Editor } from '@tiptap/core'
+import { exportToHTML, exportToMarkdown, exportToPDF } from '../../lib/export-handlers'
+import { useEditorStore } from '../../stores/editorStore'
 
 /**
  * Detect if running on Mac for keyboard shortcut display
@@ -211,7 +213,7 @@ export const commands: CommandItem[] = [
     title: 'Insert Table',
     group: 'insert',
     action: (editor) =>
-      editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+      editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: false }).run(),
   },
   {
     id: 'insert-horizontal-rule',
@@ -265,6 +267,35 @@ export const commands: CommandItem[] = [
     group: 'view',
     action: () => {
       // This will be handled by CommandPalette via onShowOutline callback
+    },
+  },
+
+  // File group - Export commands
+  {
+    id: 'export-html',
+    title: 'Export to HTML',
+    group: 'file',
+    action: (editor: Editor) => {
+      const documentName = useEditorStore.getState().document.name
+      exportToHTML(editor, documentName)
+    },
+  },
+  {
+    id: 'export-markdown',
+    title: 'Export to Markdown',
+    group: 'file',
+    action: (editor: Editor) => {
+      const documentName = useEditorStore.getState().document.name
+      exportToMarkdown(editor, documentName)
+    },
+  },
+  {
+    id: 'export-pdf',
+    title: 'Export to PDF',
+    group: 'file',
+    action: (editor: Editor) => {
+      const documentName = useEditorStore.getState().document.name
+      exportToPDF(editor, documentName)
     },
   },
 ]
