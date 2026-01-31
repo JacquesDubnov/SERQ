@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 
 ## Current Position
 
-Phase: 3 of 6 (Style System) - COMPLETE
-Plan: 4 of 4 in current phase
-Status: Complete
-Last activity: 2026-01-31 - Completed Phase 3
+Phase: 4 of 6 (Extended Features) - IN PROGRESS
+Plan: 1 of 6 in current phase
+Status: In progress
+Last activity: 2026-01-31 - Completed 04-01-PLAN.md (Table Editing)
 
-Progress: [██████░░░░] 50.0% (12/24 plans)
+Progress: [██████░░░░] 54.2% (13/24 plans)
 
 ## Performance Metrics
 
@@ -29,6 +29,7 @@ Progress: [██████░░░░] 50.0% (12/24 plans)
 | 1. Editor Foundation | 4/4 | Complete |
 | 2. File Management | 4/4 | Complete |
 | 3. Style System | 4/4 | Complete |
+| 4. Extended Features | 1/6 | In Progress |
 
 ## Accumulated Context
 
@@ -67,6 +68,9 @@ Progress: [██████░░░░] 50.0% (12/24 plans)
 | D-03-03-001 | Single accordion section expanded at a time | Reduces visual noise, focuses user on one preset category |
 | D-03-03-002 | Master Themes section shows combo preview text | Quick visual hint of what the theme includes |
 | D-03-03-003 | Format painter uses 'copy' cursor globally | Universal cross-platform cursor, no custom SVG needed |
+| D-04-01-001 | Named imports for TipTap table extensions | TipTap 3.18.0 uses named exports only |
+| D-04-01-002 | withHeaderRow: false on table insert | User toggles header row via context menu per CONTEXT |
+| D-04-01-003 | 8-color cell background palette | Matches CONTEXT spec for color presets |
 
 ### Technical Patterns Established
 
@@ -218,6 +222,40 @@ formatPainter: {
 body.format-painter-active { cursor: copy !important; }
 ```
 
+**Context Menu Pattern (Phase 4):**
+```typescript
+// State for context menu position
+const [tableMenuState, setTableMenuState] = useState<{ x: number; y: number } | null>(null)
+
+// Handle right-click on table cell
+const handleContextMenu = useCallback((e: React.MouseEvent) => {
+  const tableCell = (e.target as HTMLElement).closest('td, th')
+  if (tableCell && editor) {
+    e.preventDefault()
+    setTableMenuState({ x: e.clientX, y: e.clientY })
+  }
+}, [editor])
+
+// Render menu with viewport adjustment
+{tableMenuState && <TableContextMenu position={tableMenuState} onClose={() => setTableMenuState(null)} />}
+```
+
+**Picker Dropdown Pattern (Phase 4):**
+```typescript
+// Grid-based dimension picker for tables
+<TablePicker onSelect={(rows, cols) => {
+  editor.chain().focus().insertTable({ rows, cols, withHeaderRow: false }).run()
+}} onClose={() => setShowPicker(false)} />
+
+// Close on click outside (with delay to prevent immediate close)
+useEffect(() => {
+  const timeoutId = setTimeout(() => {
+    document.addEventListener('mousedown', handleClickOutside)
+  }, 100)
+  return () => { clearTimeout(timeoutId); document.removeEventListener('mousedown', handleClickOutside) }
+}, [])
+```
+
 ### Design Reference
 
 See `.planning/DESIGN-REFERENCE.md` for UI/UX inspiration from:
@@ -241,7 +279,7 @@ None.
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed Phase 3 (Style System)
+Stopped at: Completed 04-01-PLAN.md (Table Editing)
 Resume file: None
 
 ---
@@ -253,3 +291,4 @@ Resume file: None
 *Plan 03-03 complete: 2026-01-30*
 *Plan 03-04 complete: 2026-01-31*
 *Phase 3 complete: 2026-01-31 (human verified)*
+*Plan 04-01 complete: 2026-01-31*
