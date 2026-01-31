@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 5 of 6 (Polish) - IN PROGRESS
-Plan: 4 of 7 in current phase
+Plan: 5 of 7 in current phase
 Status: Executing
-Last activity: 2026-01-31 - Completed 05-04-PLAN.md (Version History UI)
+Last activity: 2026-01-31 - Completed 05-05-PLAN.md (Comments)
 
 Progress: [█████████░] 96.0% (24/25 plans)
 
@@ -103,6 +103,9 @@ Progress: [█████████░] 96.0% (24/25 plans)
 | D-05-04-001 | Simple read-only preview (not diff view) | VER-04 says "Version preview" not "Version diff" - visual diff is v2 |
 | D-05-04-002 | Text selection enabled in preview | VER-06 workaround - users can copy text to partially restore |
 | D-05-04-003 | Restore creates backup checkpoint | Undo safety - current state preserved before restore |
+| D-05-05-001 | Store comment text in SQLite, only ID in document marks | Keeps document JSON clean, allows comment metadata without polluting content |
+| D-05-05-002 | onCommentActivated callback option on Comment extension | Self-contained extension - click handling wired at registration, no hard dependencies |
+| D-05-05-003 | Group comments by resolved/unresolved | Clear visual separation, open comments are actionable |
 
 ### Technical Patterns Established
 
@@ -514,7 +517,7 @@ See `.planning/DESIGN-REFERENCE.md` for UI/UX inspiration from:
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 05-04-PLAN.md (Version History UI)
+Stopped at: Completed 05-05-PLAN.md (Comments)
 Resume file: None
 
 ---
@@ -537,3 +540,4 @@ Resume file: None
 *Plan 05-03 complete: 2026-01-31*
 *Plan 05-04 complete: 2026-01-31*
 *Plan 05-06 complete: 2026-01-31*
+*Plan 05-05 complete: 2026-01-31*
