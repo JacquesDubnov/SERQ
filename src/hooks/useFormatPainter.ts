@@ -53,9 +53,11 @@ export function useFormatPainter(
 
     if (!active) {
       // If not active, capture and activate
+      console.debug('[FormatPainter] Capturing format from selection')
       captureFormat(editor)
     } else {
       // If active, deactivate
+      console.debug('[FormatPainter] Deactivating')
       deactivateFormatPainter()
     }
   }, [editor, active, captureFormat, deactivateFormatPainter])
@@ -101,29 +103,95 @@ export function useFormatPainter(
     }
   }, [active])
 
-  // Listen for clicks when format painter is active (toggle mode applies on click)
+  // Listen for clicks when format painter is active
   useEffect(() => {
-    if (!active || !editor || mode !== 'toggle') return
+    if (!active || !editor) {
+      console.debug('[FormatPainter] Effect: not active or no editor', { active, hasEditor: !!editor })
+      return
+    }
 
-    const handleClick = () => {
-      // Small delay to let selection update
+    // Get fresh stored format from store
+    const currentFormat = useStyleStore.getState().formatPainter.storedFormat
+    console.debug('[FormatPainter] Effect running - Active and listening for clicks. Stored format:', currentFormat)
+
+    const handleClick = (e: MouseEvent) => {
+      console.debug('[FormatPainter] Click event fired on editor')
+
+      // Get the latest stored format directly from store
+      const { formatPainter: fp } = useStyleStore.getState()
+      if (!fp.storedFormat) {
+        console.debug('[FormatPainter] No stored format available!')
+        return
+      }
+
+      // Longer delay to ensure selection is finalized after click
       setTimeout(() => {
         const { from, to } = editor.state.selection
-        // Only apply if there's an actual selection
+        console.debug('[FormatPainter] After delay - Selection:', { from, to })
+
         if (from !== to) {
-          applyFormat(editor)
+          // There's a selection - apply format
+          console.debug('[FormatPainter] Applying format to existing selection')
+          useStyleStore.getState().applyFormat(editor)
+        } else {
+          // No selection - select the word at cursor and apply
+          console.debug('[FormatPainter] No selection, finding word at cursor')
+
+          const pos = editor.state.selection.from
+          const $pos = editor.state.doc.resolve(pos)
+
+          // Find word boundaries in parent text
+          if ($pos.parent.isTextblock && $pos.parent.textContent) {
+            const text = $pos.parent.textContent
+            const offset = $pos.parentOffset
+            console.debug('[FormatPainter] Parent text:', text, 'offset:', offset)
+
+            // Find word boundaries
+            let wordStart = offset
+            while (wordStart > 0 && /\w/.test(text[wordStart - 1])) {
+              wordStart--
+            }
+
+            let wordEnd = offset
+            while (wordEnd < text.length && /\w/.test(text[wordEnd])) {
+              wordEnd++
+            }
+
+            if (wordEnd > wordStart) {
+              const nodeStart = $pos.start()
+              const word = text.slice(wordStart, wordEnd)
+              console.debug('[FormatPainter] Found word:', word, 'selecting range:', nodeStart + wordStart, 'to', nodeStart + wordEnd)
+
+              editor
+                .chain()
+                .focus()
+                .setTextSelection({ from: nodeStart + wordStart, to: nodeStart + wordEnd })
+                .run()
+
+              // Apply format after selection is set
+              setTimeout(() => {
+                console.debug('[FormatPainter] Applying format to word')
+                useStyleStore.getState().applyFormat(editor)
+              }, 20)
+            } else {
+              console.debug('[FormatPainter] No word found at cursor position')
+            }
+          } else {
+            console.debug('[FormatPainter] Parent is not textblock or has no content')
+          }
         }
-      }, 10)
+      }, 100) // Increased delay for selection to stabilize
     }
 
-    // Listen on the editor's DOM element
     const editorElement = editor.view.dom
-    editorElement.addEventListener('mouseup', handleClick)
+    console.debug('[FormatPainter] Attaching click listener to:', editorElement)
+    editorElement.addEventListener('click', handleClick)
 
     return () => {
-      editorElement.removeEventListener('mouseup', handleClick)
+      console.debug('[FormatPainter] Removing click listener')
+      editorElement.removeEventListener('click', handleClick)
     }
-  }, [active, editor, mode, applyFormat])
+  }, [active, editor])
 
   return {
     isActive: active,

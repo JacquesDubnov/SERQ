@@ -210,11 +210,8 @@
   color-scheme: light dark;
 }
 
-/* Apply CSS variables to base elements */
-body {
-  background-color: var(--color-bg-page);
-  color: var(--color-text-primary);
-}
+/* NOTE: Body styles are NOT set here - interface uses hardcoded colors
+   from React, not CSS variables. Only canvas/editor content uses presets. */
 
 /* ========================================
    Editor Integration
@@ -226,7 +223,7 @@ body {
   font-size: var(--font-size-base);
   line-height: var(--line-height-body);
   letter-spacing: var(--letter-spacing-body);
-  color: var(--color-text-primary);
+  color: var(--color-text-primary) !important;
   text-align: var(--layout-text-align);
 }
 
@@ -256,7 +253,7 @@ body {
 }
 
 .editor-content .tiptap p {
-  color: var(--color-text-primary);
+  color: var(--color-text-primary) !important;
   margin-bottom: var(--layout-paragraph-spacing);
   text-indent: var(--layout-paragraph-indent);
 }

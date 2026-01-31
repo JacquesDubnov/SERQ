@@ -1,91 +1,45 @@
 /**
  * Format Painter Toolbar Button Component
- * Allows copying formatting from one selection and applying to another
+ * Click to capture formatting from selection, click text to apply
+ * Uses useFormatPainter hook which handles click-to-apply logic
  */
 
-import { useEffect } from 'react'
 import { Editor } from '@tiptap/react'
-import { useHotkeys } from 'react-hotkeys-hook'
 import { useFormatPainter } from '../../hooks/useFormatPainter'
+
+interface InterfaceColors {
+  bg: string
+  bgSurface: string
+  border: string
+  textPrimary: string
+  textSecondary: string
+}
 
 interface FormatPainterProps {
   editor: Editor
+  colors: InterfaceColors
 }
 
-export function FormatPainter({ editor }: FormatPainterProps) {
-  const {
-    isActive,
-    hasStoredFormat,
-    toggle,
-    deactivate,
-    startHold,
-    endHold,
-  } = useFormatPainter(editor)
+export function FormatPainter({ editor, colors }: FormatPainterProps) {
+  // Use the hook - this attaches click listeners when active
+  const { isActive, hasStoredFormat, toggle } = useFormatPainter(editor)
 
-  // Keyboard shortcut: Cmd+Shift+C to toggle format painter
-  useHotkeys(
-    'meta+shift+c, ctrl+shift+c',
-    (e) => {
-      e.preventDefault()
-      toggle()
-    },
-    {
-      enableOnContentEditable: true,
-      enableOnFormTags: true,
-    }
-  )
-
-  // Handle hold mode with modifier keys
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Cmd/Ctrl + Shift held while format painter not already active
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && !isActive) {
-        // Start hold mode on next action
-      }
-    }
-
-    const handleKeyUp = (e: KeyboardEvent) => {
-      // If format painter is in hold mode and modifiers released, deactivate
-      if (isActive && (!e.metaKey && !e.ctrlKey)) {
-        endHold()
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    window.addEventListener('keyup', handleKeyUp)
-
-    return () => {
-      window.removeEventListener('keydown', handleKeyDown)
-      window.removeEventListener('keyup', handleKeyUp)
-    }
-  }, [isActive, startHold, endHold])
-
-  // Escape to deactivate
-  useHotkeys(
-    'escape',
-    () => {
-      if (isActive) {
-        deactivate()
-      }
-    },
-    {
-      enableOnContentEditable: true,
-    },
-    [isActive, deactivate]
-  )
+  const handleClick = () => {
+    console.debug('[FormatPainter] Button clicked, toggling')
+    toggle()
+  }
 
   return (
     <button
-      onClick={toggle}
-      title={`Format Painter (Cmd+Shift+C)${isActive ? ' - Click text to apply' : ''}`}
-      className={`
-        px-2 py-1.5 rounded text-sm font-medium transition-colors relative
-        ${
-          isActive
-            ? 'bg-blue-100 text-blue-700 ring-2 ring-blue-400'
-            : 'text-gray-600 hover:bg-gray-100'
-        }
-      `}
+      onMouseDown={(e) => e.preventDefault()} // Prevent focus steal
+      onClick={handleClick}
+      title={`Format Painter${isActive ? ' - Click text to apply' : ''}`}
+      className="px-2 py-1.5 rounded text-sm font-medium transition-colors relative"
+      style={{
+        backgroundColor: isActive ? colors.bgSurface : 'transparent',
+        color: isActive ? colors.textPrimary : colors.textSecondary,
+        boxShadow: isActive ? '0 0 0 2px #3b82f6' : 'none',
+      }}
     >
       {/* Paintbrush icon */}
       <svg

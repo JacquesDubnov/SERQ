@@ -17,6 +17,9 @@ import { useEditorStore } from './editorStore'
 export interface StoredFormat {
   marks: Array<{ type: string; attrs: Record<string, unknown> }>
   textAlign: string
+  // Block-level: paragraph or heading with level
+  nodeType: 'paragraph' | 'heading'
+  headingLevel?: 1 | 2 | 3
 }
 
 export interface CustomStyle {
@@ -171,6 +174,7 @@ export const useStyleStore = create<StyleState>((set, get) => ({
   setColor: (presetId: string) => {
     const state = get()
     const effectiveMode = getEffectiveThemeMode(state.themeMode)
+    console.debug('[StyleStore] setColor called:', { presetId, effectiveMode })
     applyColorPreset(presetId, effectiveMode)
     set((s) => ({
       currentColor: presetId,
@@ -181,11 +185,20 @@ export const useStyleStore = create<StyleState>((set, get) => ({
   },
 
   setCanvas: (presetId: string) => {
-    applyCanvasPreset(presetId)
-    set((state) => ({
+    const state = get()
+    const effectiveMode = getEffectiveThemeMode(state.themeMode)
+
+    // In dark mode, canvas background stays dark regardless of preset
+    if (effectiveMode === 'dark') {
+      document.documentElement.style.setProperty('--canvas-bg-color', '#1e1e1e')
+    } else {
+      applyCanvasPreset(presetId)
+    }
+
+    set((s) => ({
       currentCanvas: presetId,
       currentMasterTheme: null,
-      recentCanvas: addToRecent(state.recentCanvas, presetId),
+      recentCanvas: addToRecent(s.recentCanvas, presetId),
     }))
     useEditorStore.getState().markDirty()
   },
@@ -231,8 +244,18 @@ export const useStyleStore = create<StyleState>((set, get) => ({
     // Reapply current color preset with new mode
     applyColorPreset(state.currentColor, effectiveMode)
 
+    // CRITICAL: Canvas background must also respect dark mode
+    // In dark mode, use dark canvas background for proper contrast
+    const root = document.documentElement
+    if (effectiveMode === 'dark') {
+      root.style.setProperty('--canvas-bg-color', '#1e1e1e')
+    } else {
+      // In light mode, reapply current canvas preset
+      applyCanvasPreset(state.currentCanvas)
+    }
+
     // Update data-theme attribute on document
-    document.documentElement.dataset.theme = effectiveMode
+    root.dataset.theme = effectiveMode
 
     set({ themeMode: mode })
     useEditorStore.getState().markDirty()
@@ -241,47 +264,111 @@ export const useStyleStore = create<StyleState>((set, get) => ({
   // Format painter actions
   captureFormat: (editor: Editor) => {
     const { state } = editor
-    const { from } = state.selection
+    const { from, to } = state.selection
 
-    // Get marks at selection
+    console.debug('[StyleStore] captureFormat called. Selection:', { from, to })
+
+    // Get marks at selection - check both from position and stored marks
     const marks: StoredFormat['marks'] = []
     const resolvedFrom = state.doc.resolve(from)
 
-    // Get marks from the resolved position
-    resolvedFrom.marks().forEach((mark) => {
-      marks.push({
-        type: mark.type.name,
-        attrs: { ...mark.attrs },
-      })
-    })
+    // If there's a selection, get marks from the selected range
+    if (from !== to) {
+      // Collect all unique marks from the selection
+      const markSet = new Map<string, { type: string; attrs: Record<string, unknown> }>()
 
-    // Get text alignment from parent node
+      state.doc.nodesBetween(from, to, (node) => {
+        console.debug('[StyleStore] Checking node:', node.type.name, 'marks:', node.marks?.map(m => m.type.name))
+        if (node.marks && node.marks.length > 0) {
+          node.marks.forEach((mark) => {
+            const key = `${mark.type.name}-${JSON.stringify(mark.attrs)}`
+            if (!markSet.has(key)) {
+              markSet.set(key, {
+                type: mark.type.name,
+                attrs: { ...mark.attrs },
+              })
+            }
+          })
+        }
+      })
+
+      markSet.forEach((mark) => marks.push(mark))
+      console.debug('[StyleStore] Collected marks from selection:', marks.length > 0 ? marks : '(none - text has no formatting)')
+    } else {
+      // No selection - get marks at cursor position
+      const cursorMarks = resolvedFrom.marks()
+      console.debug('[StyleStore] No selection, checking cursor position marks:', cursorMarks.map(m => m.type.name))
+      cursorMarks.forEach((mark) => {
+        marks.push({
+          type: mark.type.name,
+          attrs: { ...mark.attrs },
+        })
+      })
+    }
+
+    // Get text alignment and node type from parent node
     const parent = resolvedFrom.parent
     const textAlign =
       (parent.attrs.textAlign as string) ||
       (parent.type.name === 'paragraph' ? 'left' : '')
 
+    // Capture node type (paragraph or heading)
+    const nodeType = parent.type.name === 'heading' ? 'heading' : 'paragraph'
+    const headingLevel = parent.type.name === 'heading'
+      ? (parent.attrs.level as 1 | 2 | 3)
+      : undefined
+
+    const summary = marks.length > 0
+      ? `Captured: ${marks.map(m => m.type).join(', ')}, align: ${textAlign}, node: ${nodeType}${headingLevel ? ` H${headingLevel}` : ''}`
+      : `No inline formatting, align: ${textAlign}, node: ${nodeType}${headingLevel ? ` H${headingLevel}` : ''}`
+    console.debug('[StyleStore] Format capture result:', summary)
+    console.debug('[StyleStore] Captured format:', { marks, textAlign, nodeType, headingLevel })
+
     set({
       formatPainter: {
         active: true,
         mode: get().formatPainter.mode,
-        storedFormat: { marks, textAlign },
+        storedFormat: { marks, textAlign, nodeType, headingLevel },
       },
     })
   },
 
   applyFormat: (editor: Editor) => {
     const { formatPainter } = get()
-    if (!formatPainter.storedFormat) return
+    if (!formatPainter.storedFormat) {
+      console.debug('[StyleStore] No stored format to apply')
+      return
+    }
 
-    const { marks, textAlign } = formatPainter.storedFormat
+    const { marks, textAlign, nodeType, headingLevel } = formatPainter.storedFormat
+    const { from, to } = editor.state.selection
 
-    // Apply marks to current selection
+    console.debug('[StyleStore] Applying format:', {
+      marks,
+      textAlign,
+      nodeType,
+      headingLevel,
+      selection: { from, to }
+    })
+
+    // First, apply node type change (paragraph or heading)
+    // This needs to happen before marks because changing node type can affect the selection
+    if (nodeType === 'heading' && headingLevel) {
+      console.debug('[StyleStore] Setting heading level:', headingLevel)
+      editor.chain().focus().setHeading({ level: headingLevel }).run()
+    } else if (nodeType === 'paragraph') {
+      console.debug('[StyleStore] Setting to paragraph')
+      editor.chain().focus().setParagraph().run()
+    }
+
+    // Clear existing marks
     editor.chain().focus().unsetAllMarks().run()
 
+    // Apply each stored mark
     marks.forEach((mark) => {
       const markType = editor.schema.marks[mark.type]
       if (markType) {
+        console.debug('[StyleStore] Setting mark:', mark.type, mark.attrs)
         editor.chain().focus().setMark(mark.type, mark.attrs).run()
       }
     })
@@ -293,6 +380,7 @@ export const useStyleStore = create<StyleState>((set, get) => ({
 
     // In toggle mode, deactivate after one use
     if (formatPainter.mode === 'toggle') {
+      console.debug('[StyleStore] Deactivating format painter (toggle mode)')
       set({
         formatPainter: {
           ...formatPainter,

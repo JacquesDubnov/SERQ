@@ -2324,15 +2324,51 @@ export function applyColorPreset(
 ): void {
   const preset = COLOR_PRESETS.find((p) => p.id === presetId)
   if (!preset) {
-    console.warn(`Color preset not found: ${presetId}`)
+    console.warn(`[Presets] Color preset not found: ${presetId}`)
     return
   }
 
   const root = document.documentElement
   const variables = mode === 'dark' ? preset.dark : preset.light
+
+  // Debug: log before value
+  const beforeTextColor = getComputedStyle(root).getPropertyValue('--color-text-primary')
+  console.log('[Presets] Applying color preset:', presetId, mode)
+  console.log('[Presets] --color-text-primary BEFORE:', beforeTextColor.trim())
+
   Object.entries(variables).forEach(([prop, value]) => {
     root.style.setProperty(prop, value)
   })
+
+  // Debug: log after value and verify on an actual element
+  const afterTextColor = getComputedStyle(root).getPropertyValue('--color-text-primary')
+  console.log('[Presets] --color-text-primary AFTER:', afterTextColor.trim())
+
+  // Check if the editor element exists and what color it's using
+  const editorEl = document.querySelector('.editor-content .tiptap') as HTMLElement
+  if (editorEl) {
+    const computedColor = getComputedStyle(editorEl).color
+    console.log('[Presets] Editor computed color BEFORE direct style:', computedColor)
+
+    // NUCLEAR OPTION: Also set color directly on the element
+    const textColor = variables['--color-text-primary']
+    if (textColor) {
+      editorEl.style.color = textColor
+      console.log('[Presets] Set DIRECT style.color on .tiptap:', textColor)
+
+      // Also set on all paragraphs and headings
+      const elements = document.querySelectorAll('.editor-content .tiptap p, .editor-content .tiptap h1, .editor-content .tiptap h2, .editor-content .tiptap h3')
+      elements.forEach((el) => {
+        (el as HTMLElement).style.color = textColor
+      })
+      console.log('[Presets] Set DIRECT style.color on', elements.length, 'p/h1/h2/h3 elements')
+    }
+
+    const afterColor = getComputedStyle(editorEl).color
+    console.log('[Presets] Editor computed color AFTER direct style:', afterColor)
+  } else {
+    console.log('[Presets] Editor element not found yet')
+  }
 }
 
 /**

@@ -16,7 +16,8 @@
   font-size: var(--font-size-base);
   line-height: var(--line-height-body);
   letter-spacing: var(--letter-spacing-body);
-  color: var(--color-text-primary);
+  /* !important ensures color presets override any inherited/base styles */
+  color: var(--color-text-primary) !important;
 
   /* Layout variables */
   max-width: var(--layout-page-max-width, 720px);
@@ -41,7 +42,7 @@
   font-weight: 700;
   line-height: var(--line-height-heading);
   letter-spacing: var(--letter-spacing-heading);
-  color: var(--color-text-primary);
+  color: var(--color-text-primary) !important;
   margin-top: 1.5rem;
   margin-bottom: 0.5rem;
 }
@@ -52,7 +53,7 @@
   font-weight: 600;
   line-height: var(--line-height-heading);
   letter-spacing: var(--letter-spacing-heading);
-  color: var(--color-text-primary);
+  color: var(--color-text-primary) !important;
   margin-top: 1.25rem;
   margin-bottom: 0.5rem;
 }
@@ -63,7 +64,7 @@
   font-weight: 600;
   line-height: var(--line-height-heading);
   letter-spacing: var(--letter-spacing-heading);
-  color: var(--color-text-primary);
+  color: var(--color-text-primary) !important;
   margin-top: 1rem;
   margin-bottom: 0.5rem;
 }
@@ -72,7 +73,7 @@
 .editor-content .tiptap p {
   font-size: var(--font-size-base);
   line-height: var(--line-height-body);
-  color: var(--color-text-primary);
+  color: var(--color-text-primary) !important;
   text-align: var(--layout-text-align, left);
   margin-bottom: var(--layout-paragraph-spacing, 1rem);
   text-indent: var(--layout-paragraph-indent, 0);
