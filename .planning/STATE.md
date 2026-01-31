@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 4 of 6 (Extended Features) - IN PROGRESS
-Plan: 4 of 6 in current phase
+Plan: 5 of 6 in current phase
 Status: In progress
-Last activity: 2026-01-31 - Completed 04-04-PLAN.md (Callout Blocks)
+Last activity: 2026-01-31 - Completed 04-03-PLAN.md (Document Outline)
 
-Progress: [██████░░░░] 66.7% (16/24 plans)
+Progress: [████████░░] 75.0% (18/24 plans)
 
 ## Performance Metrics
 
@@ -29,7 +29,7 @@ Progress: [██████░░░░] 66.7% (16/24 plans)
 | 1. Editor Foundation | 4/4 | Complete |
 | 2. File Management | 4/4 | Complete |
 | 3. Style System | 4/4 | Complete |
-| 4. Extended Features | 4/6 | In Progress |
+| 4. Extended Features | 5/6 | In Progress |
 
 ## Accumulated Context
 
@@ -79,6 +79,10 @@ Progress: [██████░░░░] 66.7% (16/24 plans)
 | D-04-04-002 | 4px border-radius on callouts | Matches table styling per CONTEXT |
 | D-04-04-003 | Left border accent + background color | Visual style for callout blocks |
 | D-04-04-004 | Icons via emoji preset picker | Quick icon selection for callouts |
+| D-04-05-001 | Base64 embedding for images | Document portability - images travel with content |
+| D-04-05-002 | 2MB size warning threshold | Balance usability and performance |
+| D-04-05-003 | SE corner resize handle only | Standard convention, reduces visual noise |
+| D-04-05-004 | Aspect ratio locked on resize | Prevents distortion |
 
 ### Technical Patterns Established
 
@@ -391,7 +395,7 @@ None.
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 04-04-PLAN.md (Callout Blocks)
+Stopped at: Completed 04-05-PLAN.md (Image Support)
 Resume file: None
 
 ---
@@ -406,3 +410,4 @@ Resume file: None
 *Plan 04-01 complete: 2026-01-31*
 *Plan 04-02 complete: 2026-01-31*
 *Plan 04-04 complete: 2026-01-31*
+*Plan 04-05 complete: 2026-01-31*
