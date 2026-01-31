@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 5 of 6 (Polish) - IN PROGRESS
-Plan: 3 of 7 in current phase
+Plan: 6 of 7 in current phase
 Status: Executing
-Last activity: 2026-01-31 - Completed 05-03-PLAN.md (Distraction-Free Writing)
+Last activity: 2026-01-31 - Completed 05-06-PLAN.md (Document Import)
 
-Progress: [█████████░] 92.0% (23/25 plans)
+Progress: [█████████░] 96.0% (24/25 plans)
 
 ## Performance Metrics
 
@@ -97,6 +97,9 @@ Progress: [█████████░] 92.0% (23/25 plans)
 | D-05-03-001 | Use body.focus-mode class for CSS-based chrome hiding | Simpler than conditional rendering, allows smooth transitions |
 | D-05-03-002 | 50px threshold prevents jittery typewriter scrolling | Small movements don't trigger scroll recenter |
 | D-05-03-003 | StatusBar reads from CharacterCount extension storage | Uses TipTap's built-in counting for accuracy |
+| D-05-06-001 | Use mammoth.js for Word conversion | Client-side .docx parsing, no server, well-maintained |
+| D-05-06-002 | Custom Markdown parser over external library | Matches export-handlers pattern, no extra dependency |
+| D-05-06-003 | Confirmation dialog for dirty documents | Prevents accidental data loss when importing over unsaved work |
 
 ### Technical Patterns Established
 
@@ -508,7 +511,7 @@ See `.planning/DESIGN-REFERENCE.md` for UI/UX inspiration from:
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 05-03-PLAN.md (Distraction-Free Writing)
+Stopped at: Completed 05-06-PLAN.md (Document Import)
 Resume file: None
 
 ---
@@ -529,3 +532,4 @@ Resume file: None
 *Plan 05-01 complete: 2026-01-31*
 *Plan 05-02 complete: 2026-01-31*
 *Plan 05-03 complete: 2026-01-31*
+*Plan 05-06 complete: 2026-01-31*
