@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Editor Foundation** - TipTap + Tauri scaffold with critical performance patterns
 - [x] **Phase 2: File Management** - Native dialogs, .serq.html format, auto-save
 - [x] **Phase 3: Style System** - CSS variables, presets, theme switching
-- [ ] **Phase 4: Extended Features** - Tables, custom blocks, media, commands
+- [x] **Phase 4: Extended Features** - Tables, custom blocks, media, commands
 - [ ] **Phase 5: Polish** - Version history, comments, export, UI panels
 - [ ] **Phase 6: AI Integration** - Claude API, stylization workflow, streaming
 
@@ -121,7 +121,7 @@ Plans:
 - [x] 04-03-PLAN.md — Document outline panel with TableOfContents extension
 - [x] 04-04-PLAN.md — Callout block extension with color palette and collapse
 - [x] 04-05-PLAN.md — Image insertion (drag/drop, paste, slash) with resize handles
-- [ ] 04-06-PLAN.md — Human verification of all Phase 4 success criteria
+- [x] 04-06-PLAN.md — Human verification of all Phase 4 success criteria
 
 **Implementation Notes:**
 - Tables via @tiptap/extension-table (official, includes all 4 required extensions)
@@ -203,7 +203,7 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6
 | 1. Editor Foundation | 4/4 | Complete | 2026-01-30 |
 | 2. File Management | 4/4 | Complete | 2026-01-30 |
 | 3. Style System | 4/4 | Complete | 2026-01-31 |
-| 4. Extended Features | 5/6 | In Progress | - |
+| 4. Extended Features | 6/6 | Complete | 2026-01-31 |
 | 5. Polish | 0/3 | Not started | - |
 | 6. AI Integration | 0/2 | Not started | - |
 
