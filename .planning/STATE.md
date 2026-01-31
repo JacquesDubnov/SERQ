@@ -10,17 +10,17 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 4 of 6 (Extended Features) - IN PROGRESS
-Plan: 2 of 6 in current phase
+Plan: 4 of 6 in current phase
 Status: In progress
-Last activity: 2026-01-31 - Completed 04-02-PLAN.md (Command Interfaces)
+Last activity: 2026-01-31 - Completed 04-04-PLAN.md (Callout Blocks)
 
-Progress: [██████░░░░] 58.3% (14/24 plans)
+Progress: [██████░░░░] 66.7% (16/24 plans)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11
-- Total execution time: ~1 hour 48 min
+- Total plans completed: 16
+- Total execution time: ~1 hour 52 min
 
 **By Phase:**
 
@@ -29,7 +29,7 @@ Progress: [██████░░░░] 58.3% (14/24 plans)
 | 1. Editor Foundation | 4/4 | Complete |
 | 2. File Management | 4/4 | Complete |
 | 3. Style System | 4/4 | Complete |
-| 4. Extended Features | 2/6 | In Progress |
+| 4. Extended Features | 4/6 | In Progress |
 
 ## Accumulated Context
 
@@ -75,6 +75,10 @@ Progress: [██████░░░░] 58.3% (14/24 plans)
 | D-04-02-002 | Use @tiptap/suggestion for slash commands | Official TipTap utility, handles cursor and popups |
 | D-04-02-003 | tippy.js for slash menu positioning | Lightweight, handles viewport edges |
 | D-04-02-004 | Separate command definitions from UI | commands.ts defines actions, palette renders - easier to extend |
+| D-04-04-001 | Color-based callouts (not semantic types) | Per CONTEXT spec - 8 colors: blue, green, yellow, orange, red, purple, pink, gray |
+| D-04-04-002 | 4px border-radius on callouts | Matches table styling per CONTEXT |
+| D-04-04-003 | Left border accent + background color | Visual style for callout blocks |
+| D-04-04-004 | Icons via emoji preset picker | Quick icon selection for callouts |
 
 ### Technical Patterns Established
 
@@ -315,6 +319,55 @@ export const SlashCommands = Extension.create({
 })
 ```
 
+**Custom Block Extension Pattern (Phase 4):**
+```typescript
+// Node.create with ReactNodeViewRenderer for custom blocks
+export const Callout = Node.create({
+  name: 'callout',
+  group: 'block',
+  content: 'block+',  // Allows paragraphs, lists, headings inside
+  draggable: true,
+  isolating: true,
+
+  addAttributes() {
+    return {
+      color: { default: 'blue' },
+      icon: { default: null },
+      collapsed: { default: false },
+      collapsible: { default: false },
+    }
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(CalloutView)
+  },
+
+  addCommands() {
+    return {
+      insertCallout: (attrs = {}) => ({ commands }) => {
+        return commands.insertContent({
+          type: 'callout',
+          attrs,
+          content: [{ type: 'paragraph' }],
+        })
+      },
+    }
+  },
+})
+
+// View component with NodeViewWrapper/NodeViewContent
+function CalloutView({ node, updateAttributes, selected, deleteNode }) {
+  return (
+    <NodeViewWrapper className="callout" data-color={node.attrs.color}>
+      <div className="callout-header" contentEditable={false}>
+        {/* Icon, collapse button */}
+      </div>
+      <NodeViewContent className="callout-content" />
+    </NodeViewWrapper>
+  )
+}
+```
+
 ### Design Reference
 
 See `.planning/DESIGN-REFERENCE.md` for UI/UX inspiration from:
@@ -338,7 +391,7 @@ None.
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 04-02-PLAN.md (Command Interfaces)
+Stopped at: Completed 04-04-PLAN.md (Callout Blocks)
 Resume file: None
 
 ---
@@ -352,3 +405,4 @@ Resume file: None
 *Phase 3 complete: 2026-01-31 (human verified)*
 *Plan 04-01 complete: 2026-01-31*
 *Plan 04-02 complete: 2026-01-31*
+*Plan 04-04 complete: 2026-01-31*
