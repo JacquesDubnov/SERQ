@@ -325,6 +325,7 @@ function App() {
         editor={editor}
         isOpen={commandPaletteOpen}
         onOpenChange={setCommandPaletteOpen}
+        onShowOutline={() => setOutlinePanelOpen(true)}
       />
 
       {/* Document Outline Panel */}
