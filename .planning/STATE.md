@@ -5,16 +5,16 @@
 See: .planning/PROJECT.md (updated 2026-01-30)
 
 **Core value:** Documents that work everywhere, created by writers who write - not format.
-**Current focus:** Phase 4 - Extended Features
+**Current focus:** Phase 5 - Polish
 
 ## Current Position
 
-Phase: 5 of 6 (Polish) - READY TO START
-Plan: 0 of 3 in current phase
-Status: Ready to plan
-Last activity: 2026-01-31 - Phase 4 verified complete
+Phase: 5 of 6 (Polish) - IN PROGRESS
+Plan: 1 of 7 in current phase
+Status: Executing
+Last activity: 2026-01-31 - Completed 05-01-PLAN.md (SQLite Version Storage)
 
-Progress: [████████░░] 83.3% (20/24 plans)
+Progress: [█████████░] 87.5% (21/24 plans)
 
 ## Performance Metrics
 
@@ -87,6 +87,10 @@ Progress: [████████░░] 83.3% (20/24 plans)
 | D-04-03-002 | Store outline anchors in editorStore | Centralized state accessible to both panel and command palette |
 | D-04-03-003 | Panel slides from left | Mirrors StylePanel on right, provides visual balance |
 | D-04-03-004 | Jump-to at top of command palette | Most relevant when searching for headings, easy access |
+| D-05-01-001 | Use tauri-plugin-sql with SQLite | Local storage, fast, no network dependency, works offline |
+| D-05-01-002 | Singleton DB instance pattern | Avoid reconnection overhead, consistent connection |
+| D-05-01-003 | 30s debounce + 60s maxWait for auto-snapshot | Balance between data safety and disk write frequency |
+| D-05-01-004 | Keep 50 auto-saves + all checkpoints | Reasonable history depth without unbounded growth |
 
 ### Technical Patterns Established
 
@@ -420,6 +424,59 @@ const jumpToCommands: CommandItem[] = useMemo(() => {
 }, [outlineAnchors])
 ```
 
+**SQLite Migration Pattern (Phase 5):**
+```rust
+// In lib.rs - register SQL plugin with migrations
+use tauri_plugin_sql::{Builder as SqlBuilder, Migration, MigrationKind};
+
+.plugin(
+    SqlBuilder::default()
+        .add_migrations(
+            "sqlite:serq.db",
+            vec![Migration {
+                version: 1,
+                description: "create_versions_table",
+                sql: include_str!("../migrations/001_versions.sql"),
+                kind: MigrationKind::Up,
+            }],
+        )
+        .build(),
+)
+```
+
+**Database Singleton Pattern (Phase 5):**
+```typescript
+// Singleton for SQLite connection
+let dbInstance: Awaited<ReturnType<typeof Database.load>> | null = null;
+
+async function getDb() {
+  if (!dbInstance) {
+    dbInstance = await Database.load('sqlite:serq.db');
+  }
+  return dbInstance;
+}
+```
+
+**Auto-Snapshot to SQLite Pattern (Phase 5):**
+```typescript
+// Debounced save to SQLite on editor changes
+const performSnapshot = useDebouncedCallback(async () => {
+  if (!enabled || !editor || !documentPath) return;
+
+  const editorJSON = editor.getJSON();
+  const contentString = JSON.stringify(editorJSON);
+
+  // Skip if content unchanged
+  if (contentString === lastSnapshotRef.current) return;
+
+  await saveVersion(documentPath, editorJSON, wordCount, charCount, false);
+  lastSnapshotRef.current = contentString;
+  await deleteOldVersions(documentPath, 50);
+}, 30000, { maxWait: 60000 });
+
+editor.on('update', performSnapshot);
+```
+
 ### Design Reference
 
 See `.planning/DESIGN-REFERENCE.md` for UI/UX inspiration from:
@@ -445,7 +502,7 @@ See `.planning/DESIGN-REFERENCE.md` for UI/UX inspiration from:
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 04-03-PLAN.md (Document Outline)
+Stopped at: Completed 05-01-PLAN.md (SQLite Version Storage)
 Resume file: None
 
 ---
@@ -462,3 +519,5 @@ Resume file: None
 *Plan 04-03 complete: 2026-01-31*
 *Plan 04-04 complete: 2026-01-31*
 *Plan 04-05 complete: 2026-01-31*
+*Phase 4 complete: 2026-01-31 (human verified)*
+*Plan 05-01 complete: 2026-01-31*
