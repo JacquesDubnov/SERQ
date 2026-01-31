@@ -257,6 +257,16 @@ export const commands: CommandItem[] = [
       console.log('Focus mode not yet implemented')
     },
   },
+  {
+    id: 'go-to-heading',
+    title: 'Go to Heading',
+    shortcut: `${modKey}+G`,
+    group: 'view',
+    action: () => {
+      // Placeholder for outline integration - will be implemented in 04-03
+      console.log('Go to heading not yet implemented')
+    },
+  },
 ]
 
 /**
