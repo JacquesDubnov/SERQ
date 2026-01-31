@@ -13,12 +13,20 @@ pub fn run() {
             SqlBuilder::default()
                 .add_migrations(
                     "sqlite:serq.db",
-                    vec![Migration {
-                        version: 1,
-                        description: "create_versions_table",
-                        sql: include_str!("../migrations/001_versions.sql"),
-                        kind: MigrationKind::Up,
-                    }],
+                    vec![
+                        Migration {
+                            version: 1,
+                            description: "create_versions_table",
+                            sql: include_str!("../migrations/001_versions.sql"),
+                            kind: MigrationKind::Up,
+                        },
+                        Migration {
+                            version: 2,
+                            description: "create_comments_table",
+                            sql: include_str!("../migrations/002_comments.sql"),
+                            kind: MigrationKind::Up,
+                        },
+                    ],
                 )
                 .build(),
         )
