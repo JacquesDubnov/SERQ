@@ -83,6 +83,10 @@ Progress: [████████░░] 75.0% (18/24 plans)
 | D-04-05-002 | 2MB size warning threshold | Balance usability and performance |
 | D-04-05-003 | SE corner resize handle only | Standard convention, reduces visual noise |
 | D-04-05-004 | Aspect ratio locked on resize | Prevents distortion |
+| D-04-03-001 | Use TipTap TableOfContents extension | Official TipTap utility, handles heading tracking and active state |
+| D-04-03-002 | Store outline anchors in editorStore | Centralized state accessible to both panel and command palette |
+| D-04-03-003 | Panel slides from left | Mirrors StylePanel on right, provides visual balance |
+| D-04-03-004 | Jump-to at top of command palette | Most relevant when searching for headings, easy access |
 
 ### Technical Patterns Established
 
@@ -372,6 +376,50 @@ function CalloutView({ node, updateAttributes, selected, deleteNode }) {
 }
 ```
 
+**Outline Panel Pattern (Phase 4):**
+```typescript
+// TableOfContents extension onUpdate callback
+function handleTocUpdate(data: TableOfContentData): void {
+  const anchors: OutlineAnchor[] = data.map((item) => ({
+    id: item.id,
+    level: item.level,
+    textContent: item.textContent,
+    isActive: item.isActive,
+    pos: item.pos,
+  }));
+  useEditorStore.getState().setOutlineAnchors(anchors);
+}
+
+// Navigate to heading
+const handleNavigate = useCallback((anchor: OutlineAnchor) => {
+  if (!editor) return
+  editor.chain().focus().setTextSelection(anchor.pos).run()
+  const headingNode = editor.view.nodeDOM(anchor.pos)
+  if (headingNode instanceof HTMLElement) {
+    headingNode.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+}, [editor])
+```
+
+**Dynamic Command Generation Pattern (Phase 4):**
+```typescript
+// Generate commands from store state
+const jumpToCommands: CommandItem[] = useMemo(() => {
+  return outlineAnchors.map((anchor) => ({
+    id: `jump-to-${anchor.id}`,
+    title: `H${anchor.level}: ${anchor.textContent || 'Untitled'}`,
+    group: 'jump-to' as CommandGroup,
+    action: (ed: Editor) => {
+      ed.chain().focus().setTextSelection(anchor.pos).run()
+      const headingNode = ed.view.nodeDOM(anchor.pos)
+      if (headingNode instanceof HTMLElement) {
+        headingNode.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    },
+  }))
+}, [outlineAnchors])
+```
+
 ### Design Reference
 
 See `.planning/DESIGN-REFERENCE.md` for UI/UX inspiration from:
@@ -395,7 +443,7 @@ None.
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 04-05-PLAN.md (Image Support)
+Stopped at: Completed 04-03-PLAN.md (Document Outline)
 Resume file: None
 
 ---
@@ -409,5 +457,6 @@ Resume file: None
 *Phase 3 complete: 2026-01-31 (human verified)*
 *Plan 04-01 complete: 2026-01-31*
 *Plan 04-02 complete: 2026-01-31*
+*Plan 04-03 complete: 2026-01-31*
 *Plan 04-04 complete: 2026-01-31*
 *Plan 04-05 complete: 2026-01-31*
