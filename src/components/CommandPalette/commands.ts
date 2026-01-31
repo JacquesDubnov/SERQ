@@ -1,5 +1,10 @@
 import type { Editor } from '@tiptap/core'
 import { exportToHTML, exportToMarkdown, exportToPDF } from '../../lib/export-handlers'
+import {
+  importWordDocument,
+  importMarkdownFile,
+  importTextFile,
+} from '../../lib/import-handlers'
 import { useEditorStore } from '../../stores/editorStore'
 
 /**
@@ -296,6 +301,32 @@ export const commands: CommandItem[] = [
     action: (editor: Editor) => {
       const documentName = useEditorStore.getState().document.name
       exportToPDF(editor, documentName)
+    },
+  },
+
+  // Import commands
+  {
+    id: 'import-word',
+    title: 'Import Word Document (.docx)',
+    group: 'file',
+    action: (editor: Editor) => {
+      importWordDocument(editor)
+    },
+  },
+  {
+    id: 'import-markdown',
+    title: 'Import Markdown File',
+    group: 'file',
+    action: (editor: Editor) => {
+      importMarkdownFile(editor)
+    },
+  },
+  {
+    id: 'import-text',
+    title: 'Import Plain Text',
+    group: 'file',
+    action: (editor: Editor) => {
+      importTextFile(editor)
     },
   },
 ]
