@@ -1,6 +1,8 @@
+import { useState, useCallback } from 'react';
 import { useEditorState } from '@tiptap/react';
 import type { Editor } from '@tiptap/core';
 import { FormatPainter } from '../FormatPainter';
+import { TablePicker } from './TablePicker';
 
 interface InterfaceColors {
   bg: string;
@@ -46,6 +48,13 @@ function Divider({ color }: { color: string }) {
 }
 
 export function EditorToolbar({ editor, interfaceColors }: ToolbarProps) {
+  const [showTablePicker, setShowTablePicker] = useState(false)
+
+  const handleInsertTable = useCallback((rows: number, cols: number) => {
+    editor.chain().focus().insertTable({ rows, cols, withHeaderRow: false }).run()
+    setShowTablePicker(false)
+  }, [editor])
+
   // CRITICAL: Use selector to avoid re-render avalanche
   // Only re-renders when selected values change, not on every transaction
   const state = useEditorState({
@@ -245,6 +254,36 @@ export function EditorToolbar({ editor, interfaceColors }: ToolbarProps) {
       >
         Code Block
       </ToolbarButton>
+
+      {/* Table */}
+      <div style={{ position: 'relative' }}>
+        <ToolbarButton
+          onClick={() => setShowTablePicker(!showTablePicker)}
+          isActive={showTablePicker}
+          title="Insert Table"
+          colors={interfaceColors}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="currentColor"
+            style={{ display: 'block' }}
+          >
+            {/* 2x2 grid icon */}
+            <rect x="1" y="1" width="6" height="6" rx="1" />
+            <rect x="9" y="1" width="6" height="6" rx="1" />
+            <rect x="1" y="9" width="6" height="6" rx="1" />
+            <rect x="9" y="9" width="6" height="6" rx="1" />
+          </svg>
+        </ToolbarButton>
+        {showTablePicker && (
+          <TablePicker
+            onSelect={handleInsertTable}
+            onClose={() => setShowTablePicker(false)}
+          />
+        )}
+      </div>
 
       <Divider color={interfaceColors.border} />
 
