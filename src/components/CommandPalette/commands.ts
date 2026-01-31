@@ -25,6 +25,7 @@ export type CommandGroup =
   | 'insert'
   | 'file'
   | 'view'
+  | 'jump-to'
 
 /**
  * All available commands for the command palette
@@ -258,13 +259,12 @@ export const commands: CommandItem[] = [
     },
   },
   {
-    id: 'go-to-heading',
-    title: 'Go to Heading',
-    shortcut: `${modKey}+G`,
+    id: 'show-outline',
+    title: 'Show Document Outline',
+    shortcut: `${modKey}+Shift+O`,
     group: 'view',
     action: () => {
-      // Placeholder for outline integration - will be implemented in 04-03
-      console.log('Go to heading not yet implemented')
+      // This will be handled by CommandPalette via onShowOutline callback
     },
   },
 ]
@@ -281,6 +281,7 @@ export function getGroupedCommands(): Record<CommandGroup, CommandItem[]> {
     insert: [],
     file: [],
     view: [],
+    'jump-to': [],
   }
 
   for (const command of commands) {
@@ -301,4 +302,5 @@ export const groupLabels: Record<CommandGroup, string> = {
   insert: 'Insert',
   file: 'File',
   view: 'View',
+  'jump-to': 'Jump to',
 }

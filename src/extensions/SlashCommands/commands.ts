@@ -1,4 +1,5 @@
 import type { Editor, Range } from '@tiptap/core'
+import { fileToBase64, isImageFile, isLargeImage, formatFileSize } from '../../lib/imageUtils'
 
 /**
  * Slash command item interface
@@ -126,6 +127,47 @@ export const slashCommands: SlashCommandItem[] = [
     aliases: ['callout', 'admonition', 'note', 'alert'],
     command: ({ editor, range }) => {
       editor.chain().focus().deleteRange(range).insertCallout({ color: 'blue' }).run()
+    },
+  },
+  {
+    title: 'Image',
+    description: 'Insert an image from file',
+    icon: '🖼',
+    aliases: ['image', 'img', 'picture', 'photo'],
+    command: ({ editor, range }) => {
+      // Create file input and trigger click
+      const input = document.createElement('input')
+      input.type = 'file'
+      input.accept = 'image/*'
+
+      input.onchange = async () => {
+        const file = input.files?.[0]
+        if (!file || !isImageFile(file)) return
+
+        // Warn for large files
+        if (isLargeImage(file)) {
+          const proceed = window.confirm(
+            `This image is ${formatFileSize(file.size)}. Large images may slow down the document. Continue?`
+          )
+          if (!proceed) return
+        }
+
+        try {
+          const dataUrl = await fileToBase64(file)
+
+          // Delete the slash command range and insert image
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .setImage({ src: dataUrl })
+            .run()
+        } catch (error) {
+          console.error('Failed to insert image:', error)
+        }
+      }
+
+      input.click()
     },
   },
 ]
