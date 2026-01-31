@@ -3,13 +3,13 @@
  * Phase 3: Style System Foundation
  *
  * Wraps Tauri's window theme API for detecting macOS light/dark mode.
- * Supports user override to lock to specific mode.
+ * Uses styleStore.themeMode as the source of truth for user override.
  * Falls back to CSS media query when Tauri API is unavailable (browser dev).
  */
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
+import { useStyleStore } from '../stores/styleStore'
 
-type ThemeMode = 'light' | 'dark' | 'system'
 type EffectiveTheme = 'light' | 'dark'
 
 export interface UseSystemThemeReturn {
@@ -17,12 +17,6 @@ export interface UseSystemThemeReturn {
   effectiveTheme: EffectiveTheme
   /** What macOS system settings report */
   systemTheme: EffectiveTheme
-  /** User's preference: follow system, or lock to light/dark */
-  userOverride: ThemeMode
-  /** Set user's theme preference */
-  setUserOverride: (mode: ThemeMode) => void
-  /** Quick toggle between light and dark (ignores system) */
-  toggleTheme: () => void
   /** Whether the Tauri API is available */
   isTauriAvailable: boolean
 }
@@ -31,31 +25,18 @@ export interface UseSystemThemeReturn {
  * Detect and respond to system theme changes with override support.
  *
  * Uses Tauri's window API when available, falls back to CSS media queries.
- * Updates document.documentElement.dataset.theme for CSS variable switching.
- *
- * @example
- * ```tsx
- * function App() {
- *   const { effectiveTheme, toggleTheme, setUserOverride } = useSystemTheme()
- *
- *   return (
- *     <div>
- *       <p>Current theme: {effectiveTheme}</p>
- *       <button onClick={toggleTheme}>Toggle</button>
- *       <button onClick={() => setUserOverride('system')}>Follow System</button>
- *     </div>
- *   )
- * }
- * ```
+ * Syncs with styleStore.themeMode for user preference.
  */
 export function useSystemTheme(): UseSystemThemeReturn {
   const [systemTheme, setSystemTheme] = useState<EffectiveTheme>('light')
-  const [userOverride, setUserOverrideState] = useState<ThemeMode>('system')
   const [isTauriAvailable, setIsTauriAvailable] = useState(false)
 
-  // Calculate effective theme from system and override
+  // Get themeMode from styleStore (this makes the hook reactive to store changes)
+  const themeMode = useStyleStore((state) => state.themeMode)
+
+  // Calculate effective theme from system and store's themeMode
   const effectiveTheme: EffectiveTheme =
-    userOverride === 'system' ? systemTheme : userOverride
+    themeMode === 'system' ? systemTheme : themeMode
 
   // Update document theme attribute when effective theme changes
   useEffect(() => {
@@ -126,30 +107,9 @@ export function useSystemTheme(): UseSystemThemeReturn {
     }
   }, [])
 
-  // Set user override
-  const setUserOverride = useCallback((mode: ThemeMode) => {
-    setUserOverrideState(mode)
-    // Note: Persistence will be handled by styleStore in a later phase
-  }, [])
-
-  // Quick toggle between light and dark
-  const toggleTheme = useCallback(() => {
-    setUserOverrideState((current) => {
-      if (current === 'system') {
-        // If following system, toggle to opposite of current system theme
-        return systemTheme === 'dark' ? 'light' : 'dark'
-      }
-      // Otherwise toggle between light and dark
-      return current === 'dark' ? 'light' : 'dark'
-    })
-  }, [systemTheme])
-
   return {
     effectiveTheme,
     systemTheme,
-    userOverride,
-    setUserOverride,
-    toggleTheme,
     isTauriAvailable,
   }
 }
