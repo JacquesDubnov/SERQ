@@ -1,5 +1,6 @@
-import { ReactNode, useEffect } from 'react'
+import { ReactNode, useEffect, useState, useCallback } from 'react'
 import { Editor } from '@tiptap/core'
+import { TableContextMenu } from './TableContextMenu'
 
 interface EditorWrapperProps {
   editor: Editor | null
@@ -8,11 +9,30 @@ interface EditorWrapperProps {
 }
 
 /**
- * EditorWrapper provides click-anywhere functionality.
+ * EditorWrapper provides click-anywhere functionality and table context menu.
  * Clicking below the content creates empty paragraphs to position
  * the cursor at the approximate click location.
  */
 export function EditorWrapper({ editor, children, className = '' }: EditorWrapperProps) {
+  // Table context menu state
+  const [tableMenuState, setTableMenuState] = useState<{ x: number; y: number } | null>(null)
+
+  // Handle right-click for table context menu
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    const target = e.target as HTMLElement
+
+    // Check if right-click is inside a table cell
+    const tableCell = target.closest('td, th')
+    if (tableCell && editor) {
+      e.preventDefault()
+      setTableMenuState({ x: e.clientX, y: e.clientY })
+    }
+  }, [editor])
+
+  // Close table context menu
+  const closeTableMenu = useCallback(() => {
+    setTableMenuState(null)
+  }, [])
 
   useEffect(() => {
     if (!editor) return
@@ -38,7 +58,7 @@ export function EditorWrapper({ editor, children, className = '' }: EditorWrappe
       if (!proseMirror) return
 
       // Get the actual text content bounds (not including padding)
-      const contentElements = proseMirror.querySelectorAll('p, h1, h2, h3, h4, h5, h6, ul, ol, blockquote, pre, hr')
+      const contentElements = proseMirror.querySelectorAll('p, h1, h2, h3, h4, h5, h6, ul, ol, blockquote, pre, hr, table')
 
       let contentBottom = 0
       if (contentElements.length > 0) {
@@ -87,8 +107,18 @@ export function EditorWrapper({ editor, children, className = '' }: EditorWrappe
   }, [editor])
 
   return (
-    <div className={`click-anywhere-wrapper ${className}`}>
+    <div
+      className={`click-anywhere-wrapper ${className}`}
+      onContextMenu={handleContextMenu}
+    >
       {children}
+      {tableMenuState && editor && (
+        <TableContextMenu
+          editor={editor}
+          position={tableMenuState}
+          onClose={closeTableMenu}
+        />
+      )}
     </div>
   )
 }
