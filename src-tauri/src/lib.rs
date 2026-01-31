@@ -1,4 +1,6 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+use tauri_plugin_sql::{Builder as SqlBuilder, Migration, MigrationKind};
+
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! Welcome to SERQ.", name)
@@ -7,6 +9,19 @@ fn greet(name: &str) -> String {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(
+            SqlBuilder::default()
+                .add_migrations(
+                    "sqlite:serq.db",
+                    vec![Migration {
+                        version: 1,
+                        description: "create_versions_table",
+                        sql: include_str!("../migrations/001_versions.sql"),
+                        kind: MigrationKind::Up,
+                    }],
+                )
+                .build(),
+        )
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
