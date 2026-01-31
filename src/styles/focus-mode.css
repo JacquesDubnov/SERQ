@@ -1,0 +1,81 @@
+/**
+ * Focus Mode Styles
+ * Hides all UI chrome for distraction-free writing
+ */
+
+/* Focus mode active state */
+body.focus-mode {
+  /* Smooth transition into focus mode */
+  transition: background-color 0.3s ease;
+}
+
+body.focus-mode .editor-toolbar,
+body.focus-mode .toolbar-wrapper,
+body.focus-mode .status-bar,
+body.focus-mode .outline-panel,
+body.focus-mode .style-panel,
+body.focus-mode .format-painter-button,
+body.focus-mode .export-menu,
+body.focus-mode [data-toolbar] {
+  display: none !important;
+}
+
+/* Full viewport editor */
+body.focus-mode .editor-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  padding: 0;
+  margin: 0;
+}
+
+/* Center and constrain content */
+body.focus-mode .ProseMirror {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 15vh 2rem 30vh 2rem;
+  min-height: 100vh;
+}
+
+/* Show exit hint on hover at top */
+body.focus-mode::before {
+  content: 'Press Cmd+Shift+F or Esc to exit focus mode';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  text-align: center;
+  padding: 8px;
+  font-size: 12px;
+  color: var(--color-text-muted, #888);
+  background: linear-gradient(
+    to bottom,
+    var(--canvas-bg, white) 0%,
+    transparent 100%
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  z-index: 1001;
+}
+
+body.focus-mode:hover::before {
+  opacity: 1;
+}
+
+/* Fade effect for focus mode transitions */
+@keyframes focus-mode-fade-in {
+  from {
+    opacity: 0.8;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+body.focus-mode .editor-wrapper {
+  animation: focus-mode-fade-in 0.3s ease;
+}
