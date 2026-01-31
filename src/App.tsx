@@ -4,6 +4,7 @@ import { EditorCore, EditorToolbar, EditorWrapper, type EditorCoreRef } from './
 import { Canvas, type CanvasWidth } from './components/Layout';
 import { StylePanel, type StylePanelType } from './components/StylePanel';
 import { CommandPalette } from './components/CommandPalette';
+import { OutlinePanel } from './components/DocumentOutline';
 import { useEditorStore, useStyleStore } from './stores';
 import { useKeyboardShortcuts, useAutoSave, useSystemTheme } from './hooks';
 import { getStyleDefaults } from './lib/preferencesStore';
@@ -51,6 +52,7 @@ function App() {
   const [editor, setEditor] = useState<Editor | null>(null);
   const [activePanel, setActivePanel] = useState<StylePanelType | null>(null);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [outlinePanelOpen, setOutlinePanelOpen] = useState(false);
 
   // Zustand store for document state
   const document = useEditorStore((state) => state.document);
@@ -98,6 +100,16 @@ function App() {
       setCommandPaletteOpen((prev) => !prev);
     },
     { enableOnContentEditable: true, enableOnFormTags: true }
+  );
+
+  // Keyboard shortcut for document outline (Cmd+Shift+O)
+  useHotkeys(
+    'mod+shift+o',
+    (e) => {
+      e.preventDefault();
+      setOutlinePanelOpen((prev) => !prev);
+    },
+    { enableOnContentEditable: true }
   );
 
   // Toggle panel helper
@@ -195,6 +207,21 @@ function App() {
         <div className="py-3 flex items-center justify-between" style={{ paddingLeft: '20px', paddingRight: '20px' }}>
           <div className="flex items-center gap-4">
             <span className="text-lg font-semibold" style={{ color: interfaceTextPrimary }}>SERQ</span>
+            <div className="h-4 w-px" style={{ backgroundColor: interfaceBorder }} />
+            {/* Outline toggle button */}
+            <button
+              onClick={() => setOutlinePanelOpen((prev) => !prev)}
+              title="Document Outline (Cmd+Shift+O)"
+              className="p-1.5 rounded transition-colors"
+              style={{
+                backgroundColor: outlinePanelOpen ? interfaceBgSurface : 'transparent',
+                color: outlinePanelOpen ? interfaceTextPrimary : interfaceTextSecondary,
+              }}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              </svg>
+            </button>
             <div className="h-4 w-px" style={{ backgroundColor: interfaceBorder }} />
             <div className="flex items-center gap-2">
               {document.isDirty && (
@@ -298,6 +325,14 @@ function App() {
         editor={editor}
         isOpen={commandPaletteOpen}
         onOpenChange={setCommandPaletteOpen}
+      />
+
+      {/* Document Outline Panel */}
+      <OutlinePanel
+        isOpen={outlinePanelOpen}
+        onClose={() => setOutlinePanelOpen(false)}
+        editor={editor}
+        interfaceColors={interfaceColors}
       />
     </div>
   );
