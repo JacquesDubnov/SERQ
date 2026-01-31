@@ -3,6 +3,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { EditorCore, EditorToolbar, EditorWrapper, type EditorCoreRef } from './components/Editor';
 import { Canvas, type CanvasWidth } from './components/Layout';
 import { StylePanel, type StylePanelType } from './components/StylePanel';
+import { CommandPalette } from './components/CommandPalette';
 import { useEditorStore, useStyleStore } from './stores';
 import { useKeyboardShortcuts, useAutoSave, useSystemTheme } from './hooks';
 import { getStyleDefaults } from './lib/preferencesStore';
@@ -49,6 +50,7 @@ function App() {
   const editorRef = useRef<EditorCoreRef>(null);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [activePanel, setActivePanel] = useState<StylePanelType | null>(null);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
 
   // Zustand store for document state
   const document = useEditorStore((state) => state.document);
@@ -86,6 +88,16 @@ function App() {
       setActivePanel((prev) => (prev === 'themes' ? null : 'themes'));
     },
     { enableOnContentEditable: true }
+  );
+
+  // Keyboard shortcut for command palette (Cmd+K or Cmd+P)
+  useHotkeys(
+    'mod+k, mod+p',
+    (e) => {
+      e.preventDefault();
+      setCommandPaletteOpen((prev) => !prev);
+    },
+    { enableOnContentEditable: true, enableOnFormTags: true }
   );
 
   // Toggle panel helper
@@ -279,6 +291,13 @@ function App() {
         panelType={activePanel}
         onClose={() => setActivePanel(null)}
         interfaceColors={interfaceColors}
+      />
+
+      {/* Command Palette */}
+      <CommandPalette
+        editor={editor}
+        isOpen={commandPaletteOpen}
+        onOpenChange={setCommandPaletteOpen}
       />
     </div>
   );
