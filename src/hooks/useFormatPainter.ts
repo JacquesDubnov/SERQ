@@ -114,7 +114,7 @@ export function useFormatPainter(
     const currentFormat = useStyleStore.getState().formatPainter.storedFormat
     console.debug('[FormatPainter] Effect running - Active and listening for clicks. Stored format:', currentFormat)
 
-    const handleClick = (e: MouseEvent) => {
+    const handleClick = (_e: MouseEvent) => {
       console.debug('[FormatPainter] Click event fired on editor')
 
       // Get the latest stored format directly from store

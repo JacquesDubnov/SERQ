@@ -11,8 +11,13 @@ import Placeholder from '@tiptap/extension-placeholder';
 import CharacterCount from '@tiptap/extension-character-count';
 import Subscript from '@tiptap/extension-subscript';
 import Superscript from '@tiptap/extension-superscript';
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table-row';
+import { TableCell } from '@tiptap/extension-table-cell';
+import { TableHeader } from '@tiptap/extension-table-header';
 import type { Editor, JSONContent } from '@tiptap/core';
 import '../../styles/editor.css';
+import '../../styles/tables.css';
 
 export interface EditorCoreRef {
   setContent: (content: string | JSONContent) => void;
@@ -60,6 +65,16 @@ const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
         }),
         Subscript,
         Superscript,
+        Table.configure({
+          resizable: true,
+          handleWidth: 5,
+          cellMinWidth: 100,
+          lastColumnResizable: true,
+          allowTableNodeSelection: true,
+        }),
+        TableRow,
+        TableHeader,
+        TableCell,
       ],
       content: initialContent || '',
 

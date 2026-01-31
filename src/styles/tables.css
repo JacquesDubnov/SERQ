@@ -1,0 +1,315 @@
+/* ========================================
+   Table Styles for TipTap Editor
+   ======================================== */
+
+/* Table wrapper - container provided by TipTap */
+.tableWrapper {
+  position: relative;
+  max-width: 100%;
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+
+/* Base table styling */
+.editor-content .tiptap table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+/* Outer frame with 4px radius - using pseudo-element for rounded borders */
+.editor-content .tiptap table {
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 4px;
+}
+
+/* Table cells */
+.editor-content .tiptap td,
+.editor-content .tiptap th {
+  border: 1px solid var(--color-border, #e5e7eb);
+  padding: 0.5rem 0.75rem;
+  min-width: 100px;
+  vertical-align: top;
+  position: relative;
+  box-sizing: border-box;
+}
+
+/* Header row styling */
+.editor-content .tiptap th {
+  background-color: var(--color-bg-surface, #f9fafb);
+  font-weight: 600;
+  text-align: left;
+  color: var(--color-text-primary);
+}
+
+/* Cell content inherits editor typography */
+.editor-content .tiptap td p,
+.editor-content .tiptap th p {
+  margin: 0;
+  text-indent: 0;
+}
+
+/* Allow full content in cells */
+.editor-content .tiptap td > *:first-child,
+.editor-content .tiptap th > *:first-child {
+  margin-top: 0;
+}
+
+.editor-content .tiptap td > *:last-child,
+.editor-content .tiptap th > *:last-child {
+  margin-bottom: 0;
+}
+
+/* ========================================
+   Column Resize Handles
+   ======================================== */
+
+/* Resize handle provided by TipTap */
+.editor-content .tiptap .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background-color: transparent;
+  cursor: col-resize;
+  z-index: 20;
+  transition: background-color 0.15s ease;
+}
+
+.editor-content .tiptap .column-resize-handle:hover {
+  background-color: var(--color-accent, #2563eb);
+}
+
+/* While resizing */
+.editor-content .tiptap.resize-cursor {
+  cursor: col-resize;
+}
+
+/* ========================================
+   Cell Selection Styling
+   ======================================== */
+
+/* Selected cells highlight */
+.editor-content .tiptap .selectedCell {
+  background-color: var(--color-accent, #2563eb);
+  background-color: rgba(37, 99, 235, 0.15);
+}
+
+.editor-content .tiptap .selectedCell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 2px solid var(--color-accent, #2563eb);
+}
+
+/* Table selection (whole table selected) */
+.editor-content .tiptap .ProseMirror-selectednode table {
+  outline: 2px solid var(--color-accent, #2563eb);
+  outline-offset: 2px;
+}
+
+/* ========================================
+   Cell Background Colors
+   ======================================== */
+
+/* Cell background attribute styles */
+.editor-content .tiptap td[data-background-color],
+.editor-content .tiptap th[data-background-color] {
+  background-color: attr(data-background-color);
+}
+
+/* Color presets - applied via style attribute by TipTap */
+.editor-content .tiptap td[style*="background-color"],
+.editor-content .tiptap th[style*="background-color"] {
+  /* Preserve background-color from inline styles */
+}
+
+/* ========================================
+   Border Variations (for context menu toggles)
+   ======================================== */
+
+/* No borders variant */
+.editor-content .tiptap table.no-borders,
+.editor-content .tiptap table.no-borders td,
+.editor-content .tiptap table.no-borders th {
+  border: none;
+}
+
+/* Frame only (outer borders) */
+.editor-content .tiptap table.frame-only td,
+.editor-content .tiptap table.frame-only th {
+  border: none;
+}
+
+.editor-content .tiptap table.frame-only {
+  border: 1px solid var(--color-border, #e5e7eb);
+}
+
+/* Horizontal lines only */
+.editor-content .tiptap table.horizontal-only td,
+.editor-content .tiptap table.horizontal-only th {
+  border-left: none;
+  border-right: none;
+  border-top: 1px solid var(--color-border, #e5e7eb);
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+}
+
+.editor-content .tiptap table.horizontal-only {
+  border-left: none;
+  border-right: none;
+}
+
+/* Vertical lines only */
+.editor-content .tiptap table.vertical-only td,
+.editor-content .tiptap table.vertical-only th {
+  border-top: none;
+  border-bottom: none;
+  border-left: 1px solid var(--color-border, #e5e7eb);
+  border-right: 1px solid var(--color-border, #e5e7eb);
+}
+
+.editor-content .tiptap table.vertical-only {
+  border-top: none;
+  border-bottom: none;
+}
+
+/* ========================================
+   Table Context Menu Styles
+   ======================================== */
+
+.table-context-menu {
+  position: fixed;
+  background-color: var(--color-bg, #ffffff);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 0.25rem 0;
+  min-width: 180px;
+  z-index: 1000;
+  font-size: 0.875rem;
+}
+
+.table-context-menu-section {
+  padding: 0.25rem 0;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+}
+
+.table-context-menu-section:last-child {
+  border-bottom: none;
+}
+
+.table-context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  color: var(--color-text-primary, #1f2937);
+  transition: background-color 0.1s ease;
+}
+
+.table-context-menu-item:hover {
+  background-color: var(--color-bg-surface, #f3f4f6);
+}
+
+.table-context-menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.table-context-menu-item-icon {
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+/* Section label */
+.table-context-menu-label {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-secondary, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Color picker row */
+.table-context-menu-colors {
+  display: flex;
+  gap: 0.375rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.table-context-menu-color-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border, #e5e7eb);
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.table-context-menu-color-btn:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+.table-context-menu-color-btn.active {
+  box-shadow: 0 0 0 2px var(--color-accent, #2563eb);
+}
+
+/* ========================================
+   Dark Theme Overrides
+   ======================================== */
+
+:root[data-theme="dark"] .editor-content .tiptap table {
+  border-color: var(--color-border, #374151);
+}
+
+:root[data-theme="dark"] .editor-content .tiptap td,
+:root[data-theme="dark"] .editor-content .tiptap th {
+  border-color: var(--color-border, #374151);
+}
+
+:root[data-theme="dark"] .editor-content .tiptap th {
+  background-color: var(--color-bg-surface, #1f2937);
+}
+
+:root[data-theme="dark"] .table-context-menu {
+  background-color: var(--color-bg, #1f2937);
+  border-color: var(--color-border, #374151);
+}
+
+:root[data-theme="dark"] .table-context-menu-item:hover {
+  background-color: var(--color-bg-surface, #374151);
+}
+
+/* ========================================
+   Print Styles
+   ======================================== */
+
+@media print {
+  .editor-content .tiptap table {
+    page-break-inside: auto;
+  }
+
+  .editor-content .tiptap tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  .column-resize-handle {
+    display: none;
+  }
+}
