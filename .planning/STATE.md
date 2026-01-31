@@ -428,7 +428,9 @@ See `.planning/DESIGN-REFERENCE.md` for UI/UX inspiration from:
 
 ### Pending Todos
 
-None.
+1. **Add Excel-like formula support to tables** (2026-01-31)
+   - Area: ui
+   - File: `.planning/todos/pending/2026-01-31-excel-like-table-formulas.md`
 
 ### Blockers/Concerns
 
