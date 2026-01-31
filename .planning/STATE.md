@@ -10,9 +10,9 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 5 of 6 (Polish) - IN PROGRESS
-Plan: 6 of 7 in current phase
+Plan: 4 of 7 in current phase
 Status: Executing
-Last activity: 2026-01-31 - Completed 05-06-PLAN.md (Document Import)
+Last activity: 2026-01-31 - Completed 05-04-PLAN.md (Version History UI)
 
 Progress: [█████████░] 96.0% (24/25 plans)
 
@@ -100,6 +100,9 @@ Progress: [█████████░] 96.0% (24/25 plans)
 | D-05-06-001 | Use mammoth.js for Word conversion | Client-side .docx parsing, no server, well-maintained |
 | D-05-06-002 | Custom Markdown parser over external library | Matches export-handlers pattern, no extra dependency |
 | D-05-06-003 | Confirmation dialog for dirty documents | Prevents accidental data loss when importing over unsaved work |
+| D-05-04-001 | Simple read-only preview (not diff view) | VER-04 says "Version preview" not "Version diff" - visual diff is v2 |
+| D-05-04-002 | Text selection enabled in preview | VER-06 workaround - users can copy text to partially restore |
+| D-05-04-003 | Restore creates backup checkpoint | Undo safety - current state preserved before restore |
 
 ### Technical Patterns Established
 
@@ -511,7 +514,7 @@ See `.planning/DESIGN-REFERENCE.md` for UI/UX inspiration from:
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 05-06-PLAN.md (Document Import)
+Stopped at: Completed 05-04-PLAN.md (Version History UI)
 Resume file: None
 
 ---
@@ -532,4 +535,5 @@ Resume file: None
 *Plan 05-01 complete: 2026-01-31*
 *Plan 05-02 complete: 2026-01-31*
 *Plan 05-03 complete: 2026-01-31*
+*Plan 05-04 complete: 2026-01-31*
 *Plan 05-06 complete: 2026-01-31*
