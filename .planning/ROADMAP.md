@@ -154,17 +154,28 @@ Plans:
   3. User can export document to HTML, Markdown, and PDF
   4. User can import Word (.docx), Markdown, and plain text files
   5. User can toggle focus mode (Cmd+Shift+F) hiding all UI chrome
-**Plans**: TBD
+**Plans**: 7 plans
 
 Plans:
-- [ ] 05-01: TBD
-- [ ] 05-02: TBD
-- [ ] 05-03: TBD
+- [ ] 05-01-PLAN.md — SQLite foundation (tauri-plugin-sql), migrations, version storage, auto-snapshot hook
+- [ ] 05-02-PLAN.md — Export handlers (HTML, Markdown, PDF) and ExportMenu component
+- [ ] 05-03-PLAN.md — Focus mode, typewriter mode, status bar with word count
+- [ ] 05-04-PLAN.md — Version history panel (Time Machine UI) with preview and restore
+- [ ] 05-05-PLAN.md — Comment system (extension, panel, SQLite storage)
+- [ ] 05-06-PLAN.md — Import handlers (Word via Mammoth.js, Markdown, plain text)
+- [ ] 05-07-PLAN.md — App integration and human verification
 
 **Implementation Notes:**
-- SQLite via rusqlite for version storage (auto-save snapshots every 30s)
+- SQLite via tauri-plugin-sql for version storage (auto-save snapshots every 30s)
 - Single-user comments (not TipTap Pro collaboration)
 - Word import via Mammoth.js, PDF export via print-to-PDF
+- Focus mode hides all UI chrome, shows exit hint on hover
+- Status bar shows word count, character count, cursor position
+
+**Wave Structure:**
+- Wave 1 (parallel): 05-01, 05-02, 05-03 (independent foundations)
+- Wave 2 (parallel): 05-04, 05-05, 05-06 (05-04 and 05-05 depend on 05-01 SQLite)
+- Wave 3: 05-07 (integration and human verification)
 
 ---
 
@@ -204,7 +215,7 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6
 | 2. File Management | 4/4 | Complete | 2026-01-30 |
 | 3. Style System | 4/4 | Complete | 2026-01-31 |
 | 4. Extended Features | 6/6 | Complete | 2026-01-31 |
-| 5. Polish | 0/3 | Not started | - |
+| 5. Polish | 0/7 | Planned | - |
 | 6. AI Integration | 0/2 | Not started | - |
 
 ---
@@ -216,5 +227,7 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6
 *Phase 3 planned: 2026-01-30*
 *Phase 3 complete: 2026-01-31*
 *Phase 4 planned: 2026-01-31*
+*Phase 4 complete: 2026-01-31*
+*Phase 5 planned: 2026-01-31*
 *Depth: comprehensive*
 *Coverage: 99/99 v1 requirements mapped*
