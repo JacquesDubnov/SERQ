@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 4 of 6 (Extended Features) - IN PROGRESS
-Plan: 1 of 6 in current phase
+Plan: 2 of 6 in current phase
 Status: In progress
-Last activity: 2026-01-31 - Completed 04-01-PLAN.md (Table Editing)
+Last activity: 2026-01-31 - Completed 04-02-PLAN.md (Command Interfaces)
 
-Progress: [██████░░░░] 54.2% (13/24 plans)
+Progress: [██████░░░░] 58.3% (14/24 plans)
 
 ## Performance Metrics
 
@@ -29,7 +29,7 @@ Progress: [██████░░░░] 54.2% (13/24 plans)
 | 1. Editor Foundation | 4/4 | Complete |
 | 2. File Management | 4/4 | Complete |
 | 3. Style System | 4/4 | Complete |
-| 4. Extended Features | 1/6 | In Progress |
+| 4. Extended Features | 2/6 | In Progress |
 
 ## Accumulated Context
 
@@ -71,6 +71,10 @@ Progress: [██████░░░░] 54.2% (13/24 plans)
 | D-04-01-001 | Named imports for TipTap table extensions | TipTap 3.18.0 uses named exports only |
 | D-04-01-002 | withHeaderRow: false on table insert | User toggles header row via context menu per CONTEXT |
 | D-04-01-003 | 8-color cell background palette | Matches CONTEXT spec for color presets |
+| D-04-02-001 | Use cmdk for command palette | Powers Linear, Raycast, shadcn/ui - fast fuzzy search |
+| D-04-02-002 | Use @tiptap/suggestion for slash commands | Official TipTap utility, handles cursor and popups |
+| D-04-02-003 | tippy.js for slash menu positioning | Lightweight, handles viewport edges |
+| D-04-02-004 | Separate command definitions from UI | commands.ts defines actions, palette renders - easier to extend |
 
 ### Technical Patterns Established
 
@@ -256,6 +260,61 @@ useEffect(() => {
 }, [])
 ```
 
+**Command Palette Pattern (Phase 4):**
+```typescript
+// Centralized command definitions
+interface CommandItem {
+  id: string
+  title: string
+  shortcut?: string
+  group: CommandGroup
+  action: (editor: Editor) => void
+}
+
+// cmdk for command palette UI
+<Command.Dialog open={isOpen} onOpenChange={handleOpenChange}>
+  <Command.Input placeholder="Type a command..." />
+  <Command.List>
+    <Command.Group heading="Format">
+      <Command.Item onSelect={() => command.action(editor)}>
+        {command.title}
+        <kbd>{command.shortcut}</kbd>
+      </Command.Item>
+    </Command.Group>
+  </Command.List>
+</Command.Dialog>
+```
+
+**Slash Commands Pattern (Phase 4):**
+```typescript
+// TipTap extension with @tiptap/suggestion
+export const SlashCommands = Extension.create({
+  name: 'slashCommands',
+  addProseMirrorPlugins() {
+    return [
+      Suggestion({
+        char: '/',
+        items: ({ query }) => filterSlashCommands(query).slice(0, 10),
+        render: () => ({
+          onStart: (props) => {
+            component = new ReactRenderer(SlashMenu, { props, editor: props.editor })
+            popup = tippy('body', {
+              getReferenceClientRect: props.clientRect,
+              content: component.element,
+              showOnCreate: true,
+              interactive: true,
+              trigger: 'manual',
+            })
+          },
+          onKeyDown: (props) => component.ref?.onKeyDown(props),
+          onExit: () => { popup.destroy(); component.destroy() }
+        })
+      })
+    ]
+  }
+})
+```
+
 ### Design Reference
 
 See `.planning/DESIGN-REFERENCE.md` for UI/UX inspiration from:
@@ -279,7 +338,7 @@ None.
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 04-01-PLAN.md (Table Editing)
+Stopped at: Completed 04-02-PLAN.md (Command Interfaces)
 Resume file: None
 
 ---
@@ -292,3 +351,4 @@ Resume file: None
 *Plan 03-04 complete: 2026-01-31*
 *Phase 3 complete: 2026-01-31 (human verified)*
 *Plan 04-01 complete: 2026-01-31*
+*Plan 04-02 complete: 2026-01-31*
