@@ -106,25 +106,41 @@ Plans:
 ### Phase 4: Extended Features
 **Goal**: Users have full editing capabilities expected from a modern document editor
 **Depends on**: Phase 3
-**Requirements**: TBL-01, TBL-02, TBL-03, TBL-04, TBL-05, TBL-06, NAV-01, NAV-02, NAV-03, NAV-04, CUST-01, CUST-02, CUST-03, CUST-04, CUST-05, MEDIA-01, MEDIA-02, MEDIA-03, MEDIA-04, MEDIA-05, MEDIA-06, CMD-01, CMD-02, CMD-03, CMD-04, MD-01, MD-02, MD-03, MD-04
+**Requirements**: TBL-01, TBL-02, TBL-03, TBL-04, TBL-05, TBL-06, NAV-01, NAV-03, NAV-04, CUST-01, MEDIA-01, MEDIA-02, MEDIA-03, CMD-01, CMD-02, CMD-03, CMD-04
 **Success Criteria** (what must be TRUE):
   1. User can create tables, add/remove rows/columns, merge cells, and resize columns
-  2. User can insert callout blocks (info/warning/success/error) that style automatically
+  2. User can insert callout blocks with color selection that style automatically
   3. User can add images (drag/drop, paste) and resize/position them
   4. User can trigger command palette with Cmd+K and slash commands with /
   5. User can view document outline and navigate to any heading
-**Plans**: TBD
+**Plans**: 6 plans
 
 Plans:
-- [ ] 04-01: TBD
-- [ ] 04-02: TBD
-- [ ] 04-03: TBD
+- [ ] 04-01-PLAN.md — Tables with TipTap extension, dimension picker, context menu
+- [ ] 04-02-PLAN.md — Command palette (cmdk) and slash commands (@tiptap/suggestion)
+- [ ] 04-03-PLAN.md — Document outline panel with TableOfContents extension
+- [ ] 04-04-PLAN.md — Callout block extension with color palette and collapse
+- [ ] 04-05-PLAN.md — Image insertion (drag/drop, paste, slash) with resize handles
+- [ ] 04-06-PLAN.md — Human verification of all Phase 4 success criteria
 
 **Implementation Notes:**
-- Tables via @tiptap/extension-table-kit (official)
-- Custom nodes for callout, divider, spacer (3 custom extensions)
-- Columns via @tiptap-extend/columns (test compatibility with TipTap 3.18.0 first)
-- Search/replace via @sereneinserenade/tiptap-search-and-replace
+- Tables via @tiptap/extension-table (official, includes all 4 required extensions)
+- Command palette via cmdk (powers Linear, Raycast)
+- Slash commands via @tiptap/suggestion with tippy.js positioning
+- Callout is custom Node with ReactNodeViewRenderer
+- Images embedded as base64 for portability
+
+**Wave Structure:**
+- Wave 1 (parallel): 04-01, 04-02, 04-04 (no dependencies)
+- Wave 2 (parallel): 04-03, 04-05 (depend on command system from 04-02)
+- Wave 3: 04-06 (human verification after all features complete)
+
+**Deferred to Phase 5 (not in success criteria):**
+- NAV-02 (Find/Replace)
+- CUST-02-05 (Divider, Spacer, Column, Toggle blocks)
+- MEDIA-04-06 (Embeds: iframe, YouTube, video)
+- MD-01-04 (Markdown view)
+- Advanced image features (cropping, effects, masks, editor mode)
 
 ---
 
@@ -187,7 +203,7 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6
 | 1. Editor Foundation | 4/4 | Complete | 2026-01-30 |
 | 2. File Management | 4/4 | Complete | 2026-01-30 |
 | 3. Style System | 4/4 | Complete | 2026-01-31 |
-| 4. Extended Features | 0/3 | Not started | - |
+| 4. Extended Features | 0/6 | Planned | - |
 | 5. Polish | 0/3 | Not started | - |
 | 6. AI Integration | 0/2 | Not started | - |
 
@@ -199,5 +215,6 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6
 *Phase 2 complete: 2026-01-30*
 *Phase 3 planned: 2026-01-30*
 *Phase 3 complete: 2026-01-31*
+*Phase 4 planned: 2026-01-31*
 *Depth: comprehensive*
 *Coverage: 99/99 v1 requirements mapped*
