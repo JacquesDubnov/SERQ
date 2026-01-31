@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 5 of 6 (Polish) - IN PROGRESS
-Plan: 2 of 7 in current phase
+Plan: 3 of 7 in current phase
 Status: Executing
-Last activity: 2026-01-31 - Completed 05-02-PLAN.md (Document Export)
+Last activity: 2026-01-31 - Completed 05-03-PLAN.md (Distraction-Free Writing)
 
-Progress: [█████████░] 88.5% (22/24 plans)
+Progress: [█████████░] 92.0% (23/25 plans)
 
 ## Performance Metrics
 
@@ -94,6 +94,9 @@ Progress: [█████████░] 88.5% (22/24 plans)
 | D-05-02-001 | Manual JSON-to-Markdown conversion | More control than @tiptap/markdown extension, no extra dependency |
 | D-05-02-002 | Browser print dialog for PDF | No heavy libraries like jsPDF needed, works everywhere |
 | D-05-02-003 | Inline CSS in HTML export | Captures current CSS variables for visual fidelity |
+| D-05-03-001 | Use body.focus-mode class for CSS-based chrome hiding | Simpler than conditional rendering, allows smooth transitions |
+| D-05-03-002 | 50px threshold prevents jittery typewriter scrolling | Small movements don't trigger scroll recenter |
+| D-05-03-003 | StatusBar reads from CharacterCount extension storage | Uses TipTap's built-in counting for accuracy |
 
 ### Technical Patterns Established
 
@@ -505,7 +508,7 @@ See `.planning/DESIGN-REFERENCE.md` for UI/UX inspiration from:
 ## Session Continuity
 
 Last session: 2026-01-31
-Stopped at: Completed 05-02-PLAN.md (Document Export)
+Stopped at: Completed 05-03-PLAN.md (Distraction-Free Writing)
 Resume file: None
 
 ---
@@ -525,3 +528,4 @@ Resume file: None
 *Phase 4 complete: 2026-01-31 (human verified)*
 *Plan 05-01 complete: 2026-01-31*
 *Plan 05-02 complete: 2026-01-31*
+*Plan 05-03 complete: 2026-01-31*
