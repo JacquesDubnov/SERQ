@@ -1,0 +1,122 @@
+/* Resizable Image Extension Styles */
+
+/* Wrapper with alignment support */
+.resizable-image-wrapper {
+  display: flex;
+  width: 100%;
+  margin: 1rem 0;
+}
+
+.resizable-image-wrapper.alignment-left {
+  justify-content: flex-start;
+}
+
+.resizable-image-wrapper.alignment-center {
+  justify-content: center;
+}
+
+.resizable-image-wrapper.alignment-right {
+  justify-content: flex-end;
+}
+
+/* Container for image and controls */
+.resizable-image-container {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+
+/* Selection outline */
+.resizable-image-container.selected {
+  outline: 2px solid var(--color-primary, #3b82f6);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Image styling */
+.resizable-image-container img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+/* Resize handle (SE corner) */
+.resize-handle {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 12px;
+  height: 12px;
+  background-color: var(--color-primary, #3b82f6);
+  border: 2px solid white;
+  border-radius: 2px;
+  cursor: se-resize;
+  z-index: 10;
+  transition: transform 0.1s ease;
+}
+
+.resize-handle:hover,
+.resize-handle.resizing {
+  transform: scale(1.2);
+}
+
+/* Alignment toolbar */
+.image-toolbar {
+  position: absolute;
+  top: -40px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background-color: var(--bg-primary, #ffffff);
+  border: 1px solid var(--border-color, #e5e5e5);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 20;
+}
+
+.image-toolbar .toolbar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background-color: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  color: var(--text-secondary, #6b7280);
+  transition: all 0.15s ease;
+}
+
+.image-toolbar .toolbar-btn:hover {
+  background-color: var(--bg-secondary, #f3f4f6);
+  color: var(--text-primary, #1f2937);
+}
+
+.image-toolbar .toolbar-btn.active {
+  background-color: var(--color-primary, #3b82f6);
+  color: white;
+}
+
+/* Dark mode support */
+:root[data-theme="dark"] .resizable-image-container.selected {
+  outline-color: var(--color-primary, #60a5fa);
+}
+
+:root[data-theme="dark"] .resize-handle {
+  background-color: var(--color-primary, #60a5fa);
+  border-color: var(--bg-primary, #1f2937);
+}
+
+:root[data-theme="dark"] .image-toolbar {
+  background-color: var(--bg-primary, #1f2937);
+  border-color: var(--border-color, #374151);
+}
+
+:root[data-theme="dark"] .image-toolbar .toolbar-btn:hover {
+  background-color: var(--bg-secondary, #374151);
+}

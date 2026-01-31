@@ -15,12 +15,16 @@ import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
+import { TableOfContents, type TableOfContentData } from '@tiptap/extension-table-of-contents';
 import { SlashCommands } from '../../extensions/SlashCommands';
 import { Callout } from '../../extensions/Callout';
+import { ResizableImage } from '../../extensions/ResizableImage';
+import { useEditorStore, type OutlineAnchor } from '../../stores/editorStore';
 import type { Editor, JSONContent } from '@tiptap/core';
 import '../../styles/editor.css';
 import '../../styles/tables.css';
 import '../../styles/callout.css';
+import '../../styles/images.css';
 
 export interface EditorCoreRef {
   setContent: (content: string | JSONContent) => void;
@@ -35,6 +39,20 @@ interface EditorCoreProps {
   placeholder?: string;
   onUpdate?: (content: JSONContent) => void;
   className?: string;
+}
+
+/**
+ * Handle TableOfContents update - converts to OutlineAnchor format for store
+ */
+function handleTocUpdate(data: TableOfContentData): void {
+  const anchors: OutlineAnchor[] = data.map((item) => ({
+    id: item.id,
+    level: item.level,
+    textContent: item.textContent,
+    isActive: item.isActive,
+    pos: item.pos,
+  }));
+  useEditorStore.getState().setOutlineAnchors(anchors);
 }
 
 const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
@@ -80,6 +98,10 @@ const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
         TableCell,
         SlashCommands,
         Callout,
+        ResizableImage,
+        TableOfContents.configure({
+          onUpdate: handleTocUpdate,
+        }),
       ],
       content: initialContent || '',
 
