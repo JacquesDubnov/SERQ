@@ -13,15 +13,21 @@ import Subscript from '@tiptap/extension-subscript';
 import Superscript from '@tiptap/extension-superscript';
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
-import { TableCell } from '@tiptap/extension-table-cell';
+import { CustomTableCell } from '../../extensions/CustomTableCell';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { TableOfContents, type TableOfContentData } from '@tiptap/extension-table-of-contents';
 import { SlashCommands } from '../../extensions/SlashCommands';
+import { TableWidthLimit } from '../../extensions/TableWidthLimit';
+import { TableKeyboardNavigation } from '../../extensions/TableKeyboardNavigation';
 import { Callout } from '../../extensions/Callout';
 import { ResizableImage } from '../../extensions/ResizableImage';
+import { TypewriterMode } from '../../extensions/TypewriterMode';
+import { Comment } from '../../extensions/Comment';
 import { useEditorStore, type OutlineAnchor } from '../../stores/editorStore';
+import { useCommentStore } from '../../stores/commentStore';
 import { isImageFile, isLargeImage, fileToBase64, formatFileSize } from '../../lib/imageUtils';
 import type { Editor, JSONContent } from '@tiptap/core';
+import { TextSelection } from '@tiptap/pm/state';
 import '../../styles/editor.css';
 import '../../styles/tables.css';
 import '../../styles/callout.css';
@@ -64,6 +70,10 @@ const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
           // StarterKit includes: Document, Paragraph, Text, Bold, Italic,
           // Strike, Code, Heading, Blockquote, CodeBlock, HorizontalRule,
           // BulletList, OrderedList, ListItem, HardBreak, History
+          dropcursor: {
+            color: 'var(--color-accent, #2563eb)',
+            width: 2,
+          },
         }),
         Underline,
         Link.configure({
@@ -96,61 +106,123 @@ const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
         }),
         TableRow,
         TableHeader,
-        TableCell,
+        CustomTableCell,
+        TableWidthLimit,
+        TableKeyboardNavigation,
         SlashCommands,
         Callout,
         ResizableImage,
         TableOfContents.configure({
           onUpdate: handleTocUpdate,
         }),
+        TypewriterMode.configure({
+          enabled: false, // Disabled by default, toggled via StatusBar
+        }),
+        Comment.configure({
+          HTMLAttributes: {
+            class: 'comment-mark',
+          },
+          onCommentActivated: (commentId: string) => {
+            // Activate comment in store and open panel
+            useCommentStore.getState().setActiveComment(commentId);
+            useCommentStore.getState().setPanelOpen(true);
+          },
+        }),
       ],
       content: initialContent || '',
 
       // Handle image drag/drop and paste
       editorProps: {
-        handleDrop: (view, event, _slice, moved) => {
-          // Ignore if this is a move within the editor
-          if (moved) return false
+        handleDrop: (view, event, slice, moved) => {
+          // Handle internal moves (dragging content within the editor)
+          if (moved && slice && slice.content.childCount > 0) {
+            const coordinates = view.posAtCoords({
+              left: event.clientX,
+              top: event.clientY,
+            })
 
-          const files = event.dataTransfer?.files
-          if (!files || files.length === 0) return false
+            if (coordinates) {
+              event.preventDefault()
+              const { state } = view
+              const { tr } = state
 
-          // Find image files
-          const imageFiles = Array.from(files).filter(isImageFile)
+              tr.deleteSelection()
+              const insertPos = tr.mapping.map(coordinates.pos)
+              tr.insert(insertPos, slice.content)
+
+              const newPos = insertPos + slice.content.size
+              tr.setSelection(TextSelection.near(tr.doc.resolve(Math.min(newPos, tr.doc.content.size))))
+
+              view.dispatch(tr)
+              return true
+            }
+          }
+
+          const dataTransfer = event.dataTransfer
+          if (!dataTransfer) return false
+
+          const files = dataTransfer.files
+          const items = dataTransfer.items
+
+          let imageFiles: File[] = []
+          if (files && files.length > 0) {
+            imageFiles = Array.from(files).filter(isImageFile)
+          }
+
+          if (imageFiles.length === 0 && items && items.length > 0) {
+            for (let i = 0; i < items.length; i++) {
+              const item = items[i]
+              if (item.kind === 'file' && item.type.startsWith('image/')) {
+                const file = item.getAsFile()
+                if (file) imageFiles.push(file)
+              }
+            }
+          }
+
           if (imageFiles.length === 0) return false
 
           event.preventDefault()
+          event.stopPropagation()
 
-          // Process each image file
-          imageFiles.forEach(async (file) => {
-            // Show warning for large files
-            if (isLargeImage(file)) {
-              const proceed = window.confirm(
-                `This image is ${formatFileSize(file.size)}. Large images may slow down the document. Continue?`
-              )
-              if (!proceed) return
-            }
-
-            try {
-              const dataUrl = await fileToBase64(file)
-              const { state } = view
-
-              // Get position from drop coordinates
-              const coordinates = view.posAtCoords({
-                left: event.clientX,
-                top: event.clientY,
-              })
-              const pos = coordinates?.pos ?? state.selection.to
-
-              // Insert image at drop position
-              const node = state.schema.nodes.image.create({ src: dataUrl })
-              const transaction = state.tr.insert(pos, node)
-              view.dispatch(transaction)
-            } catch (error) {
-              console.error('Failed to insert image:', error)
-            }
+          // Get drop position from coordinates
+          const coordinates = view.posAtCoords({
+            left: event.clientX,
+            top: event.clientY,
           })
 
+          // Capture schema reference before async
+          const imageNodeType = view.state.schema.nodes.image
+          if (!imageNodeType) {
+            console.error('Image node type not found in schema')
+            return true
+          }
+
+          // Process images async
+          const processImages = async () => {
+            for (const file of imageFiles) {
+              if (isLargeImage(file)) {
+                const proceed = window.confirm(
+                  `This image is ${formatFileSize(file.size)}. Large images may slow down the document. Continue?`
+                )
+                if (!proceed) continue
+              }
+
+              try {
+                const dataUrl = await fileToBase64(file)
+                // Get fresh state for each insert
+                const currentState = view.state
+                const pos = coordinates?.pos ?? currentState.selection.to
+                const imageNode = imageNodeType.create({ src: dataUrl })
+                const tr = currentState.tr.insert(pos, imageNode)
+                tr.setSelection(TextSelection.near(tr.doc.resolve(pos + imageNode.nodeSize)))
+                view.dispatch(tr)
+              } catch (error) {
+                console.error('Failed to insert image:', error)
+              }
+            }
+          }
+
+          processImages()
           return true
         },
 
@@ -167,30 +239,34 @@ const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
 
           event.preventDefault()
 
-          // Process each image file
-          imageFiles.forEach(async (file) => {
-            // Show warning for large files
-            if (isLargeImage(file)) {
-              const proceed = window.confirm(
-                `This image is ${formatFileSize(file.size)}. Large images may slow down the document. Continue?`
-              )
-              if (!proceed) return
+          // Process images async and insert them
+          const processImages = async () => {
+            for (const file of imageFiles) {
+              // Show warning for large files
+              if (isLargeImage(file)) {
+                const proceed = window.confirm(
+                  `This image is ${formatFileSize(file.size)}. Large images may slow down the document. Continue?`
+                )
+                if (!proceed) continue
+              }
+
+              try {
+                const dataUrl = await fileToBase64(file)
+                // Get fresh state for each insert
+                const { state } = view
+                const pos = state.selection.to
+                const imageNode = state.schema.nodes.image.create({ src: dataUrl })
+                const tr = state.tr.insert(pos, imageNode)
+                // Move cursor after the image
+                tr.setSelection(TextSelection.near(tr.doc.resolve(pos + imageNode.nodeSize)))
+                view.dispatch(tr)
+              } catch (error) {
+                console.error('Failed to insert image:', error)
+              }
             }
+          }
 
-            try {
-              const dataUrl = await fileToBase64(file)
-              const { state } = view
-
-              // Insert image at current cursor position
-              const pos = state.selection.to
-              const node = state.schema.nodes.image.create({ src: dataUrl })
-              const transaction = state.tr.insert(pos, node)
-              view.dispatch(transaction)
-            } catch (error) {
-              console.error('Failed to insert image:', error)
-            }
-          })
-
+          processImages()
           return true
         },
       },

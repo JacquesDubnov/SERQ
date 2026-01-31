@@ -2,6 +2,9 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
+import './styles/focus-mode.css';
+import './styles/version-history.css';
+import './styles/comments.css';
 import { getPreferencesStore } from './lib/preferencesStore';
 
 // Initialize preferences store on app start
