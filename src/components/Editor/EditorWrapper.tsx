@@ -1,6 +1,23 @@
-import { ReactNode, useEffect, useState, useCallback } from 'react'
+import { ReactNode, useEffect, useState, useCallback, useRef } from 'react'
 import { Editor } from '@tiptap/core'
+import { Selection } from '@tiptap/pm/state'
+import { CellSelection } from '@tiptap/pm/tables'
 import { TableContextMenu } from './TableContextMenu'
+import { useAutoSnapshot } from '../../hooks'
+import { useEditorStore } from '../../stores/editorStore'
+
+interface SelectionInfo {
+  cellCount: number
+  rowCount: number
+  colCount: number
+}
+
+interface CellRect {
+  top: number
+  left: number
+  width: number
+  height: number
+}
 
 interface EditorWrapperProps {
   editor: Editor | null
@@ -10,37 +27,127 @@ interface EditorWrapperProps {
 
 /**
  * EditorWrapper provides click-anywhere functionality and table context menu.
- * Clicking below the content creates empty paragraphs to position
- * the cursor at the approximate click location.
  */
 export function EditorWrapper({ editor, children, className = '' }: EditorWrapperProps) {
-  // Table context menu state
-  const [tableMenuState, setTableMenuState] = useState<{ x: number; y: number } | null>(null)
+  // Auto-snapshot for version history
+  const documentPath = useEditorStore((s) => s.document.path);
+  useAutoSnapshot(editor, documentPath, { enabled: !!documentPath });
+
+  // Capture selection state on mousedown BEFORE ProseMirror can change it
+  const capturedSelectionRef = useRef<{
+    selection: Selection | null
+    selectionInfo: SelectionInfo
+    cellRects: CellRect[]
+  }>({ selection: null, selectionInfo: { cellCount: 1, rowCount: 1, colCount: 1 }, cellRects: [] })
+
+  // Table context menu state - includes cell rects for overlays
+  const [tableMenuState, setTableMenuState] = useState<{
+    x: number
+    y: number
+    selectionInfo: SelectionInfo
+    savedSelection: Selection
+    cellRects: CellRect[]
+  } | null>(null)
+
+  // Capture selection state AND cell rectangles on mousedown
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    // Only for right-click
+    if (e.button !== 2) return
+
+    const target = e.target as HTMLElement
+    if (!target.closest('td, th')) return
+
+    // CRITICAL: Capture everything NOW, before ProseMirror can change anything
+    if (editor) {
+      const { selection } = editor.state
+      let selectionInfo: SelectionInfo = { cellCount: 1, rowCount: 1, colCount: 1 }
+      const cellRects: CellRect[] = []
+
+      if (selection instanceof CellSelection) {
+        let cellCount = 0
+        selection.forEachCell((_node, pos) => {
+          cellCount++
+          // Get DOM element and capture its rectangle
+          try {
+            const domNode = editor.view.nodeDOM(pos)
+            if (domNode instanceof HTMLElement) {
+              const rect = domNode.getBoundingClientRect()
+              cellRects.push({
+                top: rect.top,
+                left: rect.left,
+                width: rect.width,
+                height: rect.height,
+              })
+            }
+          } catch {
+            // Ignore errors
+          }
+        })
+
+        const { $anchorCell, $headCell } = selection
+        const anchorRow = $anchorCell.index(-1)
+        const headRow = $headCell.index(-1)
+        const anchorCol = $anchorCell.index(0)
+        const headCol = $headCell.index(0)
+
+        const rowCount = Math.abs(headRow - anchorRow) + 1
+        const colCount = Math.abs(headCol - anchorCol) + 1
+
+        selectionInfo = { cellCount, rowCount, colCount }
+      }
+
+      // If no cells in selection, capture the clicked cell
+      if (cellRects.length === 0) {
+        const clickedCell = target.closest('td, th') as HTMLElement
+        if (clickedCell) {
+          const rect = clickedCell.getBoundingClientRect()
+          cellRects.push({
+            top: rect.top,
+            left: rect.left,
+            width: rect.width,
+            height: rect.height,
+          })
+        }
+      }
+
+      capturedSelectionRef.current = { selection, selectionInfo, cellRects }
+    }
+  }, [editor])
 
   // Handle right-click for table context menu
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement
-
-    // Check if right-click is inside a table cell
     const tableCell = target.closest('td, th')
+
     if (tableCell && editor) {
       e.preventDefault()
-      setTableMenuState({ x: e.clientX, y: e.clientY })
+      e.stopPropagation()
+
+      // Use the data captured in mousedown
+      const { selection, selectionInfo, cellRects } = capturedSelectionRef.current
+      const savedSelection = selection || editor.state.selection
+
+      // Set menu state with cell rects for overlays
+      setTableMenuState({ x: e.clientX, y: e.clientY, selectionInfo, savedSelection, cellRects })
     }
   }, [editor])
 
-  // Close table context menu
+  // Close table context menu and clean up overlays
   const closeTableMenu = useCallback(() => {
+    // Reset captured state
+    capturedSelectionRef.current = { selection: null, selectionInfo: { cellCount: 1, rowCount: 1, colCount: 1 }, cellRects: [] }
+
+    // Setting to null clears both menu and overlays (they're in the same state)
     setTableMenuState(null)
   }, [])
 
+  // Click-anywhere to extend document
   useEffect(() => {
     if (!editor) return
 
     const handleDocumentClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement
 
-      // Ignore clicks on toolbar, header, or interactive elements
       if (
         target.closest('header') ||
         target.closest('button') ||
@@ -53,11 +160,9 @@ export function EditorWrapper({ editor, children, className = '' }: EditorWrappe
         return
       }
 
-      // Get the ProseMirror element
       const proseMirror = document.querySelector('.ProseMirror') as HTMLElement
       if (!proseMirror) return
 
-      // Get the actual text content bounds (not including padding)
       const contentElements = proseMirror.querySelectorAll('p, h1, h2, h3, h4, h5, h6, ul, ol, blockquote, pre, hr, table')
 
       let contentBottom = 0
@@ -66,31 +171,24 @@ export function EditorWrapper({ editor, children, className = '' }: EditorWrappe
         const rect = lastElement.getBoundingClientRect()
         contentBottom = rect.bottom
       } else {
-        // No content, use the top of the editor
         contentBottom = proseMirror.getBoundingClientRect().top + 50
       }
 
       const clickY = e.clientY
 
-      // If click is below actual content
       if (clickY > contentBottom + 10) {
         e.preventDefault()
         e.stopPropagation()
 
-        // Calculate how many paragraphs needed to reach the click position
         const computedStyle = window.getComputedStyle(proseMirror)
         const lineHeight = parseFloat(computedStyle.lineHeight) || 24
         const distanceBelowContent = clickY - contentBottom
         const paragraphsNeeded = Math.max(1, Math.floor(distanceBelowContent / lineHeight))
 
-        // Focus editor
         editor.view.focus()
 
         setTimeout(() => {
-          // Build array of empty paragraphs to insert
           const paragraphs = Array(paragraphsNeeded).fill({ type: 'paragraph' })
-
-          // Insert all paragraphs at once at the end
           const endPos = editor.state.doc.content.size
           editor
             .chain()
@@ -109,13 +207,36 @@ export function EditorWrapper({ editor, children, className = '' }: EditorWrappe
   return (
     <div
       className={`click-anywhere-wrapper ${className}`}
+      onMouseDown={handleMouseDown}
       onContextMenu={handleContextMenu}
     >
       {children}
+
+      {/* Cell selection overlays - tied to tableMenuState so they disappear with menu */}
+      {tableMenuState?.cellRects.map((rect, index) => (
+        <div
+          key={index}
+          style={{
+            position: 'fixed',
+            top: rect.top,
+            left: rect.left,
+            width: rect.width,
+            height: rect.height,
+            backgroundColor: 'rgba(37, 99, 235, 0.15)',
+            border: '2px solid #2563eb',
+            pointerEvents: 'none',
+            zIndex: 999,
+            boxSizing: 'border-box',
+          }}
+        />
+      ))}
+
       {tableMenuState && editor && (
         <TableContextMenu
           editor={editor}
-          position={tableMenuState}
+          position={{ x: tableMenuState.x, y: tableMenuState.y }}
+          selectionInfo={tableMenuState.selectionInfo}
+          savedSelection={tableMenuState.savedSelection}
           onClose={closeTableMenu}
         />
       )}

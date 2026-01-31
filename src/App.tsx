@@ -5,8 +5,13 @@ import { Canvas, type CanvasWidth } from './components/Layout';
 import { StylePanel, type StylePanelType } from './components/StylePanel';
 import { CommandPalette } from './components/CommandPalette';
 import { OutlinePanel } from './components/DocumentOutline';
+import { VersionHistoryPanel } from './components/VersionHistory';
+import { CommentPanel } from './components/Comments';
+import { StatusBar } from './components/StatusBar';
+import { ExportMenu } from './components/ExportMenu';
 import { useEditorStore, useStyleStore } from './stores';
-import { useKeyboardShortcuts, useAutoSave, useSystemTheme } from './hooks';
+import { useKeyboardShortcuts, useAutoSave, useSystemTheme, useFocusMode } from './hooks';
+import { useTauriFileDrop } from './hooks/useTauriFileDrop';
 import { getStyleDefaults } from './lib/preferencesStore';
 import type { Editor, JSONContent } from '@tiptap/core';
 
@@ -53,12 +58,17 @@ function App() {
   const [activePanel, setActivePanel] = useState<StylePanelType | null>(null);
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   const [outlinePanelOpen, setOutlinePanelOpen] = useState(false);
+  const [isVersionHistoryOpen, setVersionHistoryOpen] = useState(false);
+  const [typewriterEnabled, setTypewriterEnabled] = useState(false);
 
   // Zustand store for document state
   const document = useEditorStore((state) => state.document);
   const canvasWidth = useEditorStore((state) => state.canvasWidth);
   const setCanvasWidth = useEditorStore((state) => state.setCanvasWidth);
   const markDirty = useEditorStore((state) => state.markDirty);
+
+  // Focus mode state
+  const { isFocusMode } = useFocusMode();
 
   // System theme detection - this responds to styleStore.themeMode
   const { effectiveTheme } = useSystemTheme();
@@ -81,6 +91,9 @@ function App() {
   // Initialize keyboard shortcuts
   useKeyboardShortcuts(editorRef);
   useAutoSave(editorRef, true);
+
+  // Handle Tauri file drops for images
+  useTauriFileDrop(editor);
 
   // Keyboard shortcut for style panel (Cmd+Shift+Y toggles themes panel)
   useHotkeys(
@@ -108,6 +121,16 @@ function App() {
     (e) => {
       e.preventDefault();
       setOutlinePanelOpen((prev) => !prev);
+    },
+    { enableOnContentEditable: true }
+  );
+
+  // Keyboard shortcut for version history (Cmd+Shift+H)
+  useHotkeys(
+    'mod+shift+h',
+    (e) => {
+      e.preventDefault();
+      setVersionHistoryOpen(true);
     },
     { enableOnContentEditable: true }
   );
@@ -168,6 +191,14 @@ function App() {
     markDirty();
     console.debug('Editor content updated:', content);
   }, [markDirty]);
+
+  // Toggle typewriter mode
+  const handleToggleTypewriter = useCallback(() => {
+    if (editor) {
+      editor.commands.toggleTypewriterMode();
+      setTypewriterEnabled((prev) => !prev);
+    }
+  }, [editor]);
 
   // Interface colors based on light/dark mode (affects EVERYTHING)
   const interfaceBg = effectiveTheme === 'dark' ? '#1a1a1a' : '#ffffff';
@@ -285,6 +316,11 @@ function App() {
               <option value="wide">Wide</option>
               <option value="full">Full</option>
             </select>
+
+            <div className="h-4 w-px" style={{ backgroundColor: interfaceBorder }} />
+
+            {/* Export Menu */}
+            <ExportMenu editor={editor} interfaceColors={interfaceColors} />
           </div>
         </div>
 
@@ -335,6 +371,30 @@ function App() {
         editor={editor}
         interfaceColors={interfaceColors}
       />
+
+      {/* Version History Panel */}
+      <VersionHistoryPanel
+        isOpen={isVersionHistoryOpen}
+        onClose={() => setVersionHistoryOpen(false)}
+        editor={editor}
+        interfaceColors={interfaceColors}
+      />
+
+      {/* Comment Panel */}
+      <CommentPanel
+        editor={editor}
+        interfaceColors={interfaceColors}
+      />
+
+      {/* Status Bar (hidden in focus mode) */}
+      {!isFocusMode && (
+        <StatusBar
+          editor={editor}
+          interfaceColors={interfaceColors}
+          typewriterEnabled={typewriterEnabled}
+          onToggleTypewriter={handleToggleTypewriter}
+        />
+      )}
     </div>
   );
 }
