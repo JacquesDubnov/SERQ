@@ -298,6 +298,20 @@ const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
           onUpdate(editor.getJSON());
         }
 
+        // Check if document is empty (only has empty paragraph)
+        const isEmpty = editor.isEmpty || (
+          editor.state.doc.content.size <= 4 && // Empty doc has size ~4
+          editor.state.doc.textContent.trim() === ''
+        );
+
+        // When document becomes empty, scroll to top so canvas is visible at top of viewport
+        if (isEmpty) {
+          const mainElement = document.querySelector('main');
+          if (mainElement && mainElement.scrollTop > 0) {
+            mainElement.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        }
+
         // Check for deleted comment marks
         const commentStore = useCommentStore.getState();
         const comments = commentStore.comments;
