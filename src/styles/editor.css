@@ -1,6 +1,7 @@
 @import './float.css';
 @import './columns.css';
 @import './line-numbers.css';
+@import './paragraph-numbers.css';
 
 /* Editor wrapper - natural height, don't expand to fill parent */
 .editor-wrapper {
