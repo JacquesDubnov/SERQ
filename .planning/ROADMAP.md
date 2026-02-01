@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: File Management** - Native dialogs, .serq.html format, auto-save
 - [x] **Phase 3: Style System** - CSS variables, presets, theme switching
 - [x] **Phase 4: Extended Features** - Tables, custom blocks, media, commands
-- [ ] **Phase 5: Polish** - Version history, comments, export, UI panels
+- [x] **Phase 5: Polish** - Version history, comments, export, UI panels
 - [ ] **Phase 6: AI Integration** - Claude API, stylization workflow, streaming
 - [x] **Phase 7: Layout and Numbering** - Multi-column layouts, text wrapping, line/paragraph numbers
 
@@ -157,13 +157,13 @@ Plans:
 **Plans**: 7 plans
 
 Plans:
-- [ ] 05-01-PLAN.md — SQLite foundation (tauri-plugin-sql), migrations, version storage, auto-snapshot hook
-- [ ] 05-02-PLAN.md — Export handlers (HTML, Markdown, PDF) and ExportMenu component
-- [ ] 05-03-PLAN.md — Focus mode, typewriter mode, status bar with word count
-- [ ] 05-04-PLAN.md — Version history panel (Time Machine UI) with preview and restore
-- [ ] 05-05-PLAN.md — Comment system (extension, panel, SQLite storage)
-- [ ] 05-06-PLAN.md — Import handlers (Word via Mammoth.js, Markdown, plain text)
-- [ ] 05-07-PLAN.md — App integration and human verification
+- [x] 05-01-PLAN.md — SQLite foundation (tauri-plugin-sql), migrations, version storage, auto-snapshot hook
+- [x] 05-02-PLAN.md — Export handlers (HTML, Markdown, PDF) and ExportMenu component
+- [x] 05-03-PLAN.md — Focus mode, typewriter mode, status bar with word count
+- [x] 05-04-PLAN.md — Version history panel (Time Machine UI) with preview and restore
+- [x] 05-05-PLAN.md — Comment system (extension, panel, SQLite storage)
+- [x] 05-06-PLAN.md — Import handlers (Word via Mammoth.js, Markdown, plain text)
+- [x] 05-07-PLAN.md — App integration and human verification
 
 **Implementation Notes:**
 - SQLite via tauri-plugin-sql for version storage (auto-save snapshots every 30s)
@@ -263,7 +263,7 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6 > 7
 | 2. File Management | 4/4 | Complete | 2026-01-30 |
 | 3. Style System | 4/4 | Complete | 2026-01-31 |
 | 4. Extended Features | 6/6 | Complete | 2026-01-31 |
-| 5. Polish | 0/7 | Planned | - |
+| 5. Polish | 7/7 | Complete | 2026-01-31 |
 | 6. AI Integration | 0/4 | Planned | - |
 | 7. Layout and Numbering | 5/5 | Complete | 2026-02-01 |
 
@@ -278,6 +278,7 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6 > 7
 *Phase 4 planned: 2026-01-31*
 *Phase 4 complete: 2026-01-31*
 *Phase 5 planned: 2026-01-31*
+*Phase 5 complete: 2026-01-31*
 *Phase 6 planned: 2026-02-01*
 *Phase 7 planned: 2026-02-01*
 *Phase 7 complete: 2026-02-01*
