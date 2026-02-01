@@ -1,10 +1,12 @@
 /**
  * CanvasContextMenu Component
  * Right-click context menu for canvas (empty space) operations
- * Provides line number controls and other canvas-level settings
+ * Provides line number controls, paragraph numbering, and other canvas-level settings
  */
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { useEditorStore, type LineNumberSettings } from '../../stores/editorStore';
+import { ParagraphNumberPicker } from './ParagraphNumberPicker';
+import { getPresetById } from '../../extensions/ParagraphNumbers';
 
 interface CanvasContextMenuProps {
   position: { x: number; y: number };
@@ -25,7 +27,9 @@ const STYLE_OPTIONS: Array<{ id: LineNumberSettings['style']; label: string }> =
 
 export function CanvasContextMenu({ position, onClose }: CanvasContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
-  const { lineNumbers, setLineNumbers, toggleLineNumbers } = useEditorStore();
+  const { lineNumbers, setLineNumbers, toggleLineNumbers, paragraphNumbers, setParagraphNumbers } = useEditorStore();
+  const [showNumberPicker, setShowNumberPicker] = useState(false);
+  const [pickerPosition, setPickerPosition] = useState({ x: 0, y: 0 });
 
   // Close on click outside or Escape
   useEffect(() => {
@@ -96,6 +100,25 @@ export function CanvasContextMenu({ position, onClose }: CanvasContextMenuProps)
     },
     [setLineNumbers]
   );
+
+  // Open paragraph number picker
+  const handleOpenNumberPicker = useCallback((e: React.MouseEvent) => {
+    const rect = (e.target as HTMLElement).getBoundingClientRect();
+    setPickerPosition({ x: rect.right + 8, y: rect.top });
+    setShowNumberPicker(true);
+  }, []);
+
+  // Toggle paragraph numbers off
+  const handleToggleParagraphNumbers = useCallback(() => {
+    if (paragraphNumbers.enabled) {
+      setParagraphNumbers({ enabled: false, presetId: null });
+    } else {
+      setParagraphNumbers({ enabled: true, presetId: 'seq-numeric' });
+    }
+  }, [paragraphNumbers.enabled, setParagraphNumbers]);
+
+  // Get current preset name
+  const currentPreset = paragraphNumbers.presetId ? getPresetById(paragraphNumbers.presetId) : null;
 
   return (
     <div
@@ -277,6 +300,121 @@ export function CanvasContextMenu({ position, onClose }: CanvasContextMenuProps)
           </>
         )}
       </div>
+
+      {/* Separator */}
+      <div
+        style={{
+          height: 1,
+          backgroundColor: 'var(--color-border, #e5e7eb)',
+          margin: '4px 12px',
+        }}
+      />
+
+      {/* Paragraph Numbers Section */}
+      <div style={{ padding: '4px 12px 8px' }}>
+        <div
+          style={{
+            fontSize: 11,
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            color: 'var(--color-text-muted, #9ca3af)',
+            marginBottom: 8,
+          }}
+        >
+          Paragraph Numbering
+        </div>
+
+        {/* Enable Toggle */}
+        <button
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            width: '100%',
+            padding: '8px 12px',
+            backgroundColor: 'transparent',
+            border: 'none',
+            borderRadius: 4,
+            cursor: 'pointer',
+            textAlign: 'left',
+            color: 'var(--color-text-primary, #1f2937)',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--color-bg-hover, #f3f4f6)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
+          onClick={handleToggleParagraphNumbers}
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          <span
+            style={{
+              width: 16,
+              height: 16,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '1px solid var(--color-border, #d1d5db)',
+              borderRadius: 3,
+              backgroundColor: paragraphNumbers.enabled
+                ? 'var(--color-accent, #2563eb)'
+                : 'transparent',
+              color: paragraphNumbers.enabled ? 'white' : 'transparent',
+              fontSize: 12,
+              fontWeight: 700,
+            }}
+          >
+            {paragraphNumbers.enabled ? '✓' : ''}
+          </span>
+          <span>Show Paragraph Numbers</span>
+        </button>
+
+        {/* Style selector button */}
+        <button
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            width: '100%',
+            padding: '8px 12px',
+            backgroundColor: 'transparent',
+            border: 'none',
+            borderRadius: 4,
+            cursor: 'pointer',
+            textAlign: 'left',
+            color: 'var(--color-text-primary, #1f2937)',
+            marginTop: 4,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.backgroundColor = 'var(--color-bg-hover, #f3f4f6)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.backgroundColor = 'transparent';
+          }}
+          onClick={handleOpenNumberPicker}
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          <span>
+            {currentPreset ? currentPreset.name : 'Choose Style...'}
+          </span>
+          <span style={{ color: 'var(--color-text-muted, #9ca3af)' }}>
+            {'\u203A'}
+          </span>
+        </button>
+      </div>
+
+      {/* Paragraph Number Picker */}
+      {showNumberPicker && (
+        <ParagraphNumberPicker
+          position={pickerPosition}
+          onClose={() => {
+            setShowNumberPicker(false);
+            onClose();
+          }}
+        />
+      )}
     </div>
   );
 }

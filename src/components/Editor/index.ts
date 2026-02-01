@@ -5,3 +5,4 @@ export { EditorWrapper } from './EditorWrapper';
 export { SelectionContextMenu } from './SelectionContextMenu';
 export { BlockContextMenu } from './BlockContextMenu';
 export { CanvasContextMenu } from './CanvasContextMenu';
+export { ParagraphNumberPicker } from './ParagraphNumberPicker';

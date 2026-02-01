@@ -25,6 +25,7 @@ import { ResizableImage } from '../../extensions/ResizableImage';
 import { TypewriterMode } from '../../extensions/TypewriterMode';
 import { Comment } from '../../extensions/Comment';
 import { LineNumbers } from '../../extensions/LineNumbers';
+import { ParagraphNumbers } from '../../extensions/ParagraphNumbers';
 import { useEditorStore, type OutlineAnchor } from '../../stores/editorStore';
 import { useCommentStore } from '../../stores/commentStore';
 import { isImageFile, isLargeImage, fileToBase64, formatFileSize } from '../../lib/imageUtils';
@@ -134,6 +135,9 @@ const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
         }),
         LineNumbers.configure({
           getSettings: () => useEditorStore.getState().lineNumbers,
+        }),
+        ParagraphNumbers.configure({
+          getSettings: () => useEditorStore.getState().paragraphNumbers,
         }),
       ],
       content: initialContent || '',
