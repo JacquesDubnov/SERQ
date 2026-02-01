@@ -1,11 +1,32 @@
 /**
  * Version Preview Component
- * Zoomed-out canvas replica showing version content with full styling
- * Matches the main editor canvas appearance exactly
+ * Uses a read-only TipTap editor with the same extensions as the main editor
+ * This ensures all content types render correctly without maintaining separate parsers
  */
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import Underline from '@tiptap/extension-underline';
+import Link from '@tiptap/extension-link';
+import Highlight from '@tiptap/extension-highlight';
+import TextAlign from '@tiptap/extension-text-align';
+import { TextStyle } from '@tiptap/extension-text-style';
+import { Color } from '@tiptap/extension-color';
+import Subscript from '@tiptap/extension-subscript';
+import Superscript from '@tiptap/extension-superscript';
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table-row';
+import { TableCell } from '@tiptap/extension-table-cell';
+import { TableHeader } from '@tiptap/extension-table-header';
+import { Callout } from '../../extensions/Callout';
+import { ColumnSection, Column } from '../../extensions/Columns';
+import { ResizableImage } from '../../extensions/ResizableImage';
 import type { Version } from '../../lib/version-storage';
 import { useStyleStore } from '../../stores/styleStore';
+import '../../styles/editor.css';
+import '../../styles/columns.css';
+import '../../styles/callout.css';
+import '../../styles/tables.css';
 
 interface InterfaceColors {
   bg: string;
@@ -28,18 +49,66 @@ export function VersionPreview({ version, interfaceColors }: VersionPreviewProps
     currentCanvas: canvasPreset,
   } = useStyleStore();
 
-  // Parse and render version content as HTML
-  const htmlContent = useMemo(() => {
-    if (!version) return '';
-
+  // Parse version content
+  const content = useMemo(() => {
+    if (!version) return null;
     try {
-      const json = JSON.parse(version.content);
-      return jsonToPreviewHTML(json);
+      return JSON.parse(version.content);
     } catch (err) {
       console.error('[VersionPreview] Failed to parse version content:', err);
-      return '<p style="color: red;">Failed to load preview</p>';
+      return null;
     }
   }, [version]);
+
+  // Create a read-only TipTap editor with the same extensions as the main editor
+  const previewEditor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        dropcursor: false,
+        gapcursor: false,
+      }),
+      Underline,
+      Link.configure({
+        openOnClick: false,
+      }),
+      Highlight.configure({
+        multicolor: true,
+      }),
+      TextAlign.configure({
+        types: ['heading', 'paragraph'],
+      }),
+      TextStyle,
+      Color,
+      Subscript,
+      Superscript,
+      Table.configure({
+        resizable: false,
+      }),
+      TableRow,
+      TableCell,
+      TableHeader,
+      Callout,
+      ColumnSection,
+      Column,
+      ResizableImage.configure({
+        inline: false,
+      }),
+    ],
+    content: content,
+    editable: false,
+    editorProps: {
+      attributes: {
+        class: 'preview-editor',
+      },
+    },
+  });
+
+  // Update editor content when version changes
+  useEffect(() => {
+    if (previewEditor && content) {
+      previewEditor.commands.setContent(content);
+    }
+  }, [previewEditor, content]);
 
   // Get canvas colors based on preset
   const getCanvasColors = () => {
@@ -112,7 +181,7 @@ export function VersionPreview({ version, interfaceColors }: VersionPreviewProps
         padding: '40px',
       }}
     >
-      {/* Scrollable wrapper - THE ONLY scroll context */}
+      {/* Scrollable wrapper */}
       <div
         style={{
           height: '100%',
@@ -124,6 +193,7 @@ export function VersionPreview({ version, interfaceColors }: VersionPreviewProps
       >
         {/* The canvas paper */}
         <div
+          className="editor-content"
           style={{
             width: '100%',
             maxWidth: '700px',
@@ -136,278 +206,29 @@ export function VersionPreview({ version, interfaceColors }: VersionPreviewProps
             ...typographyStyles,
           }}
         >
-          <div
-            className="preview-content"
-            dangerouslySetInnerHTML={{ __html: htmlContent }}
-          />
+          <EditorContent editor={previewEditor} />
         </div>
       </div>
 
-      {/* Inline styles for preview content */}
+      {/* Additional styles for read-only preview */}
       <style>{`
-        .preview-content h1 {
-          font-size: 2em;
-          font-weight: 700;
-          margin: 0 0 0.5em 0;
-          line-height: 1.2;
+        .preview-editor {
+          outline: none;
         }
-        .preview-content h2 {
-          font-size: 1.5em;
-          font-weight: 600;
-          margin: 1.5em 0 0.5em 0;
-          line-height: 1.3;
+        .preview-editor .ProseMirror {
+          outline: none;
         }
-        .preview-content h3 {
-          font-size: 1.25em;
-          font-weight: 600;
-          margin: 1.5em 0 0.5em 0;
-          line-height: 1.4;
+        .preview-editor .ProseMirror:focus {
+          outline: none;
         }
-        .preview-content p {
-          margin: 0 0 1em 0;
-        }
-        .preview-content ul, .preview-content ol {
-          margin: 0 0 1em 0;
-          padding-left: 1.5em;
-        }
-        .preview-content li {
-          margin: 0.25em 0;
-        }
-        .preview-content blockquote {
-          margin: 1em 0;
-          padding: 0.5em 1em;
-          border-left: 4px solid #0066cc;
-          background: rgba(0, 102, 204, 0.05);
-          font-style: italic;
-        }
-        .preview-content pre {
-          margin: 1em 0;
-          padding: 1em;
-          background: rgba(0, 0, 0, 0.05);
-          border-radius: 4px;
-          overflow-x: auto;
-          font-family: SF Mono, Menlo, monospace;
-          font-size: 0.9em;
-        }
-        .preview-content code {
-          font-family: SF Mono, Menlo, monospace;
-          font-size: 0.9em;
-          background: rgba(0, 0, 0, 0.05);
-          padding: 0.1em 0.3em;
-          border-radius: 3px;
-        }
-        .preview-content pre code {
-          background: none;
-          padding: 0;
-        }
-        .preview-content hr {
-          border: none;
-          border-top: 1px solid rgba(0, 0, 0, 0.1);
-          margin: 2em 0;
-        }
-        .preview-content table {
-          border-collapse: collapse;
-          width: 100%;
-          margin: 1em 0;
-        }
-        .preview-content th, .preview-content td {
-          border: 1px solid rgba(0, 0, 0, 0.1);
-          padding: 0.5em 0.75em;
-          text-align: left;
-        }
-        .preview-content th {
-          background: rgba(0, 0, 0, 0.03);
-          font-weight: 600;
-        }
-        .preview-content img {
-          max-width: 100%;
-          height: auto;
-          border-radius: 4px;
-        }
-        .preview-content .callout {
-          margin: 1em 0;
-          padding: 1em;
-          border-left: 4px solid #0066cc;
-          background: rgba(0, 102, 204, 0.05);
-          border-radius: 0 4px 4px 0;
-        }
-        .preview-content a {
-          color: #0066cc;
-          text-decoration: underline;
-        }
-        .preview-content strong {
-          font-weight: 600;
-        }
-        .preview-content em {
-          font-style: italic;
-        }
-        .preview-content s {
-          text-decoration: line-through;
-        }
-        .preview-content mark {
-          padding: 0.1em 0.2em;
-          border-radius: 2px;
+        /* Hide any interactive elements in preview */
+        .preview-editor .column-layout-handle,
+        .preview-editor .column-handles-container {
+          display: none !important;
         }
       `}</style>
     </div>
   );
-}
-
-/**
- * Simple JSON to HTML conversion for preview
- */
-function jsonToPreviewHTML(doc: any): string {
-  if (!doc.content) return '';
-
-  return doc.content
-    .map((node: any) => nodeToHTML(node))
-    .join('');
-}
-
-function nodeToHTML(node: any): string {
-  switch (node.type) {
-    case 'paragraph':
-      const pContent = inlineHTML(node.content || []);
-      return pContent ? `<p>${pContent}</p>` : '<p><br></p>';
-
-    case 'heading':
-      const level = node.attrs?.level || 1;
-      return `<h${level}>${inlineHTML(node.content || [])}</h${level}>`;
-
-    case 'bulletList':
-      const bulletItems = (node.content || [])
-        .map((item: any) => `<li>${listItemHTML(item)}</li>`)
-        .join('');
-      return `<ul>${bulletItems}</ul>`;
-
-    case 'orderedList':
-      const orderedItems = (node.content || [])
-        .map((item: any) => `<li>${listItemHTML(item)}</li>`)
-        .join('');
-      return `<ol>${orderedItems}</ol>`;
-
-    case 'blockquote':
-      const quoteContent = (node.content || [])
-        .map((n: any) => nodeToHTML(n))
-        .join('');
-      return `<blockquote>${quoteContent}</blockquote>`;
-
-    case 'codeBlock':
-      const code = (node.content || [])
-        .map((n: any) => escapeHTML(n.text || ''))
-        .join('');
-      return `<pre><code>${code}</code></pre>`;
-
-    case 'horizontalRule':
-      return '<hr />';
-
-    case 'table':
-      return tableToHTML(node);
-
-    case 'callout':
-      const calloutContent = (node.content || [])
-        .map((n: any) => nodeToHTML(n))
-        .join('');
-      return `<div class="callout">${calloutContent}</div>`;
-
-    case 'image':
-      const src = node.attrs?.src || '';
-      const alt = node.attrs?.alt || '';
-      return `<img src="${src}" alt="${escapeHTML(alt)}" />`;
-
-    default:
-      if (node.content) {
-        return node.content.map((n: any) => nodeToHTML(n)).join('');
-      }
-      return '';
-  }
-}
-
-function inlineHTML(content: any[]): string {
-  return content
-    .map((node) => {
-      if (node.type === 'text') {
-        let text = escapeHTML(node.text || '');
-        const marks = node.marks || [];
-
-        for (const mark of marks) {
-          switch (mark.type) {
-            case 'bold':
-            case 'strong':
-              text = `<strong>${text}</strong>`;
-              break;
-            case 'italic':
-            case 'em':
-              text = `<em>${text}</em>`;
-              break;
-            case 'code':
-              text = `<code>${text}</code>`;
-              break;
-            case 'strike':
-              text = `<s>${text}</s>`;
-              break;
-            case 'link':
-              text = `<a href="${escapeHTML(mark.attrs?.href || '')}">${text}</a>`;
-              break;
-            case 'highlight':
-              const color = mark.attrs?.color || '#ffeb3b';
-              text = `<mark style="background-color: ${color}">${text}</mark>`;
-              break;
-          }
-        }
-
-        return text;
-      }
-      if (node.type === 'hardBreak') {
-        return '<br>';
-      }
-      return '';
-    })
-    .join('');
-}
-
-function listItemHTML(item: any): string {
-  return (item.content || [])
-    .map((node: any) => {
-      if (node.type === 'paragraph') {
-        return inlineHTML(node.content || []);
-      }
-      return nodeToHTML(node);
-    })
-    .join('');
-}
-
-function tableToHTML(node: any): string {
-  const rows = node.content || [];
-  if (rows.length === 0) return '';
-
-  const rowsHTML = rows
-    .map((row: any) => {
-      const cells = row.content || [];
-      const cellsHTML = cells
-        .map((cell: any) => {
-          const isHeader = cell.type === 'tableHeader';
-          const tag = isHeader ? 'th' : 'td';
-          const content = (cell.content || [])
-            .map((n: any) => inlineHTML(n.content || []))
-            .join(' ');
-          return `<${tag}>${content}</${tag}>`;
-        })
-        .join('');
-      return `<tr>${cellsHTML}</tr>`;
-    })
-    .join('');
-
-  return `<table>${rowsHTML}</table>`;
-}
-
-function escapeHTML(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
 }
 
 export default VersionPreview;
