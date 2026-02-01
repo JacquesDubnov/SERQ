@@ -6,7 +6,14 @@ import Link from '@tiptap/extension-link';
 import Highlight from '@tiptap/extension-highlight';
 import TextAlign from '@tiptap/extension-text-align';
 import { TextStyle } from '@tiptap/extension-text-style';
+import FontFamily from '@tiptap/extension-font-family';
 import Color from '@tiptap/extension-color';
+import { FontSize } from '../../extensions/FontSize';
+import { FontWeight } from '../../extensions/FontWeight';
+import { FontKeyboardShortcuts } from '../../extensions/FontKeyboardShortcuts';
+import { LetterSpacing } from '../../extensions/LetterSpacing';
+import { LineHeight } from '../../extensions/LineHeight';
+import { TextCase } from '../../extensions/TextCase';
 import Placeholder from '@tiptap/extension-placeholder';
 import CharacterCount from '@tiptap/extension-character-count';
 import Subscript from '@tiptap/extension-subscript';
@@ -25,6 +32,7 @@ import { ResizableImage } from '../../extensions/ResizableImage';
 import { TypewriterMode } from '../../extensions/TypewriterMode';
 import { Comment } from '../../extensions/Comment';
 import { LineNumbers } from '../../extensions/LineNumbers';
+import { MultiSelect } from '../../extensions/MultiSelect';
 import { useEditorStore, type OutlineAnchor } from '../../stores/editorStore';
 import { useCommentStore } from '../../stores/commentStore';
 import { isImageFile, isLargeImage, fileToBase64, formatFileSize } from '../../lib/imageUtils';
@@ -90,6 +98,13 @@ const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
           types: ['heading', 'paragraph'],
         }),
         TextStyle,
+        FontFamily,
+        FontSize,
+        FontWeight,
+        FontKeyboardShortcuts,
+        LetterSpacing,
+        LineHeight,
+        TextCase,
         Color,
         Placeholder.configure({
           placeholder,
@@ -135,6 +150,7 @@ const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
         LineNumbers.configure({
           getSettings: () => useEditorStore.getState().lineNumbers,
         }),
+        MultiSelect,
       ],
       content: initialContent || '',
 

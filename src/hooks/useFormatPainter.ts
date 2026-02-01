@@ -1,9 +1,11 @@
 /**
  * Format Painter Hook
  * Manages format painter logic - capture formatting from one selection, apply to another
+ *
+ * Hold Option key while clicking to apply format multiple times without deactivating
  */
 
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { Editor } from '@tiptap/react'
 import { useStyleStore } from '../stores/styleStore'
 
@@ -103,6 +105,49 @@ export function useFormatPainter(
     }
   }, [active])
 
+  // Track Option key state for repeat brushing
+  const optionKeyHeldRef = useRef(false)
+
+  // Listen for Option key to enable repeat brushing mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey && active) {
+        optionKeyHeldRef.current = true
+        // Switch to hold mode while Option is pressed
+        useStyleStore.setState({
+          formatPainter: {
+            ...useStyleStore.getState().formatPainter,
+            mode: 'hold',
+          },
+        })
+        console.debug('[FormatPainter] Option key held - repeat brush mode ON')
+      }
+    }
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Alt' || !e.altKey) {
+        optionKeyHeldRef.current = false
+        // Deactivate format painter when Option is released
+        useStyleStore.setState({
+          formatPainter: {
+            ...useStyleStore.getState().formatPainter,
+            active: false,
+            mode: 'toggle',
+          },
+        })
+        console.debug('[FormatPainter] Option key released - format painter DEACTIVATED')
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+    }
+  }, [active])
+
   // Listen for clicks when format painter is active
   useEffect(() => {
     if (!active || !editor) {
@@ -114,8 +159,18 @@ export function useFormatPainter(
     const currentFormat = useStyleStore.getState().formatPainter.storedFormat
     console.debug('[FormatPainter] Effect running - Active and listening for clicks. Stored format:', currentFormat)
 
-    const handleClick = (_e: MouseEvent) => {
-      console.debug('[FormatPainter] Click event fired on editor')
+    const handleClick = (e: MouseEvent) => {
+      console.debug('[FormatPainter] Click event fired on editor, optionKey:', e.altKey)
+
+      // If Option key is held during click, temporarily set hold mode
+      if (e.altKey) {
+        useStyleStore.setState({
+          formatPainter: {
+            ...useStyleStore.getState().formatPainter,
+            mode: 'hold',
+          },
+        })
+      }
 
       // Get the latest stored format directly from store
       const { formatPainter: fp } = useStyleStore.getState()

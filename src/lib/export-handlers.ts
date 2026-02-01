@@ -119,13 +119,47 @@ ${content}
 }
 
 /**
+ * Check if document contains custom font styling
+ */
+function hasCustomFontStyling(editor: Editor): boolean {
+  let hasCustomFonts = false;
+  editor.state.doc.descendants((node) => {
+    if (node.marks) {
+      node.marks.forEach((mark) => {
+        if (mark.type.name === 'textStyle') {
+          const attrs = mark.attrs;
+          if (attrs.fontFamily || attrs.fontSize || attrs.fontWeight) {
+            hasCustomFonts = true;
+          }
+        }
+      });
+    }
+  });
+  return hasCustomFonts;
+}
+
+/**
  * Export to Markdown
  * Manual conversion from TipTap JSON to Markdown (no @tiptap/markdown extension needed)
+ * NOTE: Markdown does not support custom fonts, sizes, or weights
  */
 export async function exportToMarkdown(
   editor: Editor,
   documentName: string
 ): Promise<boolean> {
+  // Check if document has custom font styling
+  if (hasCustomFontStyling(editor)) {
+    const proceed = window.confirm(
+      'Warning: This document contains custom font styles (font family, size, or weight).\n\n' +
+      'Markdown format does not support these styles and they will be lost in the export.\n\n' +
+      'For full style preservation, consider exporting to HTML, PDF, EPUB, or Word format instead.\n\n' +
+      'Continue with Markdown export?'
+    );
+    if (!proceed) {
+      return false;
+    }
+  }
+
   const json = editor.getJSON()
   const markdown = jsonToMarkdown(json)
 

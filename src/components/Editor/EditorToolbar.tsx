@@ -3,6 +3,10 @@ import { useEditorState } from '@tiptap/react';
 import type { Editor } from '@tiptap/core';
 import { FormatPainter } from '../FormatPainter';
 import { TablePicker } from './TablePicker';
+import { FontControls } from './FontControls';
+import { TextColorPicker } from './TextColorPicker';
+import { SpacingControls } from './SpacingControls';
+import { CaseControls } from './CaseControls';
 
 interface InterfaceColors {
   bg: string;
@@ -19,6 +23,7 @@ interface ToolbarProps {
 
 interface ToolbarButtonProps {
   onClick: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
   isActive?: boolean;
   disabled?: boolean;
   title: string;
@@ -26,10 +31,23 @@ interface ToolbarButtonProps {
   colors: InterfaceColors;
 }
 
-function ToolbarButton({ onClick, isActive, disabled, title, children, colors }: ToolbarButtonProps) {
+// Storage keys for custom block styles
+const STYLE_STORAGE_PREFIX = 'serq-block-style-';
+
+interface BlockStyle {
+  fontFamily?: string;
+  fontSize?: string;
+  fontWeight?: string;
+  color?: string;
+  lineHeight?: string;
+  letterSpacing?: string;
+}
+
+function ToolbarButton({ onClick, onContextMenu, isActive, disabled, title, children, colors }: ToolbarButtonProps) {
   return (
     <button
       onClick={onClick}
+      onContextMenu={onContextMenu}
       disabled={disabled}
       title={title}
       className={`px-2 py-1.5 rounded text-sm font-medium transition-colors ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
@@ -48,15 +66,189 @@ function Divider({ color }: { color: string }) {
 }
 
 export function EditorToolbar({ editor, interfaceColors }: ToolbarProps) {
-  const [showTablePicker, setShowTablePicker] = useState(false)
+  const [showTablePicker, setShowTablePicker] = useState(false);
+  const [styleMenuTarget, setStyleMenuTarget] = useState<{ type: string; x: number; y: number } | null>(null);
 
   const handleInsertTable = useCallback((rows: number, cols: number) => {
-    editor.chain().focus().insertTable({ rows, cols, withHeaderRow: false }).run()
-    setShowTablePicker(false)
-  }, [editor])
+    editor.chain().focus().insertTable({ rows, cols, withHeaderRow: false }).run();
+    setShowTablePicker(false);
+  }, [editor]);
+
+  // Get style from the block where cursor is positioned (no selection needed)
+  const getCurrentBlockStyle = useCallback((): BlockStyle => {
+    const { state } = editor;
+    const { $from } = state.selection;
+
+    // Get the parent block node
+    const parentNode = $from.parent;
+
+    // Get block-level attributes (lineHeight is on the block)
+    const lineHeight = parentNode.attrs?.lineHeight || undefined;
+
+    // Get text style marks from the first text node in the block, or from cursor position
+    let fontFamily: string | undefined;
+    let fontSize: string | undefined;
+    let fontWeight: string | undefined;
+    let color: string | undefined;
+    let letterSpacing: string | undefined;
+
+    // Check marks at cursor position
+    const marks = $from.marks();
+    const textStyleMark = marks.find((m) => m.type.name === 'textStyle');
+    if (textStyleMark) {
+      fontFamily = textStyleMark.attrs.fontFamily || undefined;
+      fontSize = textStyleMark.attrs.fontSize || undefined;
+      fontWeight = textStyleMark.attrs.fontWeight || undefined;
+      color = textStyleMark.attrs.color || undefined;
+      letterSpacing = textStyleMark.attrs.letterSpacing || undefined;
+    }
+
+    // If no marks at cursor, try to get from first text node in block
+    if (!textStyleMark && parentNode.content.size > 0) {
+      parentNode.content.forEach((child) => {
+        if (child.isText && !fontFamily) {
+          const mark = child.marks.find((m) => m.type.name === 'textStyle');
+          if (mark) {
+            fontFamily = mark.attrs.fontFamily || undefined;
+            fontSize = mark.attrs.fontSize || undefined;
+            fontWeight = mark.attrs.fontWeight || undefined;
+            color = mark.attrs.color || undefined;
+            letterSpacing = mark.attrs.letterSpacing || undefined;
+          }
+        }
+      });
+    }
+
+    return {
+      fontFamily,
+      fontSize,
+      fontWeight,
+      color,
+      lineHeight,
+      letterSpacing,
+    };
+  }, [editor]);
+
+  // Apply style to ALL blocks of a given type in the document
+  const applyStyleToAllBlocks = useCallback((blockType: string, style: BlockStyle | null) => {
+    const { state, view } = editor;
+    const { tr } = state;
+    const nodeType = blockType === 'paragraph' ? 'paragraph' : 'heading';
+    const level = blockType.startsWith('heading') ? parseInt(blockType.replace('heading', '')) : null;
+
+    // Find all matching blocks and apply style
+    state.doc.descendants((node, pos) => {
+      const isMatch = nodeType === 'paragraph'
+        ? node.type.name === 'paragraph'
+        : node.type.name === 'heading' && node.attrs.level === level;
+
+      if (isMatch) {
+        // Update block attributes (lineHeight)
+        if (style === null) {
+          // Reset - remove lineHeight
+          const { lineHeight, ...restAttrs } = node.attrs;
+          tr.setNodeMarkup(pos, undefined, restAttrs);
+        } else if (style.lineHeight) {
+          tr.setNodeMarkup(pos, undefined, { ...node.attrs, lineHeight: style.lineHeight });
+        }
+
+        // Apply text marks to all text within this block
+        node.descendants((child, childPos) => {
+          if (child.isText) {
+            const from = pos + 1 + childPos;
+            const to = from + child.nodeSize;
+
+            if (style === null) {
+              // Reset - remove all style marks
+              const textStyleType = state.schema.marks.textStyle;
+              if (textStyleType) {
+                tr.removeMark(from, to, textStyleType);
+              }
+            } else {
+              // Apply new style marks
+              const textStyleType = state.schema.marks.textStyle;
+              if (textStyleType) {
+                const markAttrs: Record<string, string | undefined> = {};
+                if (style.fontFamily) markAttrs.fontFamily = style.fontFamily;
+                if (style.fontSize) markAttrs.fontSize = style.fontSize;
+                if (style.fontWeight) markAttrs.fontWeight = style.fontWeight;
+                if (style.color) markAttrs.color = style.color;
+                if (style.letterSpacing) markAttrs.letterSpacing = style.letterSpacing;
+
+                if (Object.keys(markAttrs).length > 0) {
+                  tr.addMark(from, to, textStyleType.create(markAttrs));
+                }
+              }
+            }
+          }
+        });
+      }
+    });
+
+    if (tr.docChanged) {
+      view.dispatch(tr);
+    }
+  }, [editor]);
+
+  // Save style to localStorage AND apply to all blocks
+  const handleAssignStyle = useCallback((blockType: string) => {
+    const style = getCurrentBlockStyle();
+    localStorage.setItem(STYLE_STORAGE_PREFIX + blockType, JSON.stringify(style));
+
+    // Apply to all existing blocks of this type
+    applyStyleToAllBlocks(blockType, style);
+
+    setStyleMenuTarget(null);
+  }, [getCurrentBlockStyle, applyStyleToAllBlocks]);
+
+  // Reset style AND apply default to all blocks
+  const handleResetStyle = useCallback((blockType: string) => {
+    localStorage.removeItem(STYLE_STORAGE_PREFIX + blockType);
+
+    // Reset all existing blocks of this type to default
+    applyStyleToAllBlocks(blockType, null);
+
+    setStyleMenuTarget(null);
+  }, [applyStyleToAllBlocks]);
+
+  // Apply saved style when setting block type
+  const applyBlockWithStyle = useCallback((blockType: string, level?: number) => {
+    const savedStyleJson = localStorage.getItem(STYLE_STORAGE_PREFIX + blockType);
+
+    // First, set the block type
+    if (blockType === 'paragraph') {
+      editor.chain().focus().setParagraph().run();
+    } else if (blockType.startsWith('heading')) {
+      editor.chain().focus().toggleHeading({ level: level as 1 | 2 | 3 | 4 | 5 | 6 }).run();
+    }
+
+    // Then apply saved style if exists
+    if (savedStyleJson) {
+      try {
+        const style: BlockStyle = JSON.parse(savedStyleJson);
+        const chain = editor.chain().focus();
+
+        if (style.fontFamily) chain.setFontFamily(style.fontFamily);
+        if (style.fontSize) chain.setFontSize(style.fontSize);
+        if (style.fontWeight) chain.setFontWeight(style.fontWeight);
+        if (style.color) chain.setColor(style.color);
+        if (style.lineHeight) chain.setLineHeight(style.lineHeight);
+        if (style.letterSpacing) chain.setLetterSpacing(style.letterSpacing);
+
+        chain.run();
+      } catch {
+        // Ignore parse errors
+      }
+    }
+  }, [editor]);
+
+  // Right-click handler for block type buttons
+  const handleBlockContextMenu = useCallback((e: React.MouseEvent, blockType: string) => {
+    e.preventDefault();
+    setStyleMenuTarget({ type: blockType, x: e.clientX, y: e.clientY });
+  }, []);
 
   // CRITICAL: Use selector to avoid re-render avalanche
-  // Only re-renders when selected values change, not on every transaction
   const state = useEditorState({
     editor,
     selector: (ctx) => ({
@@ -91,6 +283,14 @@ export function EditorToolbar({ editor, interfaceColors }: ToolbarProps) {
     }),
   });
 
+  const menuItemStyle: React.CSSProperties = {
+    padding: '8px 16px',
+    cursor: 'pointer',
+    fontSize: '13px',
+    color: interfaceColors.textPrimary,
+    whiteSpace: 'nowrap',
+  };
+
   return (
     <div
       className="py-2 flex items-center gap-2 flex-wrap"
@@ -101,6 +301,26 @@ export function EditorToolbar({ editor, interfaceColors }: ToolbarProps) {
         paddingRight: '20px',
       }}
     >
+      {/* Font Controls */}
+      <FontControls editor={editor} interfaceColors={interfaceColors} />
+
+      <Divider color={interfaceColors.border} />
+
+      {/* Text Color */}
+      <TextColorPicker editor={editor} interfaceColors={interfaceColors} />
+
+      <Divider color={interfaceColors.border} />
+
+      {/* Spacing Controls */}
+      <SpacingControls editor={editor} interfaceColors={interfaceColors} />
+
+      <Divider color={interfaceColors.border} />
+
+      {/* Case Controls */}
+      <CaseControls editor={editor} interfaceColors={interfaceColors} />
+
+      <Divider color={interfaceColors.border} />
+
       {/* History */}
       <ToolbarButton
         onClick={() => editor.chain().focus().undo().run()}
@@ -121,35 +341,39 @@ export function EditorToolbar({ editor, interfaceColors }: ToolbarProps) {
 
       <Divider color={interfaceColors.border} />
 
-      {/* Block Types */}
+      {/* Block Types with right-click style assignment */}
       <ToolbarButton
-        onClick={() => editor.chain().focus().setParagraph().run()}
+        onClick={() => applyBlockWithStyle('paragraph')}
+        onContextMenu={(e) => handleBlockContextMenu(e, 'paragraph')}
         isActive={state.isParagraph && !state.isHeading1 && !state.isHeading2 && !state.isHeading3}
-        title="Paragraph"
+        title="Paragraph (right-click to assign style)"
         colors={interfaceColors}
       >
         P
       </ToolbarButton>
       <ToolbarButton
-        onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
+        onClick={() => applyBlockWithStyle('heading1', 1)}
+        onContextMenu={(e) => handleBlockContextMenu(e, 'heading1')}
         isActive={state.isHeading1}
-        title="Heading 1 (Cmd+Alt+1)"
+        title="Heading 1 (right-click to assign style)"
         colors={interfaceColors}
       >
         H1
       </ToolbarButton>
       <ToolbarButton
-        onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
+        onClick={() => applyBlockWithStyle('heading2', 2)}
+        onContextMenu={(e) => handleBlockContextMenu(e, 'heading2')}
         isActive={state.isHeading2}
-        title="Heading 2 (Cmd+Alt+2)"
+        title="Heading 2 (right-click to assign style)"
         colors={interfaceColors}
       >
         H2
       </ToolbarButton>
       <ToolbarButton
-        onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
+        onClick={() => applyBlockWithStyle('heading3', 3)}
+        onContextMenu={(e) => handleBlockContextMenu(e, 'heading3')}
         isActive={state.isHeading3}
-        title="Heading 3 (Cmd+Alt+3)"
+        title="Heading 3 (right-click to assign style)"
         colors={interfaceColors}
       >
         H3
@@ -185,7 +409,7 @@ export function EditorToolbar({ editor, interfaceColors }: ToolbarProps) {
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleStrike().run()}
         isActive={state.isStrike}
-        title="Strikethrough (Cmd+Shift+S)"
+        title="Strikethrough"
         colors={interfaceColors}
       >
         S
@@ -201,7 +425,7 @@ export function EditorToolbar({ editor, interfaceColors }: ToolbarProps) {
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleSubscript().run()}
         isActive={state.isSubscript}
-        title="Subscript (Cmd+,)"
+        title="Subscript"
         colors={interfaceColors}
       >
         X₂
@@ -209,7 +433,7 @@ export function EditorToolbar({ editor, interfaceColors }: ToolbarProps) {
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleSuperscript().run()}
         isActive={state.isSuperscript}
-        title="Superscript (Cmd+.)"
+        title="Superscript"
         colors={interfaceColors}
       >
         X²
@@ -221,7 +445,7 @@ export function EditorToolbar({ editor, interfaceColors }: ToolbarProps) {
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBulletList().run()}
         isActive={state.isBulletList}
-        title="Bullet List (Cmd+Shift+8)"
+        title="Bullet List"
         colors={interfaceColors}
       >
         • List
@@ -229,7 +453,7 @@ export function EditorToolbar({ editor, interfaceColors }: ToolbarProps) {
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleOrderedList().run()}
         isActive={state.isOrderedList}
-        title="Numbered List (Cmd+Shift+7)"
+        title="Numbered List"
         colors={interfaceColors}
       >
         1. List
@@ -241,7 +465,7 @@ export function EditorToolbar({ editor, interfaceColors }: ToolbarProps) {
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleBlockquote().run()}
         isActive={state.isBlockquote}
-        title="Blockquote (Cmd+Shift+B)"
+        title="Blockquote"
         colors={interfaceColors}
       >
         Quote
@@ -249,7 +473,7 @@ export function EditorToolbar({ editor, interfaceColors }: ToolbarProps) {
       <ToolbarButton
         onClick={() => editor.chain().focus().toggleCodeBlock().run()}
         isActive={state.isCodeBlock}
-        title="Code Block (Cmd+Alt+C)"
+        title="Code Block"
         colors={interfaceColors}
       >
         Code Block
@@ -270,7 +494,6 @@ export function EditorToolbar({ editor, interfaceColors }: ToolbarProps) {
             fill="currentColor"
             style={{ display: 'block' }}
           >
-            {/* 2x2 grid icon */}
             <rect x="1" y="1" width="6" height="6" rx="1" />
             <rect x="9" y="1" width="6" height="6" rx="1" />
             <rect x="1" y="9" width="6" height="6" rx="1" />
@@ -298,7 +521,6 @@ export function EditorToolbar({ editor, interfaceColors }: ToolbarProps) {
           fill="currentColor"
           style={{ display: 'block' }}
         >
-          {/* Callout box icon with left border */}
           <rect x="1" y="2" width="2" height="12" rx="1" />
           <rect x="4" y="2" width="11" height="12" rx="1" opacity="0.4" />
           <circle cx="9" cy="6" r="1.5" />
@@ -312,7 +534,7 @@ export function EditorToolbar({ editor, interfaceColors }: ToolbarProps) {
       <ToolbarButton
         onClick={() => editor.chain().focus().setTextAlign('left').run()}
         isActive={state.alignLeft}
-        title="Align Left (Cmd+Shift+L)"
+        title="Align Left"
         colors={interfaceColors}
       >
         Left
@@ -320,7 +542,7 @@ export function EditorToolbar({ editor, interfaceColors }: ToolbarProps) {
       <ToolbarButton
         onClick={() => editor.chain().focus().setTextAlign('center').run()}
         isActive={state.alignCenter}
-        title="Align Center (Cmd+Shift+E)"
+        title="Align Center"
         colors={interfaceColors}
       >
         Center
@@ -328,7 +550,7 @@ export function EditorToolbar({ editor, interfaceColors }: ToolbarProps) {
       <ToolbarButton
         onClick={() => editor.chain().focus().setTextAlign('right').run()}
         isActive={state.alignRight}
-        title="Align Right (Cmd+Shift+R)"
+        title="Align Right"
         colors={interfaceColors}
       >
         Right
@@ -336,7 +558,7 @@ export function EditorToolbar({ editor, interfaceColors }: ToolbarProps) {
       <ToolbarButton
         onClick={() => editor.chain().focus().setTextAlign('justify').run()}
         isActive={state.alignJustify}
-        title="Justify (Cmd+Shift+J)"
+        title="Justify"
         colors={interfaceColors}
       >
         Justify
@@ -344,8 +566,94 @@ export function EditorToolbar({ editor, interfaceColors }: ToolbarProps) {
 
       <Divider color={interfaceColors.border} />
 
+      {/* Clear Formatting */}
+      <ToolbarButton
+        onClick={() => {
+          // Complete reset: remove ALL inline marks and reset block attributes
+          editor
+            .chain()
+            .focus()
+            .unsetAllMarks()
+            .setTextAlign('left')
+            .run();
+
+          // Explicitly unset textStyle attributes that may persist
+          if (editor.can().unsetFontFamily?.()) editor.commands.unsetFontFamily();
+          if (editor.can().unsetFontSize?.()) editor.commands.unsetFontSize();
+          if (editor.can().unsetFontWeight?.()) editor.commands.unsetFontWeight();
+          if (editor.can().unsetColor?.()) editor.commands.unsetColor();
+          if (editor.can().unsetLetterSpacing?.()) editor.commands.unsetLetterSpacing();
+          if (editor.can().unsetLineHeight?.()) editor.commands.unsetLineHeight();
+        }}
+        title="Clear Formatting (Cmd+\)"
+        colors={interfaceColors}
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="currentColor"
+          style={{ display: 'block' }}
+        >
+          {/* Eraser icon */}
+          <path d="M8.086 2.207a2 2 0 0 1 2.828 0l3.879 3.879a2 2 0 0 1 0 2.828l-5.5 5.5A2 2 0 0 1 7.879 15H5.12a2 2 0 0 1-1.414-.586l-2.5-2.5a2 2 0 0 1 0-2.828l6.879-6.879zm2.121.707a1 1 0 0 0-1.414 0L4.16 7.547l5.293 5.293 4.633-4.633a1 1 0 0 0 0-1.414l-3.879-3.879zM8.746 13.547 3.453 8.254 1.914 9.793a1 1 0 0 0 0 1.414l2.5 2.5a1 1 0 0 0 .707.293H7.88a1 1 0 0 0 .707-.293l.16-.16z"/>
+        </svg>
+      </ToolbarButton>
+
       {/* Format Painter */}
       <FormatPainter editor={editor} colors={interfaceColors} />
+
+      {/* Style Assignment Context Menu */}
+      {styleMenuTarget && (
+        <>
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 999,
+            }}
+            onClick={() => setStyleMenuTarget(null)}
+          />
+          <div
+            style={{
+              position: 'fixed',
+              left: styleMenuTarget.x,
+              top: styleMenuTarget.y,
+              backgroundColor: interfaceColors.bg,
+              border: `1px solid ${interfaceColors.border}`,
+              borderRadius: '6px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              zIndex: 1000,
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={menuItemStyle}
+              onClick={() => handleAssignStyle(styleMenuTarget.type)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = interfaceColors.bgSurface;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              Assign Current Style
+            </div>
+            <div
+              style={menuItemStyle}
+              onClick={() => handleResetStyle(styleMenuTarget.type)}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = interfaceColors.bgSurface;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              Reset to Default
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

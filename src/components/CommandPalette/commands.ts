@@ -99,7 +99,26 @@ export const commands: CommandItem[] = [
     title: 'Clear Formatting',
     shortcut: `${modKey}+\\`,
     group: 'format',
-    action: (editor) => editor.chain().focus().unsetAllMarks().run(),
+    action: (editor) => {
+      // Complete reset: remove ALL inline marks and reset block attributes
+      editor
+        .chain()
+        .focus()
+        // Remove all inline marks (bold, italic, textStyle with font/color/size, etc.)
+        .unsetAllMarks()
+        // Reset text alignment to default
+        .setTextAlign('left')
+        .run()
+
+      // Also need to explicitly unset textStyle attributes that may persist
+      // These commands may not exist if extensions aren't loaded, so we check
+      if (editor.can().unsetFontFamily?.()) editor.commands.unsetFontFamily()
+      if (editor.can().unsetFontSize?.()) editor.commands.unsetFontSize()
+      if (editor.can().unsetFontWeight?.()) editor.commands.unsetFontWeight()
+      if (editor.can().unsetColor?.()) editor.commands.unsetColor()
+      if (editor.can().unsetLetterSpacing?.()) editor.commands.unsetLetterSpacing()
+      if (editor.can().unsetLineHeight?.()) editor.commands.unsetLineHeight()
+    },
   },
 
   // Headings group

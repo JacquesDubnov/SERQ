@@ -6,3 +6,4 @@ export { useFormatPainter, type UseFormatPainterReturn } from './useFormatPainte
 export { useAutoSnapshot } from './useAutoSnapshot'
 export { useFocusMode } from './useFocusMode'
 export { useVersionHistory } from './useVersionHistory'
+export { useFontShortcuts } from './useFontShortcuts'

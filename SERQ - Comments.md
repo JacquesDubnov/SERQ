@@ -42,16 +42,7 @@ From 07-01 (Columns):
 
 
 
-
-  Okay, let's create a standard font management on the toolbar. Just like in Word or in Google Docs, add drop-downs of:
-- Font name
-- Font size
-- Font type (bold, semi-bold, regular, thin, light etc. As per each font)
-Add buttons to increase and decrease font sizes.
-Make sure the system can support the top 30 fonts used by Google Fonts. Make a research and make sure that we have access to the top 30 Google Fonts from our font menu with all their weights and variations.
-
-When selecting a text and applying the font style, size, and type on that selected text, this will override the paragraph, heading, and other block instructions to this particular selected text.
-
-Obviously, there will be no representation of this in Markdown unless you know how to do it in Markdown. So it can only be represented if exported as HTML, Word, EPUB, etc. So when saving as Markdown, we need to warn the user that Markdown format does not save individual fonts.
-
-go.
+Select your first chunk normally (click and drag)
+Hold Cmd
+Click and drag to select another chunk elsewhere
+Keep holding Cmd to add more selections

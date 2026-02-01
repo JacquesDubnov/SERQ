@@ -92,6 +92,7 @@ function App() {
   // Initialize keyboard shortcuts
   useKeyboardShortcuts(editorRef);
   useAutoSave(editorRef, true);
+  // Note: Font shortcuts handled by FontKeyboardShortcuts extension, not useFontShortcuts hook
 
   // Handle Tauri file drops for images
   useTauriFileDrop(editor);
@@ -338,9 +339,10 @@ function App() {
       </header>
 
       {/* Main content - pushed down by header height, padded at bottom for status bar */}
+      {/* marginTop: header bar (~52px) + toolbar (~48px) + 40px gap = 140px */}
       <main
         className="flex-1 overflow-auto"
-        style={{ marginTop: '52px', paddingBottom: '36px' }} // Clear header + status bar
+        style={{ marginTop: '140px', paddingBottom: '36px' }} // Clear header + toolbar + gap + status bar
       >
         <Canvas width={canvasWidth} viewportColor={interfaceBgSurface}>
           <EditorWrapper editor={editor}>

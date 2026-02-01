@@ -27,7 +27,7 @@ function getRegularLinePositions(view: EditorView): number[] {
   const { doc } = view.state;
   const positions: number[] = [];
 
-  doc.forEach((node, offset) => {
+  doc.forEach((_node, offset) => {
     try {
       const coords = view.coordsAtPos(offset + 1);
       if (coords) {

@@ -306,29 +306,18 @@ export const useStyleStore = create<StyleState>((set, get) => ({
       })
     }
 
-    // Get text alignment and node type from parent node
-    const parent = resolvedFrom.parent
-    const textAlign =
-      (parent.attrs.textAlign as string) ||
-      (parent.type.name === 'paragraph' ? 'left' : '')
-
-    // Capture node type (paragraph or heading)
-    const nodeType = parent.type.name === 'heading' ? 'heading' : 'paragraph'
-    const headingLevel = parent.type.name === 'heading'
-      ? (parent.attrs.level as 1 | 2 | 3)
-      : undefined
-
+    // Format painter only captures inline marks, not block-level formatting
+    // This keeps the painter focused on text styling only
     const summary = marks.length > 0
-      ? `Captured: ${marks.map(m => m.type).join(', ')}, align: ${textAlign}, node: ${nodeType}${headingLevel ? ` H${headingLevel}` : ''}`
-      : `No inline formatting, align: ${textAlign}, node: ${nodeType}${headingLevel ? ` H${headingLevel}` : ''}`
+      ? `Captured inline marks: ${marks.map(m => m.type).join(', ')}`
+      : `No inline formatting captured`
     console.debug('[StyleStore] Format capture result:', summary)
-    console.debug('[StyleStore] Captured format:', { marks, textAlign, nodeType, headingLevel })
 
     set({
       formatPainter: {
         active: true,
         mode: get().formatPainter.mode,
-        storedFormat: { marks, textAlign, nodeType, headingLevel },
+        storedFormat: { marks, textAlign: '', nodeType: 'paragraph', headingLevel: undefined },
       },
     })
   },
@@ -340,31 +329,47 @@ export const useStyleStore = create<StyleState>((set, get) => ({
       return
     }
 
-    const { marks, textAlign, nodeType, headingLevel } = formatPainter.storedFormat
+    const { marks } = formatPainter.storedFormat
     const { from, to } = editor.state.selection
 
-    console.debug('[StyleStore] Applying format:', {
+    console.debug('[StyleStore] Applying format (inline marks only):', {
       marks,
-      textAlign,
-      nodeType,
-      headingLevel,
       selection: { from, to }
     })
 
-    // First, apply node type change (paragraph or heading)
-    // This needs to happen before marks because changing node type can affect the selection
-    if (nodeType === 'heading' && headingLevel) {
-      console.debug('[StyleStore] Setting heading level:', headingLevel)
-      editor.chain().focus().setHeading({ level: headingLevel }).run()
-    } else if (nodeType === 'paragraph') {
-      console.debug('[StyleStore] Setting to paragraph')
-      editor.chain().focus().setParagraph().run()
+    // Format painter affects ALL inline text styling:
+    // - Font family, size, weight
+    // - Text color
+    // - Bold, italic, underline, strikethrough
+    // - Any other text marks
+    // It REPLACES all existing styling on the target with the captured styling
+
+    if (from === to) {
+      console.debug('[StyleStore] No selection, cannot apply format')
+      return
     }
 
-    // Clear existing marks
+    // Step 1: Remove ALL existing marks/formatting on the selection
+    // This resets the text to plain, unstyled text
     editor.chain().focus().unsetAllMarks().run()
 
-    // Apply each stored mark
+    // Also explicitly reset textStyle (font, size, weight, color)
+    // unsetAllMarks should handle this, but be explicit
+    if (editor.can().unsetFontFamily?.()) {
+      editor.chain().focus().unsetFontFamily().run()
+    }
+    if (editor.can().unsetFontSize?.()) {
+      editor.chain().focus().unsetFontSize().run()
+    }
+    if (editor.can().unsetFontWeight?.()) {
+      editor.chain().focus().unsetFontWeight().run()
+    }
+    if (editor.can().unsetColor?.()) {
+      editor.chain().focus().unsetColor().run()
+    }
+
+    // Step 2: Apply each captured mark
+    // This applies all the styling from the source text
     marks.forEach((mark) => {
       const markType = editor.schema.marks[mark.type]
       if (markType) {
@@ -372,11 +377,6 @@ export const useStyleStore = create<StyleState>((set, get) => ({
         editor.chain().focus().setMark(mark.type, mark.attrs).run()
       }
     })
-
-    // Apply text alignment if applicable
-    if (textAlign && editor.can().setTextAlign(textAlign)) {
-      editor.chain().focus().setTextAlign(textAlign).run()
-    }
 
     // In toggle mode, deactivate after one use
     if (formatPainter.mode === 'toggle') {

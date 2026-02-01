@@ -1,4 +1,6 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+// mod commands;  // TODO: Fix keyring API before re-enabling
+
 use tauri_plugin_sql::{Builder as SqlBuilder, Migration, MigrationKind};
 
 #[tauri::command]
@@ -9,6 +11,7 @@ fn greet(name: &str) -> String {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // .plugin(tauri_plugin_keyring::init())  // TODO: Re-enable with commands
         .plugin(
             SqlBuilder::default()
                 .add_migrations(
@@ -34,7 +37,13 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
-        .invoke_handler(tauri::generate_handler![greet])
+        .invoke_handler(tauri::generate_handler![
+            // TODO: Re-enable after fixing keyring API
+            // commands::set_api_key,
+            // commands::get_api_key,
+            // commands::has_api_key,
+            greet
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
