@@ -9,7 +9,7 @@ export default function CalloutView({
   selected,
   deleteNode,
 }: NodeViewProps) {
-  const { color, icon, collapsed, collapsible } = node.attrs
+  const { color, icon, collapsed, collapsible, borderStyle, float: floatValue = 'none' } = node.attrs
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
 
   const handleToggleCollapse = useCallback(
@@ -45,6 +45,13 @@ export default function CalloutView({
     updateAttributes({ collapsible: !collapsible })
   }, [collapsible, updateAttributes])
 
+  const handleChangeBorderStyle = useCallback(
+    (newBorderStyle: 'left' | 'right' | 'top' | 'bottom' | 'full' | 'none') => {
+      updateAttributes({ borderStyle: newBorderStyle })
+    },
+    [updateAttributes]
+  )
+
   const handleDelete = useCallback(() => {
     deleteNode()
   }, [deleteNode])
@@ -53,11 +60,17 @@ export default function CalloutView({
     setContextMenu(null)
   }, [])
 
+  // Determine wrapper class based on float value
+  const floatClass = floatValue && floatValue !== 'none' ? `block-float-${floatValue}` : ''
+  const wrapperClass = `callout ${selected ? 'callout-selected' : ''} ${collapsed ? 'callout-collapsed' : ''} ${floatClass}`.trim()
+
   return (
     <>
       <NodeViewWrapper
-        className={`callout ${selected ? 'callout-selected' : ''} ${collapsed ? 'callout-collapsed' : ''}`}
+        className={wrapperClass}
         data-color={color}
+        data-border-style={borderStyle || 'left'}
+        data-float={floatValue !== 'none' ? floatValue : undefined}
         onContextMenu={handleContextMenu}
       >
         {/* Header with icon and collapse button */}
@@ -97,9 +110,11 @@ export default function CalloutView({
           position={contextMenu}
           currentColor={color}
           currentIcon={icon}
+          currentBorderStyle={borderStyle || 'left'}
           isCollapsible={collapsible}
           onChangeColor={handleChangeColor}
           onChangeIcon={handleChangeIcon}
+          onChangeBorderStyle={handleChangeBorderStyle}
           onToggleCollapsible={handleToggleCollapsible}
           onDelete={handleDelete}
           onClose={handleCloseContextMenu}

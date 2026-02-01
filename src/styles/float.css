@@ -1,0 +1,139 @@
+/* ========================================
+   Block Float System for Text Wrapping
+   ======================================== */
+
+/**
+ * Float options for block elements (images, callouts):
+ * - none: Default, no float (block centered or aligned)
+ * - left: Float left, text wraps on right
+ * - right: Float right, text wraps on left
+ * - center-wrap: Centered with text wrapping below (treated as no float with center alignment)
+ */
+
+/* ========================================
+   Float Left
+   ======================================== */
+
+.block-float-left,
+[data-float="left"] {
+  float: left;
+  margin-right: 1.5rem;
+  margin-bottom: 1rem;
+  margin-top: 0.25rem;
+  max-width: 50%;
+}
+
+/* ========================================
+   Float Right
+   ======================================== */
+
+.block-float-right,
+[data-float="right"] {
+  float: right;
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+  margin-top: 0.25rem;
+  max-width: 50%;
+}
+
+/* ========================================
+   Center Wrap (No float, just centered)
+   ======================================== */
+
+.block-float-center-wrap,
+[data-float="center-wrap"] {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  margin-bottom: 1rem;
+  max-width: 80%;
+}
+
+/* ========================================
+   Headings Clear Floats
+   ======================================== */
+
+.editor-content .tiptap h1,
+.editor-content .tiptap h2,
+.editor-content .tiptap h3,
+.editor-content .tiptap h4,
+.editor-content .tiptap h5,
+.editor-content .tiptap h6 {
+  clear: both;
+}
+
+/* ========================================
+   Clear Break Element
+   ======================================== */
+
+.clear-break,
+[data-clear-break] {
+  clear: both;
+  display: block;
+  height: 0;
+  margin: 0;
+  padding: 0;
+}
+
+/* ========================================
+   Image-specific Float Adjustments
+   ======================================== */
+
+/* Override wrapper flex behavior when floating */
+.resizable-image-wrapper[data-float="left"],
+.resizable-image-wrapper[data-float="right"] {
+  display: block;
+  width: auto;
+}
+
+/* Ensure floated images don't use alignment justify */
+.resizable-image-wrapper[data-float="left"],
+.resizable-image-wrapper[data-float="right"] {
+  justify-content: unset;
+}
+
+/* ========================================
+   Callout-specific Float Adjustments
+   ======================================== */
+
+/* Floated callouts get constrained width */
+.callout[data-float="left"],
+.callout[data-float="right"] {
+  max-width: 45%;
+  min-width: 200px;
+}
+
+/* Center-wrap callout */
+.callout[data-float="center-wrap"] {
+  max-width: 90%;
+}
+
+/* ========================================
+   Print Styles
+   ======================================== */
+
+@media print {
+  /* Clear floats before page breaks */
+  .block-float-left,
+  .block-float-right,
+  [data-float="left"],
+  [data-float="right"] {
+    page-break-inside: avoid;
+  }
+}
+
+/* ========================================
+   Responsive: Disable floats on mobile
+   ======================================== */
+
+@media (max-width: 640px) {
+  .block-float-left,
+  .block-float-right,
+  [data-float="left"],
+  [data-float="right"] {
+    float: none;
+    margin-left: auto;
+    margin-right: auto;
+    max-width: 100%;
+  }
+}

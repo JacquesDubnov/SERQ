@@ -1,12 +1,18 @@
+@import './float.css';
+
 /* Editor wrapper - natural height, don't expand to fill parent */
 .editor-wrapper {
   width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
 }
 
 /* Editor content area */
 .editor-content {
   flex: 1;
   overflow-y: auto;
+  overflow-x: clip;
+  max-width: 100%;
 }
 
 /* ProseMirror editor styling - uses CSS variables from style presets */
@@ -28,6 +34,9 @@
   margin-left: var(--layout-margin-left, auto);
   margin-right: var(--layout-margin-right, auto);
   min-height: calc(100vh - 12rem);
+
+  /* Contain table overflow during column resize */
+  overflow-x: hidden;
 }
 
 /* Prose typography */
@@ -106,30 +115,55 @@
   vertical-align: super;
 }
 
-/* Code */
-.editor-content .tiptap code {
+/* Inline code - NOT inside pre blocks */
+.editor-content .tiptap code:not(pre code) {
   font-family: var(--font-mono);
-  background-color: var(--color-bg-surface, #f3f4f6);
-  color: var(--color-text-primary);
+  background-color: #f5f5f5;
+  color: #d63384;
   border-radius: 0.25rem;
-  padding: 0.125rem 0.25rem;
+  padding: 0.125rem 0.375rem;
   font-size: 0.875em;
+  border: 1px solid #e0e0e0;
 }
 
+:root[data-theme="dark"] .editor-content .tiptap code:not(pre code) {
+  background-color: #2d2d2d;
+  border-color: #404040;
+  color: #f8b4b4;
+}
+
+/* Code block - light gray background */
 .editor-content .tiptap pre {
-  background-color: var(--color-bg-surface, #1e1e1e);
-  color: var(--color-text-primary, #f8f8f2);
+  background-color: #f5f5f5 !important;
+  color: #1f2937 !important;
   font-family: var(--font-mono);
   padding: 1rem;
   border-radius: 0.5rem;
   overflow-x: auto;
+  border: 1px solid #e5e7eb;
+  margin: 1rem 0;
 }
 
+/* Code inside pre - reset ALL styles */
 .editor-content .tiptap pre code {
-  background: none;
-  padding: 0;
+  all: unset;
+  font-family: var(--font-mono);
   font-size: 0.875rem;
-  color: inherit;
+  color: #1f2937 !important;
+  line-height: 1.6;
+  display: block;
+  background: transparent !important;
+}
+
+/* Dark mode code block */
+:root[data-theme="dark"] .editor-content .tiptap pre {
+  background-color: #1f2937 !important;
+  color: #e5e7eb !important;
+  border-color: #374151;
+}
+
+:root[data-theme="dark"] .editor-content .tiptap pre code {
+  color: #e5e7eb !important;
 }
 
 /* Lists */
@@ -309,5 +343,23 @@ body.format-painter-active * {
   .editor-content .tiptap p {
     orphans: 3;
     widows: 3;
+  }
+}
+
+/* ========================================
+   Drop Cursor (insertion indicator when dragging)
+   ======================================== */
+
+.editor-content .tiptap .ProseMirror-dropcursor {
+  border-color: var(--color-accent, #2563eb) !important;
+  animation: drop-cursor-pulse 1s ease-in-out infinite;
+}
+
+@keyframes drop-cursor-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
   }
 }

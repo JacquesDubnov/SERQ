@@ -5,13 +5,14 @@ const MIN_WIDTH = 100
 const ALIGNMENT_OPTIONS = ['left', 'center', 'right'] as const
 
 export function ImageView({ node, updateAttributes, selected }: NodeViewProps) {
-  const { src, alt, title, width, alignment = 'center' } = node.attrs
+  const { src, alt, title, width, alignment = 'center', float: floatValue = 'none' } = node.attrs
   const imageRef = useRef<HTMLImageElement>(null)
   const [isResizing, setIsResizing] = useState(false)
-  const [showToolbar, setShowToolbar] = useState(false)
+  // Show toolbar only when selected (no delay on deselection)
+  const showToolbar = selected
 
   const handleMouseDown = useCallback(
-    (e: React.MouseEvent) => {
+    (corner: 'nw' | 'ne' | 'sw' | 'se') => (e: React.MouseEvent) => {
       e.preventDefault()
       e.stopPropagation()
 
@@ -21,13 +22,16 @@ export function ImageView({ node, updateAttributes, selected }: NodeViewProps) {
       const startX = e.clientX
       const startWidth = image.offsetWidth
       const aspectRatio = image.naturalHeight / image.naturalWidth
+      // For left-side handles, X movement is inverted
+      const isLeftSide = corner === 'nw' || corner === 'sw'
 
       setIsResizing(true)
 
       const handleMouseMove = (moveEvent: MouseEvent) => {
         const currentX = moveEvent.clientX
         const deltaX = currentX - startX
-        let newWidth = startWidth + deltaX
+        // Invert delta for left-side handles
+        let newWidth = isLeftSide ? startWidth - deltaX : startWidth + deltaX
 
         // Enforce minimum width
         newWidth = Math.max(MIN_WIDTH, newWidth)
@@ -60,14 +64,27 @@ export function ImageView({ node, updateAttributes, selected }: NodeViewProps) {
     [updateAttributes]
   )
 
+  // Determine wrapper class based on float value
+  const floatClass = floatValue && floatValue !== 'none' ? `block-float-${floatValue}` : ''
+  const wrapperClass = `resizable-image-wrapper ${floatValue === 'none' ? `alignment-${alignment}` : ''} ${floatClass}`.trim()
+
   return (
     <NodeViewWrapper
-      className={`resizable-image-wrapper alignment-${alignment}`}
-      data-alignment={alignment}
-      onMouseEnter={() => setShowToolbar(true)}
-      onMouseLeave={() => !selected && setShowToolbar(false)}
+      className={wrapperClass}
+      data-alignment={floatValue === 'none' ? alignment : undefined}
+      data-float={floatValue !== 'none' ? floatValue : undefined}
+      draggable={selected}
+      data-drag-handle=""
     >
       <div className={`resizable-image-container ${selected ? 'selected' : ''}`}>
+        {/* Drag handle overlay - visible indicator when selected */}
+        {selected && (
+          <div
+            className="image-drag-handle"
+            contentEditable={false}
+            title="Drag to move"
+          />
+        )}
         {/* Alignment toolbar */}
         {(selected || showToolbar) && (
           <div className="image-toolbar" contentEditable={false}>
@@ -118,12 +135,30 @@ export function ImageView({ node, updateAttributes, selected }: NodeViewProps) {
           draggable={false}
         />
 
-        {/* Resize handle (SE corner) */}
+        {/* Resize handles (all 4 corners) */}
         {selected && (
-          <div
-            className={`resize-handle ${isResizing ? 'resizing' : ''}`}
-            onMouseDown={handleMouseDown}
-          />
+          <>
+            <div
+              className={`resize-handle resize-handle-nw ${isResizing ? 'resizing' : ''}`}
+              onMouseDown={handleMouseDown('nw')}
+              title="Resize NW"
+            />
+            <div
+              className={`resize-handle resize-handle-ne ${isResizing ? 'resizing' : ''}`}
+              onMouseDown={handleMouseDown('ne')}
+              title="Resize NE"
+            />
+            <div
+              className={`resize-handle resize-handle-sw ${isResizing ? 'resizing' : ''}`}
+              onMouseDown={handleMouseDown('sw')}
+              title="Resize SW"
+            />
+            <div
+              className={`resize-handle resize-handle-se ${isResizing ? 'resizing' : ''}`}
+              onMouseDown={handleMouseDown('se')}
+              title="Resize SE"
+            />
+          </>
         )}
       </div>
     </NodeViewWrapper>
