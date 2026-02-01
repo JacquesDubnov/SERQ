@@ -24,8 +24,8 @@ interface VersionPreviewProps {
 export function VersionPreview({ version, interfaceColors }: VersionPreviewProps) {
   // Get current style presets for rendering
   const {
-    typography,
-    canvas: canvasPreset,
+    currentTypography: typography,
+    currentCanvas: canvasPreset,
   } = useStyleStore();
 
   // Parse and render version content as HTML
@@ -104,31 +104,35 @@ export function VersionPreview({ version, interfaceColors }: VersionPreviewProps
 
   return (
     <div
-      className="flex-1 flex items-center justify-center overflow-hidden"
       style={{
+        flex: 1,
+        minHeight: 0,
+        overflow: 'hidden',
         backgroundColor: interfaceColors.bgSurface,
         padding: '40px',
       }}
     >
-      {/* Canvas container - centered with shadow and rounded corners */}
+      {/* Scrollable wrapper - THE ONLY scroll context */}
       <div
-        className="relative"
         style={{
-          width: '100%',
-          maxWidth: '700px',
           height: '100%',
-          maxHeight: 'calc(100vh - 250px)',
-          overflow: 'auto',
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          display: 'flex',
+          justifyContent: 'center',
         }}
       >
         {/* The canvas paper */}
         <div
-          className="rounded-lg shadow-lg"
           style={{
+            width: '100%',
+            maxWidth: '700px',
+            flexShrink: 0,
             backgroundColor: canvasColors.bg,
             color: canvasColors.text,
             padding: '80px 100px',
-            minHeight: '100%',
+            borderRadius: '8px',
+            boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
             ...typographyStyles,
           }}
         >
