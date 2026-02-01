@@ -52,6 +52,13 @@ export default function CalloutView({
     [updateAttributes]
   )
 
+  const handleChangeFloat = useCallback(
+    (newFloat: 'none' | 'left' | 'right' | 'center-wrap') => {
+      updateAttributes({ float: newFloat })
+    },
+    [updateAttributes]
+  )
+
   const handleDelete = useCallback(() => {
     deleteNode()
   }, [deleteNode])
@@ -111,10 +118,12 @@ export default function CalloutView({
           currentColor={color}
           currentIcon={icon}
           currentBorderStyle={borderStyle || 'left'}
+          currentFloat={floatValue as 'none' | 'left' | 'right' | 'center-wrap'}
           isCollapsible={collapsible}
           onChangeColor={handleChangeColor}
           onChangeIcon={handleChangeIcon}
           onChangeBorderStyle={handleChangeBorderStyle}
+          onChangeFloat={handleChangeFloat}
           onToggleCollapsible={handleToggleCollapsible}
           onDelete={handleDelete}
           onClose={handleCloseContextMenu}

@@ -1,13 +1,16 @@
 import { useCallback, useRef, useState } from 'react'
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react'
+import { BlockContextMenu } from '../../components/Editor/BlockContextMenu'
 
 const MIN_WIDTH = 100
 const ALIGNMENT_OPTIONS = ['left', 'center', 'right'] as const
+type FloatOption = 'none' | 'left' | 'right' | 'center-wrap'
 
-export function ImageView({ node, updateAttributes, selected }: NodeViewProps) {
+export function ImageView({ node, updateAttributes, selected, editor }: NodeViewProps) {
   const { src, alt, title, width, alignment = 'center', float: floatValue = 'none' } = node.attrs
   const imageRef = useRef<HTMLImageElement>(null)
   const [isResizing, setIsResizing] = useState(false)
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
   // Show toolbar only when selected (no delay on deselection)
   const showToolbar = selected
 
@@ -64,19 +67,45 @@ export function ImageView({ node, updateAttributes, selected }: NodeViewProps) {
     [updateAttributes]
   )
 
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setContextMenu({ x: e.clientX, y: e.clientY })
+  }, [])
+
+  const handleChangeFloat = useCallback(
+    (newFloat: FloatOption) => {
+      updateAttributes({ float: newFloat })
+    },
+    [updateAttributes]
+  )
+
+  const handleInsertClearBreak = useCallback(() => {
+    if (editor) {
+      // Insert a horizontal rule after the current node as a clear break
+      editor.chain().focus().insertContent({ type: 'horizontalRule' }).run()
+    }
+  }, [editor])
+
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(null)
+  }, [])
+
   // Determine wrapper class based on float value
   const floatClass = floatValue && floatValue !== 'none' ? `block-float-${floatValue}` : ''
   const wrapperClass = `resizable-image-wrapper ${floatValue === 'none' ? `alignment-${alignment}` : ''} ${floatClass}`.trim()
 
   return (
-    <NodeViewWrapper
-      className={wrapperClass}
-      data-alignment={floatValue === 'none' ? alignment : undefined}
-      data-float={floatValue !== 'none' ? floatValue : undefined}
-      draggable={selected}
-      data-drag-handle=""
-    >
-      <div className={`resizable-image-container ${selected ? 'selected' : ''}`}>
+    <>
+      <NodeViewWrapper
+        className={wrapperClass}
+        data-alignment={floatValue === 'none' ? alignment : undefined}
+        data-float={floatValue !== 'none' ? floatValue : undefined}
+        draggable={selected}
+        data-drag-handle=""
+        onContextMenu={handleContextMenu}
+      >
+        <div className={`resizable-image-container ${selected ? 'selected' : ''}`}>
         {/* Drag handle overlay - visible indicator when selected */}
         {selected && (
           <div
@@ -162,5 +191,17 @@ export function ImageView({ node, updateAttributes, selected }: NodeViewProps) {
         )}
       </div>
     </NodeViewWrapper>
+
+    {/* Context Menu for Float Options */}
+    {contextMenu && (
+      <BlockContextMenu
+        position={contextMenu}
+        currentFloat={floatValue as FloatOption}
+        onChangeFloat={handleChangeFloat}
+        onInsertClearBreak={handleInsertClearBreak}
+        onClose={handleCloseContextMenu}
+      />
+    )}
+  </>
   )
 }
