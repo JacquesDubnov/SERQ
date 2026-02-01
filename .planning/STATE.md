@@ -538,8 +538,25 @@ See `.planning/DESIGN-REFERENCE.md` for UI/UX inspiration from:
 ## Session Continuity
 
 Last session: 2026-02-01
-Stopped at: Phase 7 complete and verified
+Stopped at: Ready for Phase 6 (AI Integration)
 Resume file: None
+
+### Session 2026-02-01 (evening) - Toolbar & Formatting Improvements
+
+**Completed (ad-hoc, not from roadmap):**
+- Font cycling shortcuts (Cmd+Alt+Up/Down) through all 35 fonts
+- Clear Formatting button + enhanced Cmd+\ command
+- Multi-select extension for Cmd+click non-sequential selection
+- Format painter: Option key hold for repeat, deactivate on release
+- Line/character spacing controls with selection preservation
+- Text case controls (upper/lower/title/sentence case)
+- Font size/weight controls with keyboard shortcuts
+- Fixed font cycling only working within subgroups (exact matching)
+- Fixed format painter affecting entire paragraph
+- Line spacing default changed from "Auto" to "1"
+- Added 40px gap between toolbar and canvas
+
+**Commit:** 58e3a1c - feat(editor): comprehensive toolbar and formatting improvements
 
 ---
 *State updated: 2026-02-01*
