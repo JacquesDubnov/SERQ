@@ -1,6 +1,7 @@
 import type { Editor, Range } from '@tiptap/core'
 import { fileToBase64, isImageFile, isLargeImage, formatFileSize } from '../../lib/imageUtils'
 import { useCommentStore } from '../../stores/commentStore'
+import { useEditorStore } from '../../stores/editorStore'
 
 /**
  * Detect if running on Mac for keyboard shortcut display
@@ -501,6 +502,39 @@ export const slashCommands: SlashCommandItem[] = [
       const root = document.documentElement
       const currentTheme = root.dataset.theme
       root.dataset.theme = currentTheme === 'dark' ? 'light' : 'dark'
+    },
+  },
+  {
+    title: 'Line Numbers (Regular)',
+    description: 'Number each paragraph',
+    icon: '1.',
+    group: 'view',
+    aliases: ['line', 'linenumbers', 'numbers', 'regular', 'paragraph'],
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).run()
+      useEditorStore.getState().setLineNumberStyle('regular')
+    },
+  },
+  {
+    title: 'Line Numbers (Legal)',
+    description: 'Number every visual line',
+    icon: '123',
+    group: 'view',
+    aliases: ['legal', 'alllines', 'everyline'],
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).run()
+      useEditorStore.getState().setLineNumberStyle('legal')
+    },
+  },
+  {
+    title: 'Line Numbers Off',
+    description: 'Hide line numbers',
+    icon: '×',
+    group: 'view',
+    aliases: ['nolines', 'hidelinenumbers', 'linesoff'],
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).run()
+      useEditorStore.getState().setLineNumbers({ enabled: false })
     },
   },
 ]

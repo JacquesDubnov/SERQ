@@ -3,7 +3,19 @@
  * Uses cmdk library with custom styling for SERQ
  */
 
-/* Dialog backdrop */
+/* Backdrop overlay - clickable to close */
+.command-palette-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 20vh;
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+/* Legacy dialog backdrop (if using Command.Dialog) */
 [cmdk-dialog] {
   position: fixed;
   inset: 0;
@@ -104,16 +116,16 @@
   border-radius: 6px;
   cursor: pointer;
   transition: background-color 0.1s ease;
+  background-color: transparent;
 }
 
-.command-item:hover,
+/* Selected item (keyboard navigation) - takes priority */
 .command-item[data-selected='true'] {
-  background-color: var(--interface-bg-surface, #f5f5f5);
+  background-color: var(--interface-bg-surface, #f5f5f5) !important;
 }
 
-:root[data-theme='dark'] .command-item:hover,
 :root[data-theme='dark'] .command-item[data-selected='true'] {
-  background-color: #262626;
+  background-color: #262626 !important;
 }
 
 /* Command title */

@@ -7,3 +7,4 @@ export {
   type StyleMetadata,
   type PersistedStyleState,
 } from './styleStore'
+export { useCommentStore, type Comment, type CommentState } from './commentStore'

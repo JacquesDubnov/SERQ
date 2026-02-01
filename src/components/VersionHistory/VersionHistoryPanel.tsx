@@ -52,6 +52,16 @@ export function VersionHistoryPanel({
     }
   }, [isOpen, loadVersions, clearSelection]);
 
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = '';
+      };
+    }
+  }, [isOpen]);
+
   // Keyboard navigation
   useEffect(() => {
     if (!isOpen) return;
@@ -66,10 +76,9 @@ export function VersionHistoryPanel({
         return;
       }
 
-      // Up/Down arrow navigation for version list
+      // Up/Down arrow navigation
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
         e.preventDefault();
-
         if (versions.length === 0) return;
 
         const currentIndex = selectedVersion
@@ -84,6 +93,12 @@ export function VersionHistoryPanel({
         }
 
         selectVersion(versions[newIndex].id);
+
+        // Scroll the selected card into view
+        setTimeout(() => {
+          const card = document.querySelector(`[data-version-id="${versions[newIndex].id}"]`);
+          card?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 0);
       }
 
       // Enter to restore
@@ -96,13 +111,11 @@ export function VersionHistoryPanel({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose, versions, selectedVersion, selectVersion, showConfirmModal]);
 
-  // Handle restore click - show confirmation modal
   const handleRestoreClick = useCallback(() => {
     if (!selectedVersion) return;
     setShowConfirmModal(true);
   }, [selectedVersion]);
 
-  // Confirm restore
   const handleConfirmRestore = useCallback(async () => {
     if (!editor || !selectedVersion || isRestoring) return;
 
@@ -112,98 +125,121 @@ export function VersionHistoryPanel({
       if (success) {
         setShowConfirmModal(false);
         onClose();
-      } else {
-        alert('Failed to restore version. Please try again.');
       }
     } finally {
       setIsRestoring(false);
     }
   }, [editor, selectedVersion, isRestoring, restoreVersion, onClose]);
 
-  // Format timestamp
   const formatTimestamp = (timestamp: number): { relative: string; absolute: string } => {
     const now = Date.now();
     const diff = now - timestamp;
     const date = new Date(timestamp);
-
-    const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
 
     let relative: string;
-    if (minutes < 1) relative = 'Just now';
-    else if (minutes < 60) relative = `${minutes}m ago`;
-    else if (hours < 24) relative = `${hours}h ago`;
-    else if (days < 7) relative = `${days}d ago`;
-    else relative = date.toLocaleDateString();
+    if (hours >= 24) {
+      // Absolute time for >24h
+      relative = date.toLocaleString();
+    } else {
+      const minutes = Math.floor(diff / 60000);
+      if (minutes < 1) relative = 'Just now';
+      else if (minutes < 60) relative = `${minutes}m ago`;
+      else relative = `${hours}h ago`;
+    }
 
-    const absolute = date.toLocaleString();
-
-    return { relative, absolute };
+    return { relative, absolute: date.toLocaleString() };
   };
 
-  // Calculate version number (newest = highest number)
-  const getVersionNumber = (index: number): number => {
-    return versions.length - index;
-  };
+  const getVersionNumber = (index: number): number => versions.length - index;
 
   if (!isOpen) return null;
 
   return (
     <div
-      className="fixed inset-0 z-50 flex"
-      style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
+        display: 'flex',
+        alignItems: 'stretch',
+        justifyContent: 'stretch',
+        padding: '32px',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        overflow: 'hidden',
+      }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
-        className="flex-1 flex m-8 rounded-lg overflow-hidden shadow-2xl"
-        style={{ backgroundColor: interfaceColors.bg }}
+        style={{
+          flex: 1,
+          display: 'flex',
+          borderRadius: '12px',
+          overflow: 'hidden',
+          backgroundColor: interfaceColors.bg,
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+        }}
       >
         {/* Left sidebar - version list */}
         <div
-          className="w-72 flex flex-col shrink-0"
           style={{
+            width: '320px',
+            flexShrink: 0,
+            display: 'flex',
+            flexDirection: 'column',
             backgroundColor: interfaceColors.bgSurface,
             borderRight: `1px solid ${interfaceColors.border}`,
           }}
         >
-          {/* Header */}
+          {/* Header with proper padding */}
           <div
-            className="px-4 py-4 shrink-0"
-            style={{ borderBottom: `1px solid ${interfaceColors.border}` }}
+            style={{
+              padding: '20px 24px',
+              borderBottom: `1px solid ${interfaceColors.border}`,
+            }}
           >
             <h2
-              className="text-base font-semibold"
-              style={{ color: interfaceColors.textPrimary }}
+              style={{
+                fontSize: '16px',
+                fontWeight: 600,
+                color: interfaceColors.textPrimary,
+                margin: 0,
+              }}
             >
               Version History
             </h2>
-            <p className="text-xs mt-1" style={{ color: interfaceColors.textMuted }}>
+            <p
+              style={{
+                fontSize: '12px',
+                color: interfaceColors.textMuted,
+                margin: '8px 0 0 0',
+              }}
+            >
               {versions.length} version{versions.length !== 1 ? 's' : ''} saved
             </p>
           </div>
 
           {/* Version list - scrollable */}
-          <div className="flex-1 overflow-y-auto">
+          <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
             {isLoading && versions.length === 0 ? (
-              <div className="p-4 text-center">
-                <p className="text-sm" style={{ color: interfaceColors.textMuted }}>
+              <div style={{ padding: '24px', textAlign: 'center' }}>
+                <p style={{ fontSize: '14px', color: interfaceColors.textMuted }}>
                   Loading versions...
                 </p>
               </div>
             ) : versions.length === 0 ? (
-              <div className="p-4 text-center">
-                <p className="text-sm" style={{ color: interfaceColors.textMuted }}>
+              <div style={{ padding: '24px', textAlign: 'center' }}>
+                <p style={{ fontSize: '14px', color: interfaceColors.textMuted, margin: '0 0 12px 0' }}>
                   No versions saved yet.
                 </p>
-                <p className="text-xs mt-2" style={{ color: interfaceColors.textMuted }}>
+                <p style={{ fontSize: '12px', color: interfaceColors.textMuted, margin: 0 }}>
                   Save your document (Cmd+S) to create versions.
                 </p>
               </div>
             ) : (
-              <div className="p-3 space-y-2">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                 {versions.map((version, index) => (
                   <VersionCard
                     key={version.id}
@@ -220,34 +256,61 @@ export function VersionHistoryPanel({
           </div>
         </div>
 
-        {/* Right side - preview (no overflow, fixed height) */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Preview header with restore button */}
+        {/* Right side - preview */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+          {/* Preview header with proper padding */}
           <div
-            className="flex items-center justify-between px-5 py-4 shrink-0"
-            style={{ borderBottom: `1px solid ${interfaceColors.border}` }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '16px 24px',
+              borderBottom: `1px solid ${interfaceColors.border}`,
+            }}
           >
             <div>
-              <h3 className="font-medium" style={{ color: interfaceColors.textPrimary }}>
+              <h3
+                style={{
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  color: interfaceColors.textPrimary,
+                  margin: 0,
+                }}
+              >
                 Preview
               </h3>
               {selectedVersion && (
-                <p className="text-xs mt-1" style={{ color: interfaceColors.textMuted }}>
-                  {selectedVersion.word_count.toLocaleString()} words
+                <p
+                  style={{
+                    fontSize: '12px',
+                    color: interfaceColors.textMuted,
+                    margin: '6px 0 0 0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                  }}
+                >
+                  <span>{selectedVersion.word_count.toLocaleString()} words</span>
+                  <span style={{ color: interfaceColors.border }}>|</span>
+                  <span>Saved {new Date(selectedVersion.timestamp).toLocaleString()}</span>
                 </p>
               )}
             </div>
-            <div className="flex items-center gap-3">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               {selectedVersion && (
                 <button
                   onClick={handleRestoreClick}
                   disabled={isRestoring}
-                  className="px-4 py-2 text-sm font-medium rounded transition-colors"
                   style={{
+                    padding: '10px 20px',
+                    fontSize: '13px',
+                    fontWeight: 500,
+                    borderRadius: '6px',
+                    border: 'none',
                     backgroundColor: '#0066cc',
                     color: '#ffffff',
-                    opacity: isRestoring ? 0.5 : 1,
                     cursor: isRestoring ? 'not-allowed' : 'pointer',
+                    opacity: isRestoring ? 0.5 : 1,
                   }}
                 >
                   Restore This Version
@@ -255,11 +318,14 @@ export function VersionHistoryPanel({
               )}
               <button
                 onClick={onClose}
-                className="px-4 py-2 text-sm rounded transition-colors"
                 style={{
+                  padding: '10px 20px',
+                  fontSize: '13px',
+                  borderRadius: '6px',
                   backgroundColor: interfaceColors.bgSurface,
                   border: `1px solid ${interfaceColors.border}`,
                   color: interfaceColors.textPrimary,
+                  cursor: 'pointer',
                 }}
               >
                 Close
@@ -267,7 +333,7 @@ export function VersionHistoryPanel({
             </div>
           </div>
 
-          {/* Preview content - fixed height, internal scroll only */}
+          {/* Preview content */}
           <VersionPreview
             version={selectedVersion}
             interfaceColors={interfaceColors}
@@ -278,42 +344,82 @@ export function VersionHistoryPanel({
       {/* Confirmation Modal */}
       {showConfirmModal && selectedVersion && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center"
-          style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 60,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          }}
           onClick={() => setShowConfirmModal(false)}
         >
           <div
-            className="rounded-lg shadow-xl p-6 max-w-md mx-4"
-            style={{ backgroundColor: interfaceColors.bg }}
+            style={{
+              backgroundColor: interfaceColors.bg,
+              borderRadius: '12px',
+              padding: '28px 32px',
+              maxWidth: '420px',
+              margin: '0 24px',
+              boxShadow: '0 20px 40px rgba(0, 0, 0, 0.2)',
+            }}
             onClick={(e) => e.stopPropagation()}
           >
             <h3
-              className="text-lg font-semibold mb-3"
-              style={{ color: interfaceColors.textPrimary }}
+              style={{
+                fontSize: '18px',
+                fontWeight: 600,
+                color: interfaceColors.textPrimary,
+                margin: '0 0 16px 0',
+              }}
             >
               Restore Version?
             </h3>
+
             <p
-              className="text-sm mb-4"
-              style={{ color: interfaceColors.textSecondary }}
+              style={{
+                fontSize: '14px',
+                lineHeight: 1.6,
+                color: interfaceColors.textSecondary,
+                margin: '0 0 12px 0',
+              }}
             >
               This will restore your document to the version from{' '}
-              <strong>{new Date(selectedVersion.timestamp).toLocaleString()}</strong>.
+              <strong style={{ color: interfaceColors.textPrimary }}>
+                {new Date(selectedVersion.timestamp).toLocaleString()}
+              </strong>.
             </p>
+
             <p
-              className="text-sm mb-6"
-              style={{ color: interfaceColors.textMuted }}
+              style={{
+                fontSize: '13px',
+                lineHeight: 1.5,
+                color: interfaceColors.textMuted,
+                margin: '0 0 28px 0',
+              }}
             >
               Your current work will be saved as a checkpoint before restoring.
             </p>
-            <div className="flex justify-end gap-3">
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'flex-end',
+                gap: '12px',
+              }}
+            >
               <button
                 onClick={() => setShowConfirmModal(false)}
-                className="px-4 py-2 text-sm rounded transition-colors"
                 style={{
+                  padding: '10px 20px',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  borderRadius: '6px',
                   backgroundColor: interfaceColors.bgSurface,
                   border: `1px solid ${interfaceColors.border}`,
                   color: interfaceColors.textPrimary,
+                  cursor: 'pointer',
                 }}
               >
                 Cancel
@@ -321,10 +427,15 @@ export function VersionHistoryPanel({
               <button
                 onClick={handleConfirmRestore}
                 disabled={isRestoring}
-                className="px-4 py-2 text-sm font-medium rounded transition-colors"
                 style={{
+                  padding: '10px 20px',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                  borderRadius: '6px',
+                  border: 'none',
                   backgroundColor: '#0066cc',
                   color: '#ffffff',
+                  cursor: isRestoring ? 'not-allowed' : 'pointer',
                   opacity: isRestoring ? 0.5 : 1,
                 }}
               >
@@ -339,7 +450,11 @@ export function VersionHistoryPanel({
 }
 
 /**
- * Version card component
+ * Version card with proper layout:
+ * Line 1: Version number (v1, v2...) - 10px, regular
+ * Line 2: Relative/absolute time - 12px, bold
+ * Line 3: Word count - 11px, muted
+ * + Tag in top right
  */
 interface VersionCardProps {
   version: Version;
@@ -360,10 +475,11 @@ function VersionCard({
 }: VersionCardProps) {
   const { relative, absolute } = formatTimestamp(version.timestamp);
 
-  // Determine tag type and color
-  const getTagInfo = (): { label: string; bgColor: string; textColor: string } => {
+  // Determine tag
+  const getTagInfo = () => {
     if (version.is_checkpoint) {
-      if (version.checkpoint_name?.toLowerCase().includes('restore')) {
+      const name = version.checkpoint_name || '';
+      if (name.toLowerCase().includes('restore')) {
         return { label: 'Restored', bgColor: '#3b82f620', textColor: '#3b82f6' };
       }
       return { label: 'Checkpoint', bgColor: '#3b82f620', textColor: '#3b82f6' };
@@ -371,64 +487,96 @@ function VersionCard({
     return { label: 'Version', bgColor: '#22c55e20', textColor: '#22c55e' };
   };
 
-  const tagInfo = getTagInfo();
+  const tag = getTagInfo();
 
   return (
     <button
       onClick={onSelect}
-      className="w-full text-left p-4 rounded-lg transition-all"
+      data-version-id={version.id}
       style={{
+        width: '100%',
+        textAlign: 'left',
+        padding: '16px 18px',
+        borderRadius: '8px',
+        border: isSelected ? '2px solid #0066cc' : `1px solid ${interfaceColors.border}`,
         backgroundColor: isSelected ? interfaceColors.bg : 'transparent',
-        border: isSelected
-          ? `2px solid #0066cc`
-          : `1px solid ${interfaceColors.border}`,
+        cursor: 'pointer',
+        transition: 'all 0.15s ease',
       }}
     >
-      {/* Top row: Timestamp (bold, large) + Tag */}
-      <div className="flex items-center justify-between mb-2">
+      {/* Row 1: Version number + Tag */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '8px',
+        }}
+      >
         <span
-          className="text-sm font-bold"
-          style={{ color: interfaceColors.textPrimary }}
-          title={absolute}
-        >
-          {relative}
-        </span>
-        <span
-          className="px-2 py-0.5 text-[10px] font-medium rounded"
           style={{
-            backgroundColor: tagInfo.bgColor,
-            color: tagInfo.textColor,
+            fontSize: '10px',
+            fontWeight: 400,
+            color: interfaceColors.textMuted,
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
           }}
         >
-          {tagInfo.label}
+          v{versionNumber}
+        </span>
+        <span
+          style={{
+            fontSize: '10px',
+            fontWeight: 500,
+            padding: '3px 8px',
+            borderRadius: '4px',
+            backgroundColor: tag.bgColor,
+            color: tag.textColor,
+          }}
+        >
+          {tag.label}
         </span>
       </div>
 
-      {/* Checkpoint name if exists */}
+      {/* Row 2: Timestamp (bold, larger) */}
+      <p
+        style={{
+          fontSize: '13px',
+          fontWeight: 600,
+          color: interfaceColors.textPrimary,
+          margin: '0 0 6px 0',
+        }}
+        title={absolute}
+      >
+        {relative}
+      </p>
+
+      {/* Row 3: Checkpoint name if exists */}
       {version.is_checkpoint && version.checkpoint_name && (
         <p
-          className="text-xs mb-2 truncate"
-          style={{ color: interfaceColors.textSecondary }}
+          style={{
+            fontSize: '11px',
+            color: interfaceColors.textSecondary,
+            margin: '0 0 6px 0',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
         >
           {version.checkpoint_name}
         </p>
       )}
 
-      {/* Bottom row: Version number + Word count */}
-      <div className="flex items-center justify-between">
-        <span
-          className="text-xs"
-          style={{ color: interfaceColors.textMuted }}
-        >
-          v{versionNumber}
-        </span>
-        <span
-          className="text-xs"
-          style={{ color: interfaceColors.textMuted }}
-        >
-          {version.word_count.toLocaleString()} words
-        </span>
-      </div>
+      {/* Row 4: Word count */}
+      <p
+        style={{
+          fontSize: '11px',
+          color: interfaceColors.textMuted,
+          margin: 0,
+        }}
+      >
+        {version.word_count.toLocaleString()} words
+      </p>
     </button>
   );
 }

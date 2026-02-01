@@ -1,7 +1,6 @@
 import { Node, mergeAttributes } from '@tiptap/core'
 import { TextSelection } from '@tiptap/pm/state'
-import { ReactNodeViewRenderer } from '@tiptap/react'
-import ColumnsView from './ColumnsView'
+import { ColumnSectionView } from './ColumnSectionView'
 
 // Extend TipTap's Commands interface
 declare module '@tiptap/core' {
@@ -23,19 +22,25 @@ declare module '@tiptap/core' {
        * Remove columns and extract content as paragraphs
        */
       removeColumns: () => ReturnType
+      /**
+       * Set the number of columns
+       */
+      setColumnCount: (count: number) => ReturnType
     }
   }
 }
 
 /**
  * ColumnSection node - parent container for column layout
- * Content: column+ (must contain at least one column)
+ *
+ * IMPORTANT: This does NOT use ReactNodeViewRenderer.
+ * Using native ProseMirror rendering allows clicks to work in all columns.
+ * The Table extension works the same way - no React, just CSS.
  */
 export const ColumnSection = Node.create({
   name: 'columnSection',
   group: 'block',
   content: 'column+',
-  draggable: true,
   isolating: true,
 
   // Priority > 100 to avoid TipTap extension conflicts
@@ -84,12 +89,31 @@ export const ColumnSection = Node.create({
     return [{ tag: 'div[data-column-section]' }]
   },
 
-  renderHTML({ HTMLAttributes }) {
-    return ['div', mergeAttributes({ 'data-column-section': '' }, HTMLAttributes), 0]
+  renderHTML({ node, HTMLAttributes }) {
+    const { columnCount, columnWidths, gap, showBorders } = node.attrs
+    const widths = columnWidths || Array(columnCount).fill(1)
+    const gridTemplate = widths.map((w: number) => `minmax(80px, ${w}fr)`).join(' ')
+
+    return [
+      'div',
+      mergeAttributes(
+        {
+          'data-column-section': '',
+          class: `column-section ${showBorders ? 'column-section-bordered' : ''}`,
+          style: `display: grid; grid-template-columns: ${gridTemplate}; gap: ${gap};`,
+        },
+        HTMLAttributes
+      ),
+      0, // content hole
+    ]
   },
 
+  /**
+   * Use plain ProseMirror NodeView (like TableView) instead of ReactNodeViewRenderer
+   * This ensures proper event handling and click/focus in all columns
+   */
   addNodeView() {
-    return ReactNodeViewRenderer(ColumnsView)
+    return ({ node, view, getPos }) => new ColumnSectionView(node, view, getPos)
   },
 
   addCommands() {
@@ -170,6 +194,74 @@ export const ColumnSection = Node.create({
         () =>
         ({ chain }) => {
           return chain().deleteNode('columnSection').run()
+        },
+
+      setColumnCount:
+        (count) =>
+        ({ tr, state, dispatch }) => {
+          const { selection } = state
+          const { $from } = selection
+
+          // Find the columnSection at cursor position
+          for (let depth = $from.depth; depth > 0; depth--) {
+            const node = $from.node(depth)
+            if (node.type.name === 'columnSection') {
+              const pos = $from.before(depth)
+              const currentCount = node.attrs.columnCount
+
+              if (count === currentCount) return false
+
+              // Extract content from existing columns
+              const existingContent: any[][] = []
+              node.forEach((column) => {
+                const content: any[] = []
+                column.forEach((child) => {
+                  content.push(child.toJSON())
+                })
+                existingContent.push(content)
+              })
+
+              // Create new columns with redistributed content
+              const newColumns = []
+              for (let i = 0; i < count; i++) {
+                const columnContent = existingContent[i] || [{ type: 'paragraph' }]
+                newColumns.push({
+                  type: 'column',
+                  content: columnContent.length > 0 ? columnContent : [{ type: 'paragraph' }],
+                })
+              }
+
+              // If reducing columns, merge extra content into the last column
+              if (count < currentCount) {
+                const lastColumnContent = [...newColumns[count - 1].content]
+                for (let i = count; i < existingContent.length; i++) {
+                  lastColumnContent.push(...existingContent[i])
+                }
+                newColumns[count - 1].content = lastColumnContent
+              }
+
+              // Calculate new widths (equal distribution)
+              const newWidths = Array(count).fill(1)
+
+              // Replace the node
+              const newNode = state.schema.nodeFromJSON({
+                type: 'columnSection',
+                attrs: {
+                  ...node.attrs,
+                  columnCount: count,
+                  columnWidths: newWidths,
+                },
+                content: newColumns,
+              })
+
+              if (dispatch) {
+                tr.replaceWith(pos, pos + node.nodeSize, newNode)
+                dispatch(tr)
+              }
+              return true
+            }
+          }
+          return false
         },
     }
   },

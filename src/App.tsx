@@ -1,12 +1,12 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { EditorCore, EditorToolbar, EditorWrapper, type EditorCoreRef } from './components/Editor';
+import { EditorCore, EditorToolbar, EditorWrapper, SelectionContextMenu, type EditorCoreRef } from './components/Editor';
 import { Canvas, type CanvasWidth } from './components/Layout';
 import { StylePanel, type StylePanelType } from './components/StylePanel';
 import { CommandPalette } from './components/CommandPalette';
 import { OutlinePanel } from './components/DocumentOutline';
 import { VersionHistoryPanel } from './components/VersionHistory';
-import { CommentPanel } from './components/Comments';
+import { CommentPanel, CommentTooltip } from './components/Comments';
 import { StatusBar } from './components/StatusBar';
 import { ExportMenu } from './components/ExportMenu';
 import { useEditorStore, useStyleStore } from './stores';
@@ -66,6 +66,7 @@ function App() {
   const canvasWidth = useEditorStore((state) => state.canvasWidth);
   const setCanvasWidth = useEditorStore((state) => state.setCanvasWidth);
   const markDirty = useEditorStore((state) => state.markDirty);
+  const showSaveGlow = useEditorStore((state) => state.showSaveGlow);
 
   // Focus mode state
   const { isFocusMode } = useFocusMode();
@@ -105,11 +106,20 @@ function App() {
     { enableOnContentEditable: true }
   );
 
-  // Keyboard shortcut for command palette (Cmd+K or Cmd+P)
+  // Get the store action for storing selection
+  const setStoredSelection = useEditorStore((state) => state.setStoredSelection);
+
+  // Keyboard shortcut for command palette (Cmd+P)
   useHotkeys(
-    'mod+k, mod+p',
+    'mod+p',
     (e) => {
       e.preventDefault();
+      // Store current selection before opening palette (for commands like Add Comment)
+      if (editor && !commandPaletteOpen) {
+        const { from, to } = editor.state.selection;
+        setStoredSelection({ from, to });
+        console.log('[App] Stored selection before opening palette:', { from, to });
+      }
       setCommandPaletteOpen((prev) => !prev);
     },
     { enableOnContentEditable: true, enableOnFormTags: true }
@@ -125,15 +135,6 @@ function App() {
     { enableOnContentEditable: true }
   );
 
-  // Keyboard shortcut for version history (Cmd+Shift+H)
-  useHotkeys(
-    'mod+shift+h',
-    (e) => {
-      e.preventDefault();
-      setVersionHistoryOpen(true);
-    },
-    { enableOnContentEditable: true }
-  );
 
   // Toggle panel helper
   const togglePanel = useCallback((panel: StylePanelType) => {
@@ -184,8 +185,9 @@ function App() {
   // Update window title based on document state
   useEffect(() => {
     const dirtyIndicator = document.isDirty ? '• ' : '';
-    window.document.title = `${dirtyIndicator}${document.name} - SERQ`;
-  }, [document.name, document.isDirty]);
+    const displayName = document.path ? document.name : `${document.name} - UNSAVED`;
+    window.document.title = `${dirtyIndicator}${displayName} - SERQ`;
+  }, [document.name, document.isDirty, document.path]);
 
   const handleUpdate = useCallback((content: JSONContent) => {
     markDirty();
@@ -258,7 +260,9 @@ function App() {
               {document.isDirty && (
                 <span className="text-orange-500 text-lg" title="Unsaved changes">•</span>
               )}
-              <span className="text-sm" style={{ color: interfaceTextSecondary }}>{document.name}</span>
+              <span className="text-sm" style={{ color: interfaceTextSecondary }}>
+                {document.path ? document.name : `${document.name} - UNSAVED`}
+              </span>
               {document.lastSaved && !document.isDirty && (
                 <span className="text-xs" style={{ color: interfaceTextMuted }}>
                   Saved {formatRelativeTime(document.lastSaved)}
@@ -333,10 +337,10 @@ function App() {
         )}
       </header>
 
-      {/* Main content - pushed down by header height */}
+      {/* Main content - pushed down by header height, padded at bottom for status bar */}
       <main
         className="flex-1 overflow-auto"
-        style={{ marginTop: '52px' }} // Just clear the fixed header, Canvas adds 40px padding
+        style={{ marginTop: '52px', paddingBottom: '36px' }} // Clear header + status bar
       >
         <Canvas width={canvasWidth} viewportColor={interfaceBgSurface}>
           <EditorWrapper editor={editor}>
@@ -362,6 +366,7 @@ function App() {
         isOpen={commandPaletteOpen}
         onOpenChange={setCommandPaletteOpen}
         onShowOutline={() => setOutlinePanelOpen(true)}
+        onShowVersionHistory={() => setVersionHistoryOpen(true)}
       />
 
       {/* Document Outline Panel */}
@@ -386,15 +391,59 @@ function App() {
         interfaceColors={interfaceColors}
       />
 
-      {/* Status Bar (hidden in focus mode) */}
+      {/* Comment Tooltip (hover over highlighted comments) */}
+      <CommentTooltip
+        editor={editor}
+        interfaceColors={interfaceColors}
+      />
+
+      {/* Selection Context Menu (right-click on selected text) */}
+      <SelectionContextMenu
+        editor={editor}
+        interfaceColors={interfaceColors}
+      />
+
+      {/* Status Bar (hidden in focus mode) - fixed at bottom */}
       {!isFocusMode && (
-        <StatusBar
-          editor={editor}
-          interfaceColors={interfaceColors}
-          typewriterEnabled={typewriterEnabled}
-          onToggleTypewriter={handleToggleTypewriter}
+        <div className="fixed bottom-0 left-0 right-0 z-20">
+          <StatusBar
+            editor={editor}
+            interfaceColors={interfaceColors}
+            typewriterEnabled={typewriterEnabled}
+            onToggleTypewriter={handleToggleTypewriter}
+          />
+        </div>
+      )}
+
+      {/* Save Glow Effect - blue neon border glow on save */}
+      {showSaveGlow && (
+        <div
+          className="save-glow-overlay"
+          style={{
+            position: 'fixed',
+            inset: 0,
+            pointerEvents: 'none',
+            zIndex: 9999,
+            boxShadow: 'inset 0 0 30px 8px rgba(59, 130, 246, 0.6), inset 0 0 60px 15px rgba(59, 130, 246, 0.3)',
+            animation: 'saveGlow 0.6s ease-out forwards',
+          }}
         />
       )}
+
+      {/* Save glow keyframes - injected once */}
+      <style>{`
+        @keyframes saveGlow {
+          0% {
+            opacity: 0;
+          }
+          30% {
+            opacity: 1;
+          }
+          100% {
+            opacity: 0;
+          }
+        }
+      `}</style>
     </div>
   );
 }

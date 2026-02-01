@@ -121,7 +121,11 @@ export async function getVersions(
     [documentPath, limit]
   );
   console.log('[VersionStorage] Found versions:', results.length);
-  return results;
+  // SQLite stores booleans as 0/1, convert to proper JS booleans
+  return results.map(v => ({
+    ...v,
+    is_checkpoint: Boolean(v.is_checkpoint),
+  }));
 }
 
 /**
@@ -135,7 +139,12 @@ export async function getVersionById(
     'SELECT * FROM versions WHERE id = $1',
     [versionId]
   );
-  return results[0] || null;
+  if (!results[0]) return null;
+  // SQLite stores booleans as 0/1, convert to proper JS booleans
+  return {
+    ...results[0],
+    is_checkpoint: Boolean(results[0].is_checkpoint),
+  };
 }
 
 /**

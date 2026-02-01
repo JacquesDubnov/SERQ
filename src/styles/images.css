@@ -69,11 +69,20 @@
   cursor: grabbing !important;
 }
 
-/* Selection outline */
+/* Selection outline - NO cursor here, let children control their own cursor */
 .resizable-image-container.selected {
   outline: 2px solid var(--color-primary, #3b82f6);
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+/* Grab cursor only on the image itself, not the handles */
+.resizable-image-container.selected img {
+  cursor: grab;
+}
+
+.resizable-image-container.selected img:active {
+  cursor: grabbing;
 }
 
 /* Image styling */
@@ -92,8 +101,8 @@
   background-color: #3b82f6;
   border: 2px solid white;
   border-radius: 3px;
-  z-index: 9999 !important;
-  transition: transform 0.1s ease;
+  z-index: 150; /* Above drag handle (100), below context menus (1000+) */
+  transition: transform 0.1s ease, background-color 0.1s ease;
   pointer-events: auto !important;
   box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
@@ -104,34 +113,32 @@
   background-color: #1d4ed8;
 }
 
-/* Force cursor on resize handles - override everything */
-.editor-content .resize-handle,
-.editor-content .tiptap .resize-handle,
-.resizable-image-container .resize-handle {
-  cursor: se-resize !important;
-}
-
-.editor-content .resize-handle-nw,
-.editor-content .tiptap .resize-handle-nw,
-.resizable-image-container .resize-handle-nw {
+/* Diagonal resize cursors for corner handles - MUST override parent grab cursor */
+.resize-handle-nw,
+.resize-handle-nw:hover,
+.resizable-image-container .resize-handle-nw,
+.resizable-image-container.selected .resize-handle-nw {
   cursor: nwse-resize !important;
 }
 
-.editor-content .resize-handle-ne,
-.editor-content .tiptap .resize-handle-ne,
-.resizable-image-container .resize-handle-ne {
+.resize-handle-ne,
+.resize-handle-ne:hover,
+.resizable-image-container .resize-handle-ne,
+.resizable-image-container.selected .resize-handle-ne {
   cursor: nesw-resize !important;
 }
 
-.editor-content .resize-handle-sw,
-.editor-content .tiptap .resize-handle-sw,
-.resizable-image-container .resize-handle-sw {
+.resize-handle-sw,
+.resize-handle-sw:hover,
+.resizable-image-container .resize-handle-sw,
+.resizable-image-container.selected .resize-handle-sw {
   cursor: nesw-resize !important;
 }
 
-.editor-content .resize-handle-se,
-.editor-content .tiptap .resize-handle-se,
-.resizable-image-container .resize-handle-se {
+.resize-handle-se,
+.resize-handle-se:hover,
+.resizable-image-container .resize-handle-se,
+.resizable-image-container.selected .resize-handle-se {
   cursor: nwse-resize !important;
 }
 
@@ -206,6 +213,14 @@
   color: white;
 }
 
+/* Separator between alignment and wrap buttons */
+.image-toolbar .toolbar-separator {
+  width: 1px;
+  height: 20px;
+  background-color: var(--border-color, #e5e5e5);
+  margin: 0 4px;
+}
+
 /* Images inside table cells */
 .editor-content .tiptap td .resizable-image-wrapper,
 .editor-content .tiptap th .resizable-image-wrapper {
@@ -238,46 +253,6 @@
 .editor-content .tiptap td:has(.resizable-image-container.selected),
 .editor-content .tiptap th:has(.resizable-image-container.selected) {
   overflow: visible;
-}
-
-/* ========================================
-   Free Position Mode
-   ======================================== */
-
-/* Parent container needs relative positioning for absolute children */
-.editor-content .tiptap {
-  position: relative;
-}
-
-/* Free position wrapper - absolute positioned */
-.resizable-image-wrapper.free-position-mode {
-  position: absolute;
-  z-index: 10;
-  margin: 0;
-}
-
-/* Visual indicator for free position mode */
-.resizable-image-wrapper.free-position-mode .resizable-image-container {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-}
-
-.resizable-image-wrapper.free-position-mode .resizable-image-container.selected {
-  outline-color: #10b981; /* Green to indicate special mode */
-  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
-}
-
-/* Free position drag handle indicator */
-.resizable-image-wrapper.free-position-mode .image-drag-handle {
-  background: rgba(16, 185, 129, 0.8);
-}
-
-.resizable-image-wrapper.free-position-mode .image-drag-handle:hover {
-  background: rgba(16, 185, 129, 1);
-}
-
-/* When dragging in free position mode */
-.resizable-image-wrapper.free-position-mode:active {
-  cursor: grabbing !important;
 }
 
 /* Dark mode support */

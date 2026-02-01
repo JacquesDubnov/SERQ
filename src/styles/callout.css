@@ -5,7 +5,37 @@
   padding: 1rem;
   border-radius: 4px;
   margin: 1rem 0;
+}
+
+/* Border style: left (default) */
+.callout[data-border-style="left"],
+.callout:not([data-border-style]) {
   border-left: 4px solid;
+}
+
+/* Border style: full */
+.callout[data-border-style="full"] {
+  border: 2px solid;
+}
+
+/* Border style: right */
+.callout[data-border-style="right"] {
+  border-right: 4px solid;
+}
+
+/* Border style: top */
+.callout[data-border-style="top"] {
+  border-top: 4px solid;
+}
+
+/* Border style: bottom */
+.callout[data-border-style="bottom"] {
+  border-bottom: 4px solid;
+}
+
+/* Border style: none */
+.callout[data-border-style="none"] {
+  border: none;
 }
 
 .callout-header {
@@ -55,6 +85,48 @@
   margin-bottom: 0;
 }
 
+/* Reset heading margins inside callouts */
+.callout-content h1,
+.callout-content h2,
+.callout-content h3,
+.callout-content h4,
+.callout-content h5,
+.callout-content h6 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+}
+
+.callout-content h1:first-child,
+.callout-content h2:first-child,
+.callout-content h3:first-child,
+.callout-content h4:first-child,
+.callout-content h5:first-child,
+.callout-content h6:first-child {
+  margin-top: 0;
+}
+
+.callout-content h1:last-child,
+.callout-content h2:last-child,
+.callout-content h3:last-child,
+.callout-content h4:last-child,
+.callout-content h5:last-child,
+.callout-content h6:last-child {
+  margin-bottom: 0;
+}
+
+/* Reduce heading size inside callouts */
+.callout-content h1 {
+  font-size: 1.5rem;
+}
+
+.callout-content h2 {
+  font-size: 1.25rem;
+}
+
+.callout-content h3 {
+  font-size: 1.125rem;
+}
+
 .callout-collapsed .callout-content {
   display: none !important;
 }
@@ -70,42 +142,42 @@
 
 .callout[data-color="blue"] {
   background-color: #dbeafe;
-  border-left-color: #3b82f6;
+  border-color: #3b82f6;
 }
 
 .callout[data-color="green"] {
   background-color: #dcfce7;
-  border-left-color: #22c55e;
+  border-color: #22c55e;
 }
 
 .callout[data-color="yellow"] {
   background-color: #fef9c3;
-  border-left-color: #eab308;
+  border-color: #eab308;
 }
 
 .callout[data-color="orange"] {
   background-color: #ffedd5;
-  border-left-color: #f97316;
+  border-color: #f97316;
 }
 
 .callout[data-color="red"] {
   background-color: #fee2e2;
-  border-left-color: #ef4444;
+  border-color: #ef4444;
 }
 
 .callout[data-color="purple"] {
   background-color: #f3e8ff;
-  border-left-color: #a855f7;
+  border-color: #a855f7;
 }
 
 .callout[data-color="pink"] {
   background-color: #fce7f3;
-  border-left-color: #ec4899;
+  border-color: #ec4899;
 }
 
 .callout[data-color="gray"] {
   background-color: #f3f4f6;
-  border-left-color: #6b7280;
+  border-color: #6b7280;
 }
 
 /* ================================
@@ -114,42 +186,42 @@
 
 :root[data-theme="dark"] .callout[data-color="blue"] {
   background-color: #1e3a5f;
-  border-left-color: #60a5fa;
+  border-color: #60a5fa;
 }
 
 :root[data-theme="dark"] .callout[data-color="green"] {
   background-color: #14532d;
-  border-left-color: #4ade80;
+  border-color: #4ade80;
 }
 
 :root[data-theme="dark"] .callout[data-color="yellow"] {
   background-color: #422006;
-  border-left-color: #facc15;
+  border-color: #facc15;
 }
 
 :root[data-theme="dark"] .callout[data-color="orange"] {
   background-color: #431407;
-  border-left-color: #fb923c;
+  border-color: #fb923c;
 }
 
 :root[data-theme="dark"] .callout[data-color="red"] {
   background-color: #450a0a;
-  border-left-color: #f87171;
+  border-color: #f87171;
 }
 
 :root[data-theme="dark"] .callout[data-color="purple"] {
   background-color: #3b0764;
-  border-left-color: #c084fc;
+  border-color: #c084fc;
 }
 
 :root[data-theme="dark"] .callout[data-color="pink"] {
   background-color: #500724;
-  border-left-color: #f472b6;
+  border-color: #f472b6;
 }
 
 :root[data-theme="dark"] .callout[data-color="gray"] {
   background-color: #1f2937;
-  border-left-color: #9ca3af;
+  border-color: #9ca3af;
 }
 
 /* ================================
@@ -298,4 +370,38 @@
 
 :root[data-theme="dark"] .callout-context-menu-icon-btn.active {
   background-color: var(--bg-hover-dark, #374151);
+}
+
+/* ================================
+   Callouts inside Table Cells
+   ================================ */
+
+.editor-content .tiptap td .callout,
+.editor-content .tiptap th .callout {
+  margin: 0.5rem 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.editor-content .tiptap td .callout:first-child,
+.editor-content .tiptap th .callout:first-child {
+  margin-top: 0;
+}
+
+.editor-content .tiptap td .callout:last-child,
+.editor-content .tiptap th .callout:last-child {
+  margin-bottom: 0;
+}
+
+/* Ensure callout context menu is visible above table */
+.editor-content .tiptap td .callout-context-menu,
+.editor-content .tiptap th .callout-context-menu {
+  z-index: 1050;
+}
+
+/* Prevent cell from clipping selected callouts */
+.editor-content .tiptap td:has(.callout-selected),
+.editor-content .tiptap th:has(.callout-selected) {
+  overflow: visible;
 }

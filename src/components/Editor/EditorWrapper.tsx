@@ -3,7 +3,6 @@ import { Editor } from '@tiptap/core'
 import { Selection } from '@tiptap/pm/state'
 import { CellSelection } from '@tiptap/pm/tables'
 import { TableContextMenu } from './TableContextMenu'
-import { CanvasContextMenu } from './CanvasContextMenu'
 import { useAutoSnapshot } from '../../hooks'
 import { useEditorStore } from '../../stores/editorStore'
 
@@ -48,12 +47,6 @@ export function EditorWrapper({ editor, children, className = '' }: EditorWrappe
     selectionInfo: SelectionInfo
     savedSelection: Selection
     cellRects: CellRect[]
-  } | null>(null)
-
-  // Canvas context menu state (for empty canvas right-click)
-  const [canvasMenuState, setCanvasMenuState] = useState<{
-    x: number
-    y: number
   } | null>(null)
 
   // Capture selection state AND cell rectangles on mousedown
@@ -137,35 +130,6 @@ export function EditorWrapper({ editor, children, className = '' }: EditorWrappe
 
       // Set menu state with cell rects for overlays
       setTableMenuState({ x: e.clientX, y: e.clientY, selectionInfo, savedSelection, cellRects })
-      return
-    }
-
-    // Canvas context menu - check if click is below content (empty space)
-    const isInteractive = target.closest('button') ||
-                          target.closest('input') ||
-                          target.closest('[role="menu"]') ||
-                          target.closest('.callout') ||
-                          target.closest('img')
-
-    if (isInteractive) return
-
-    // Check if click is in the canvas area below content
-    const proseMirror = document.querySelector('.ProseMirror') as HTMLElement
-    if (!proseMirror) return
-
-    const contentElements = proseMirror.querySelectorAll('p, h1, h2, h3, h4, h5, h6, ul, ol, blockquote, pre, hr, table, .callout')
-    let contentBottom = proseMirror.getBoundingClientRect().top + 50
-    if (contentElements.length > 0) {
-      const lastElement = contentElements[contentElements.length - 1]
-      const rect = lastElement.getBoundingClientRect()
-      contentBottom = rect.bottom
-    }
-
-    // Only show canvas menu if clicking below content
-    if (e.clientY > contentBottom + 10) {
-      e.preventDefault()
-      e.stopPropagation()
-      setCanvasMenuState({ x: e.clientX, y: e.clientY })
     }
   }, [editor])
 
@@ -176,11 +140,6 @@ export function EditorWrapper({ editor, children, className = '' }: EditorWrappe
 
     // Setting to null clears both menu and overlays (they're in the same state)
     setTableMenuState(null)
-  }, [])
-
-  // Close canvas context menu
-  const closeCanvasMenu = useCallback(() => {
-    setCanvasMenuState(null)
   }, [])
 
   // Click-anywhere to extend document
@@ -280,13 +239,6 @@ export function EditorWrapper({ editor, children, className = '' }: EditorWrappe
           selectionInfo={tableMenuState.selectionInfo}
           savedSelection={tableMenuState.savedSelection}
           onClose={closeTableMenu}
-        />
-      )}
-
-      {canvasMenuState && (
-        <CanvasContextMenu
-          position={{ x: canvasMenuState.x, y: canvasMenuState.y }}
-          onClose={closeCanvasMenu}
         />
       )}
     </div>

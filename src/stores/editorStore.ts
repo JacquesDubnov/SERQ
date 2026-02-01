@@ -25,8 +25,7 @@ type AutoSaveStatus = 'idle' | 'saving' | 'saved' | 'error'
  */
 export interface LineNumberSettings {
   enabled: boolean
-  position: 'gutter' | 'margin'
-  style: 'code' | 'legal'
+  style: 'regular' | 'legal'  // regular = per paragraph, legal = every visual line
 }
 
 /**
@@ -38,14 +37,6 @@ export interface StoredSelection {
   to: number
 }
 
-/**
- * Paragraph numbering settings
- */
-export interface ParagraphNumberSettings {
-  enabled: boolean
-  presetId: string | null // null = off, string = preset ID
-}
-
 interface EditorState {
   document: DocumentMeta
   canvasWidth: 'narrow' | 'normal' | 'wide' | 'full'
@@ -54,7 +45,6 @@ interface EditorState {
   storedSelection: StoredSelection | null
   showSaveGlow: boolean
   lineNumbers: LineNumberSettings
-  paragraphNumbers: ParagraphNumberSettings
 
   setDocument: (path: string | null, name: string) => void
   markDirty: () => void
@@ -67,8 +57,7 @@ interface EditorState {
   triggerSaveGlow: () => void
   setLineNumbers: (settings: Partial<LineNumberSettings>) => void
   toggleLineNumbers: () => void
-  setParagraphNumbers: (settings: Partial<ParagraphNumberSettings>) => void
-  toggleParagraphNumbers: () => void
+  setLineNumberStyle: (style: 'regular' | 'legal') => void
 }
 
 export const useEditorStore = create<EditorState>((set) => ({
@@ -85,12 +74,7 @@ export const useEditorStore = create<EditorState>((set) => ({
   showSaveGlow: false,
   lineNumbers: {
     enabled: false,
-    position: 'gutter',
-    style: 'code',
-  },
-  paragraphNumbers: {
-    enabled: false,
-    presetId: null,
+    style: 'regular',
   },
 
   setDocument: (path, name) => set({
@@ -134,16 +118,8 @@ export const useEditorStore = create<EditorState>((set) => ({
     lineNumbers: { ...state.lineNumbers, enabled: !state.lineNumbers.enabled }
   })),
 
-  setParagraphNumbers: (settings) => set((state) => ({
-    paragraphNumbers: { ...state.paragraphNumbers, ...settings }
-  })),
-
-  toggleParagraphNumbers: () => set((state) => ({
-    paragraphNumbers: {
-      ...state.paragraphNumbers,
-      enabled: !state.paragraphNumbers.enabled,
-      presetId: state.paragraphNumbers.enabled ? null : 'seq-numeric',
-    }
+  setLineNumberStyle: (style) => set((state) => ({
+    lineNumbers: { ...state.lineNumbers, style, enabled: true }
   })),
 }))
 

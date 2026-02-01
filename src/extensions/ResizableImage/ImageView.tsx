@@ -1,221 +1,346 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useRef, useEffect } from 'react'
 import { NodeViewWrapper, type NodeViewProps } from '@tiptap/react'
-import { BlockContextMenu } from '../../components/Editor/BlockContextMenu'
 
 const MIN_WIDTH = 100
 const ALIGNMENT_OPTIONS = ['left', 'center', 'right'] as const
-type FloatOption = 'none' | 'left' | 'right' | 'center-wrap'
 
-export function ImageView({ node, updateAttributes, selected, editor }: NodeViewProps) {
+export function ImageView({ node, updateAttributes, selected, editor, getPos }: NodeViewProps) {
   const {
     src,
     alt,
     title,
     width,
     alignment = 'center',
-    float: floatValue = 'none',
-    freePosition = false,
-    positionX = 50,
-    positionY = 0,
+    textWrap = false,
   } = node.attrs
   const imageRef = useRef<HTMLImageElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
-  const [isResizing, setIsResizing] = useState(false)
-  const [isDraggingPosition, setIsDraggingPosition] = useState(false)
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
-  // Show toolbar only when selected (no delay on deselection)
+  const containerRef = useRef<HTMLDivElement>(null)
+  // Show toolbar only when selected
   const showToolbar = selected
 
-  const handleMouseDown = useCallback(
-    (corner: 'nw' | 'ne' | 'sw' | 'se') => (e: React.MouseEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
+  // Create resize handles via DOM OUTSIDE the editor entirely (appended to body)
+  // This bypasses any TipTap/ProseMirror cursor interference
+  useEffect(() => {
+    const container = containerRef.current
+    const image = imageRef.current
+    if (!container || !image || !selected) return
 
-      const image = imageRef.current
-      if (!image) return
+    const handles: HTMLDivElement[] = []
+    const corners: Array<{ name: 'nw' | 'ne' | 'sw' | 'se'; cursor: string }> = [
+      { name: 'nw', cursor: 'nwse-resize' },
+      { name: 'ne', cursor: 'nesw-resize' },
+      { name: 'sw', cursor: 'nesw-resize' },
+      { name: 'se', cursor: 'nwse-resize' },
+    ]
 
-      const startX = e.clientX
-      const startWidth = image.offsetWidth
-      const aspectRatio = image.naturalHeight / image.naturalWidth
-      // For left-side handles, X movement is inverted
-      const isLeftSide = corner === 'nw' || corner === 'sw'
+    const updateHandlePositions = () => {
+      const rect = container.getBoundingClientRect()
+      handles.forEach((handle, i) => {
+        const corner = corners[i]
+        const isTop = corner.name.startsWith('n')
+        const isLeft = corner.name.endsWith('w')
+        handle.style.left = `${isLeft ? rect.left - 7 : rect.right - 7}px`
+        handle.style.top = `${isTop ? rect.top - 7 : rect.bottom - 7}px`
+      })
+    }
 
-      setIsResizing(true)
+    corners.forEach(({ name, cursor }) => {
+      const handle = document.createElement('div')
+      handle.className = `image-resize-handle-external image-resize-handle-${name}`
+      handle.style.cssText = `
+        position: fixed;
+        width: 14px;
+        height: 14px;
+        background-color: #3b82f6;
+        border: 2px solid white;
+        border-radius: 3px;
+        z-index: 10000;
+        cursor: ${cursor} !important;
+        pointer-events: auto;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        transition: transform 0.1s ease, background-color 0.1s ease;
+      `
 
-      const handleMouseMove = (moveEvent: MouseEvent) => {
-        const currentX = moveEvent.clientX
-        const deltaX = currentX - startX
-        // Invert delta for left-side handles
-        let newWidth = isLeftSide ? startWidth - deltaX : startWidth + deltaX
+      // Hover effect + force cursor via multiple methods
+      handle.addEventListener('mouseenter', () => {
+        handle.style.transform = 'scale(1.3)'
+        handle.style.backgroundColor = '#1d4ed8'
+        // Force cursor via setProperty with !important
+        handle.style.setProperty('cursor', cursor, 'important')
+        // Also set on body as backup
+        document.body.style.setProperty('cursor', cursor, 'important')
+      })
+      handle.addEventListener('mouseleave', () => {
+        handle.style.transform = ''
+        handle.style.backgroundColor = '#3b82f6'
+        // Reset body cursor
+        document.body.style.removeProperty('cursor')
+      })
 
-        // Enforce minimum width
-        newWidth = Math.max(MIN_WIDTH, newWidth)
+      // Mousedown handler for resizing
+      handle.addEventListener('mousedown', (e) => {
+        e.preventDefault()
+        e.stopPropagation()
 
-        // Calculate height based on aspect ratio
-        const newHeight = Math.round(newWidth * aspectRatio)
+        const startX = e.clientX
+        const startWidth = image.offsetWidth
+        const aspectRatio = image.naturalHeight / image.naturalWidth
+        const isLeftSide = name === 'nw' || name === 'sw'
 
-        updateAttributes({
-          width: Math.round(newWidth),
-          height: newHeight,
-        })
-      }
+        const onMouseMove = (moveEvent: MouseEvent) => {
+          const deltaX = moveEvent.clientX - startX
+          let newWidth = isLeftSide ? startWidth - deltaX : startWidth + deltaX
+          newWidth = Math.max(MIN_WIDTH, newWidth)
+          const newHeight = Math.round(newWidth * aspectRatio)
+          updateAttributes({ width: Math.round(newWidth), height: newHeight })
+          // Update handle positions as image resizes
+          requestAnimationFrame(updateHandlePositions)
+        }
 
-      const handleMouseUp = () => {
-        setIsResizing(false)
-        document.removeEventListener('mousemove', handleMouseMove)
-        document.removeEventListener('mouseup', handleMouseUp)
-      }
+        const onMouseUp = () => {
+          document.removeEventListener('mousemove', onMouseMove)
+          document.removeEventListener('mouseup', onMouseUp)
+        }
 
-      document.addEventListener('mousemove', handleMouseMove)
-      document.addEventListener('mouseup', handleMouseUp)
-    },
-    [updateAttributes]
-  )
+        document.addEventListener('mousemove', onMouseMove)
+        document.addEventListener('mouseup', onMouseUp)
+      })
+
+      document.body.appendChild(handle)
+      handles.push(handle)
+    })
+
+    // Initial position
+    updateHandlePositions()
+
+    // Update on scroll/resize
+    const onScrollOrResize = () => requestAnimationFrame(updateHandlePositions)
+    window.addEventListener('scroll', onScrollOrResize, true)
+    window.addEventListener('resize', onScrollOrResize)
+
+    // Cleanup
+    return () => {
+      handles.forEach(h => h.remove())
+      window.removeEventListener('scroll', onScrollOrResize, true)
+      window.removeEventListener('resize', onScrollOrResize)
+    }
+  }, [selected, updateAttributes])
 
   const handleAlignmentChange = useCallback(
     (newAlignment: (typeof ALIGNMENT_OPTIONS)[number]) => {
-      updateAttributes({ alignment: newAlignment })
+      // Center alignment doesn't support wrap - auto-disable it
+      if (newAlignment === 'center') {
+        updateAttributes({ alignment: newAlignment, textWrap: false })
+      } else {
+        updateAttributes({ alignment: newAlignment })
+      }
     },
     [updateAttributes]
   )
 
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setContextMenu({ x: e.clientX, y: e.clientY })
-  }, [])
+  const handleToggleWrap = useCallback(() => {
+    updateAttributes({ textWrap: !textWrap })
+  }, [textWrap, updateAttributes])
 
-  const handleChangeFloat = useCallback(
-    (newFloat: FloatOption) => {
-      updateAttributes({ float: newFloat })
-    },
-    [updateAttributes]
-  )
-
-  const handleInsertClearBreak = useCallback(() => {
-    if (editor) {
-      // Insert a horizontal rule after the current node as a clear break
-      editor.chain().focus().insertContent({ type: 'horizontalRule' }).run()
-    }
-  }, [editor])
-
-  const handleCloseContextMenu = useCallback(() => {
-    setContextMenu(null)
-  }, [])
-
-  // Free position drag handling
-  const handleFreePositionDrag = useCallback(
+  // Handle right-click to select image (shows toolbar)
+  const handleContextMenu = useCallback(
     (e: React.MouseEvent) => {
-      if (!freePosition || !wrapperRef.current) return
+      // Prevent default browser context menu
+      e.preventDefault()
+
+      // If not already selected, select this image node
+      if (!selected && editor && typeof getPos === 'function') {
+        const pos = getPos()
+        if (typeof pos === 'number') {
+          editor.commands.setNodeSelection(pos)
+        }
+      }
+    },
+    [selected, editor, getPos]
+  )
+
+  // Custom drag to reposition image in document
+  const handleDragToReposition = useCallback(
+    (e: React.MouseEvent) => {
+      if (!selected || !editor) return
+      if (e.button !== 0) return // Only left click
+
+      // Don't start drag if clicking on resize handles or toolbar
+      const target = e.target as HTMLElement
+      if (target.closest('.resize-handle') || target.closest('.image-toolbar')) return
+
       e.preventDefault()
       e.stopPropagation()
 
-      const startX = e.clientX
-      const startY = e.clientY
-      const startPosX = positionX
-      const startPosY = positionY
+      const view = editor.view
+      const imgElement = imageRef.current
 
-      // Get the canvas container for bounds calculation
-      const canvas = wrapperRef.current.closest('.tiptap') as HTMLElement
-      if (!canvas) return
+      // Get current node position
+      const pos = editor.state.selection.from
 
-      const canvasRect = canvas.getBoundingClientRect()
-      const imageWidth = imageRef.current?.offsetWidth || 0
+      // Create thumbnail for dragging
+      const thumbnail = document.createElement('div')
+      thumbnail.id = 'image-drag-thumbnail'
+      thumbnail.style.cssText = `
+        position: fixed;
+        width: 80px;
+        height: 80px;
+        background-image: url(${src});
+        background-size: cover;
+        background-position: center;
+        border-radius: 4px;
+        border: 2px solid #2563eb;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        opacity: 0.9;
+        pointer-events: none;
+        z-index: 10001;
+        transform: translate(-50%, -50%) scale(1);
+        transition: transform 0.15s ease-out;
+      `
+      document.body.appendChild(thumbnail)
 
-      setIsDraggingPosition(true)
+      // Animate shrink from original size
+      if (imgElement) {
+        const rect = imgElement.getBoundingClientRect()
+        const scaleX = rect.width / 80
+        const scaleY = rect.height / 80
+        thumbnail.style.left = `${rect.left + rect.width / 2}px`
+        thumbnail.style.top = `${rect.top + rect.height / 2}px`
+        thumbnail.style.transform = `translate(-50%, -50%) scale(${Math.max(scaleX, scaleY)})`
 
-      const handleMouseMove = (moveEvent: MouseEvent) => {
-        const deltaX = moveEvent.clientX - startX
-        const deltaY = moveEvent.clientY - startY
-
-        // Convert pixel movement to percentage (relative to canvas width)
-        const deltaXPercent = (deltaX / canvasRect.width) * 100
-        const deltaYPx = deltaY
-
-        // Calculate new position
-        let newPosX = startPosX + deltaXPercent
-        let newPosY = startPosY + deltaYPx
-
-        // Constrain X to keep image within canvas (0-100% minus image width percentage)
-        const imageWidthPercent = (imageWidth / canvasRect.width) * 100
-        const minX = imageWidthPercent / 2
-        const maxX = 100 - imageWidthPercent / 2
-        newPosX = Math.max(minX, Math.min(maxX, newPosX))
-
-        // Constrain Y to reasonable bounds (within current block context)
-        newPosY = Math.max(-100, Math.min(500, newPosY))
-
-        updateAttributes({
-          positionX: Math.round(newPosX * 10) / 10,
-          positionY: Math.round(newPosY),
+        // Trigger shrink animation
+        requestAnimationFrame(() => {
+          thumbnail.style.transform = 'translate(-50%, -50%) scale(1)'
         })
       }
 
+      // Create drop cursor
+      let cursor = document.getElementById('editor-drop-cursor')
+      if (!cursor) {
+        cursor = document.createElement('div')
+        cursor.id = 'editor-drop-cursor'
+        cursor.style.cssText = `
+          position: fixed;
+          width: 3px;
+          background-color: #2563eb;
+          pointer-events: none;
+          z-index: 10000;
+          display: none;
+          box-shadow: 0 0 8px rgba(37, 99, 235, 0.8), 0 0 2px rgba(37, 99, 235, 1);
+          border-radius: 2px;
+        `
+        document.body.appendChild(cursor)
+      }
+
+      let dropPos: number | null = null
+
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        // Move thumbnail to follow mouse
+        thumbnail.style.left = `${moveEvent.clientX}px`
+        thumbnail.style.top = `${moveEvent.clientY}px`
+
+        // Get drop position in editor
+        const coordinates = view.posAtCoords({
+          left: moveEvent.clientX,
+          top: moveEvent.clientY,
+        })
+
+        if (coordinates && cursor) {
+          dropPos = coordinates.pos
+          try {
+            const cursorCoords = view.coordsAtPos(coordinates.pos)
+            cursor.style.display = 'block'
+            cursor.style.left = `${cursorCoords.left}px`
+            cursor.style.top = `${cursorCoords.top}px`
+            cursor.style.height = `${Math.max(20, cursorCoords.bottom - cursorCoords.top)}px`
+          } catch {
+            cursor.style.display = 'none'
+          }
+        } else if (cursor) {
+          cursor.style.display = 'none'
+          dropPos = null
+        }
+      }
+
       const handleMouseUp = () => {
-        setIsDraggingPosition(false)
         document.removeEventListener('mousemove', handleMouseMove)
         document.removeEventListener('mouseup', handleMouseUp)
+
+        // Remove thumbnail
+        thumbnail.remove()
+
+        // Hide cursor
+        if (cursor) cursor.style.display = 'none'
+
+        // Move the image if we have a valid drop position
+        if (dropPos !== null && dropPos !== pos) {
+          const { state } = view
+          const { tr } = state
+
+          // Get the image node
+          const node = state.doc.nodeAt(pos)
+          if (node && node.type.name === 'image') {
+            // Calculate adjusted position after deletion
+            let insertPos = dropPos
+            if (dropPos > pos) {
+              insertPos = dropPos - node.nodeSize
+            }
+
+            // Delete the image from original position
+            tr.delete(pos, pos + node.nodeSize)
+
+            // Insert at new position
+            tr.insert(Math.max(0, insertPos), node)
+
+            view.dispatch(tr)
+            view.focus()
+          }
+        }
       }
 
       document.addEventListener('mousemove', handleMouseMove)
       document.addEventListener('mouseup', handleMouseUp)
     },
-    [freePosition, positionX, positionY, updateAttributes]
+    [selected, editor, src]
   )
 
-  const handleToggleFreePosition = useCallback(
-    (enabled: boolean) => {
-      // Clear float when enabling free position (mutually exclusive)
-      if (enabled && floatValue !== 'none') {
-        updateAttributes({ float: 'none', freePosition: true, positionX: 50, positionY: 0 })
-      } else {
-        updateAttributes({ freePosition: enabled })
-      }
-    },
-    [floatValue, updateAttributes]
-  )
+  // Determine wrapper class based on text wrap and alignment
+  // Wrap only available for left/right alignment (center never wraps)
+  const getWrapClass = () => {
+    if (!textWrap) return ''
+    if (alignment === 'left') return 'image-wrap-left'
+    if (alignment === 'right') return 'image-wrap-right'
+    return '' // center alignment never wraps
+  }
 
-  // Determine wrapper class based on float value and free position
-  const floatClass = floatValue && floatValue !== 'none' && !freePosition ? `block-float-${floatValue}` : ''
-  const freePositionClass = freePosition ? 'free-position-mode' : ''
-  const wrapperClass = `resizable-image-wrapper ${!freePosition && floatValue === 'none' ? `alignment-${alignment}` : ''} ${floatClass} ${freePositionClass}`.trim()
-
-  // Free position inline styles
-  const freePositionStyles: React.CSSProperties = freePosition
-    ? {
-        position: 'absolute',
-        left: `${positionX}%`,
-        top: `${positionY}px`,
-        transform: 'translateX(-50%)',
-        zIndex: 10,
-        cursor: isDraggingPosition ? 'grabbing' : 'grab',
-      }
-    : {}
+  const wrapperClass = `resizable-image-wrapper ${!textWrap ? `alignment-${alignment}` : ''} ${getWrapClass()}`.trim()
 
   return (
-    <>
-      <NodeViewWrapper
-        ref={wrapperRef}
-        className={wrapperClass}
-        style={freePositionStyles}
-        data-alignment={!freePosition && floatValue === 'none' ? alignment : undefined}
-        data-float={!freePosition && floatValue !== 'none' ? floatValue : undefined}
-        data-free-position={freePosition ? 'true' : undefined}
-        draggable={selected && !freePosition}
-        data-drag-handle={!freePosition ? '' : undefined}
+    <NodeViewWrapper
+      ref={wrapperRef}
+      className={wrapperClass}
+      data-alignment={alignment}
+      data-text-wrap={textWrap ? 'true' : undefined}
+      draggable={false}
+    >
+      <div
+        ref={containerRef}
+        className={`resizable-image-container ${selected ? 'selected' : ''}`}
+        onMouseDown={selected ? handleDragToReposition : undefined}
         onContextMenu={handleContextMenu}
-        onMouseDown={freePosition && selected ? handleFreePositionDrag : undefined}
       >
-        <div className={`resizable-image-container ${selected ? 'selected' : ''}`}>
         {/* Drag handle overlay - visible indicator when selected */}
         {selected && (
           <div
             className="image-drag-handle"
             contentEditable={false}
             title="Drag to move"
+            onMouseDown={handleDragToReposition}
+            style={{ cursor: 'grab' }}
           />
         )}
-        {/* Alignment toolbar */}
+        {/* Alignment + Wrap toolbar */}
         {(selected || showToolbar) && (
           <div className="image-toolbar" contentEditable={false}>
             {ALIGNMENT_OPTIONS.map((option) => (
@@ -249,6 +374,27 @@ export function ImageView({ node, updateAttributes, selected, editor }: NodeView
                 )}
               </button>
             ))}
+            {/* Text Wrap Toggle - only for left/right alignment */}
+            {alignment !== 'center' && (
+              <>
+                <div className="toolbar-separator" />
+                <button
+                  className={`toolbar-btn ${textWrap ? 'active' : ''}`}
+                  onClick={handleToggleWrap}
+                  title={textWrap ? 'Disable text wrap' : 'Enable text wrap'}
+                  type="button"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="5" width="8" height="8" rx="1" />
+                    <line x1="14" y1="6" x2="21" y2="6" />
+                    <line x1="14" y1="9" x2="21" y2="9" />
+                    <line x1="14" y1="12" x2="21" y2="12" />
+                    <line x1="3" y1="17" x2="21" y2="17" />
+                    <line x1="3" y1="20" x2="21" y2="20" />
+                  </svg>
+                </button>
+              </>
+            )}
           </div>
         )}
 
@@ -265,47 +411,8 @@ export function ImageView({ node, updateAttributes, selected, editor }: NodeView
           draggable={false}
         />
 
-        {/* Resize handles (all 4 corners) */}
-        {selected && (
-          <>
-            <div
-              className={`resize-handle resize-handle-nw ${isResizing ? 'resizing' : ''}`}
-              onMouseDown={handleMouseDown('nw')}
-              title="Resize NW"
-            />
-            <div
-              className={`resize-handle resize-handle-ne ${isResizing ? 'resizing' : ''}`}
-              onMouseDown={handleMouseDown('ne')}
-              title="Resize NE"
-            />
-            <div
-              className={`resize-handle resize-handle-sw ${isResizing ? 'resizing' : ''}`}
-              onMouseDown={handleMouseDown('sw')}
-              title="Resize SW"
-            />
-            <div
-              className={`resize-handle resize-handle-se ${isResizing ? 'resizing' : ''}`}
-              onMouseDown={handleMouseDown('se')}
-              title="Resize SE"
-            />
-          </>
-        )}
+        {/* Resize handles are created via DOM in useEffect (not React) for proper cursor behavior */}
       </div>
     </NodeViewWrapper>
-
-    {/* Context Menu for Float Options */}
-    {contextMenu && (
-      <BlockContextMenu
-        position={contextMenu}
-        currentFloat={floatValue as FloatOption}
-        onChangeFloat={handleChangeFloat}
-        onInsertClearBreak={handleInsertClearBreak}
-        onClose={handleCloseContextMenu}
-        freePosition={freePosition}
-        onToggleFreePosition={handleToggleFreePosition}
-        showFreePositionOption={true}
-      />
-    )}
-  </>
   )
 }

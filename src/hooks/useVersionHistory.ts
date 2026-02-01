@@ -41,14 +41,18 @@ export function useVersionHistory(): UseVersionHistoryReturn {
 
   // Load versions when document path changes
   const loadVersions = useCallback(async () => {
+    console.log('[VersionHistory] loadVersions called - path:', documentPath);
     if (!documentPath) {
+      console.log('[VersionHistory] No document path, clearing versions');
       setVersions([]);
       return;
     }
 
     setIsLoading(true);
     try {
+      console.log('[VersionHistory] Fetching versions for:', documentPath);
       const versionList = await getVersions(documentPath, 100);
+      console.log('[VersionHistory] Got versions:', versionList.length);
       setVersions(versionList);
     } catch (err) {
       console.error('[VersionHistory] Failed to load versions:', err);
@@ -93,13 +97,18 @@ export function useVersionHistory(): UseVersionHistoryReturn {
         const wordCount = editor.storage.characterCount?.words?.() ?? 0;
         const charCount = editor.storage.characterCount?.characters?.() ?? 0;
 
+        // Calculate version number (versions are sorted newest first)
+        const versionIndex = versions.findIndex(v => v.id === selectedVersion.id);
+        const versionNumber = versionIndex >= 0 ? versions.length - versionIndex : '?';
+        const dateOnly = new Date(selectedVersion.timestamp).toLocaleDateString();
+
         await saveVersion(
           documentPath,
           currentJSON,
           wordCount,
           charCount,
           true, // Named checkpoint
-          `Before restore to version from ${new Date(selectedVersion.timestamp).toLocaleString()}`
+          `Restored from v${versionNumber}, ${dateOnly}`
         );
 
         // Restore content

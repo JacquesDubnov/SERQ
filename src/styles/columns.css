@@ -47,6 +47,10 @@
   min-width: 80px;
   padding: 0.5rem;
   position: relative;
+  /* Prevent word breaking in columns */
+  word-break: normal;
+  overflow-wrap: normal;
+  hyphens: none;
 }
 
 /* Subtle highlight on focus within column */

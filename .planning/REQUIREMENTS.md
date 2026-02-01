@@ -80,7 +80,7 @@ Requirements for first release (2 weeks). Mapped to TipTap coverage from researc
 - [ ] **CUST-01**: Callout/admonition block (info/warning/success/error)
 - [ ] **CUST-02**: Divider/horizontal rule block
 - [ ] **CUST-03**: Spacer block (vertical spacing)
-- [ ] **CUST-04**: Column layout block (2-5 columns)
+- [ ] **CUST-04**: Column layout block (2-6 columns)
 - [ ] **CUST-05**: Toggle/collapsible block
 
 ### Media (Mixed - Some Native, Some Custom)
@@ -195,6 +195,21 @@ Requirements for first release (2 weeks). Mapped to TipTap coverage from researc
 - [ ] **CANV-02**: Background gradients
 - [ ] **CANV-03**: Background patterns
 - [ ] **CANV-04**: Per-section backgrounds
+
+### Layout Features (Custom)
+
+<!-- Advanced layout capabilities for professional documents -->
+
+- [ ] **LAYOUT-01**: Multi-column section blocks (2-6 columns, CSS Grid based)
+- [ ] **LAYOUT-02**: Text wrapping/float (left, right, center-wrap)
+- [ ] **LAYOUT-03**: Free image positioning within canvas bounds
+
+### Numbering Features (Custom)
+
+<!-- Line and paragraph numbering for reference documents -->
+
+- [ ] **NUMBER-01**: Line numbers (gutter or margin position)
+- [ ] **NUMBER-02**: Paragraph numbering presets (sequential, hierarchical, legal)
 
 ## v2 Requirements
 
@@ -384,6 +399,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 | AI-04 | Preview/accept/reject | Pending |
 | AI-05 | Streaming response | Pending |
 
+### Phase 7: Layout and Numbering (5 requirements)
+
+| Requirement | Description | Status |
+|-------------|-------------|--------|
+| LAYOUT-01 | Multi-column section blocks | Pending |
+| LAYOUT-02 | Text wrapping/float | Pending |
+| LAYOUT-03 | Free image positioning | Pending |
+| NUMBER-01 | Line numbers | Pending |
+| NUMBER-02 | Paragraph numbering presets | Pending |
+
 ## Coverage Summary
 
 | Phase | Requirement Count | Categories |
@@ -394,10 +419,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Phase 4: Extended Features | 29 | TBL, NAV, CUST, MEDIA, CMD, MD |
 | Phase 5: Polish | 22 | VER, UI, COMM, EXP |
 | Phase 6: AI Integration | 5 | AI |
-| **Total** | **99** | - |
+| Phase 7: Layout and Numbering | 5 | LAYOUT, NUMBER |
+| **Total** | **104** | - |
 
-**Coverage:** 99/99 v1 requirements mapped. No orphans.
+**Coverage:** 104/104 v1 requirements mapped. No orphans.
 
 ---
 *Requirements defined: 2026-01-30*
-*Last updated: 2026-01-30 after roadmap creation*
+*Last updated: 2026-02-01 added Phase 7 requirements (LAYOUT, NUMBER)*

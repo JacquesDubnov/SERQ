@@ -1,57 +1,159 @@
 /**
  * CalloutContextMenu Component
  * Right-click context menu for callout operations
+ * Uses consistent UI with other context menus (tables, images)
  */
 
 import { useEffect, useRef, useCallback } from 'react'
-import { CALLOUT_COLORS, CALLOUT_ICONS } from '../../lib/calloutColors'
+import { CALLOUT_COLORS } from '../../lib/calloutColors'
 
 type BorderStyle = 'left' | 'right' | 'top' | 'bottom' | 'full' | 'none'
-type FloatOption = 'none' | 'left' | 'right' | 'center-wrap'
-
-const BORDER_STYLES: { id: BorderStyle; label: string; icon: string }[] = [
-  { id: 'left', label: 'Left border', icon: '⊏' },
-  { id: 'right', label: 'Right border', icon: '⊐' },
-  { id: 'top', label: 'Top border', icon: '⊓' },
-  { id: 'bottom', label: 'Bottom border', icon: '⊔' },
-  { id: 'full', label: 'Full border', icon: '▢' },
-  { id: 'none', label: 'No border', icon: '○' },
-]
-
-const FLOAT_OPTIONS: { id: FloatOption; label: string; icon: string }[] = [
-  { id: 'none', label: 'No float', icon: '▣' },
-  { id: 'left', label: 'Float left', icon: '◧' },
-  { id: 'right', label: 'Float right', icon: '◨' },
-  { id: 'center-wrap', label: 'Center (text below)', icon: '◫' },
-]
 
 interface CalloutContextMenuProps {
   position: { x: number; y: number }
   currentColor: string
   currentIcon: string | null
   currentBorderStyle: BorderStyle
-  currentFloat?: FloatOption
   isCollapsible: boolean
   onChangeColor: (color: string) => void
   onChangeIcon: (icon: string | null) => void
   onChangeBorderStyle: (style: BorderStyle) => void
-  onChangeFloat?: (float: FloatOption) => void
   onToggleCollapsible: () => void
   onDelete: () => void
   onClose: () => void
 }
+
+// SVG Icons for consistent UI
+const Icons = {
+  // Border styles
+  borderLeft: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="2" y="2" width="12" height="12" rx="1" strokeOpacity="0.3" />
+      <line x1="2" y1="2" x2="2" y2="14" strokeWidth="2.5" />
+    </svg>
+  ),
+  borderRight: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="2" y="2" width="12" height="12" rx="1" strokeOpacity="0.3" />
+      <line x1="14" y1="2" x2="14" y2="14" strokeWidth="2.5" />
+    </svg>
+  ),
+  borderTop: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="2" y="2" width="12" height="12" rx="1" strokeOpacity="0.3" />
+      <line x1="2" y1="2" x2="14" y2="2" strokeWidth="2.5" />
+    </svg>
+  ),
+  borderBottom: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="2" y="2" width="12" height="12" rx="1" strokeOpacity="0.3" />
+      <line x1="2" y1="14" x2="14" y2="14" strokeWidth="2.5" />
+    </svg>
+  ),
+  borderFull: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="2" y="2" width="12" height="12" rx="1" />
+    </svg>
+  ),
+  borderNone: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeOpacity="0.3">
+      <rect x="2" y="2" width="12" height="12" rx="1" strokeDasharray="2 2" />
+    </svg>
+  ),
+  // Callout icons (clean SVG versions)
+  info: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+      <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="8" cy="4.5" r="1" />
+      <rect x="7" y="6.5" width="2" height="5" rx="0.5" />
+    </svg>
+  ),
+  warning: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+      <path d="M8 1L15 14H1L8 1Z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <circle cx="8" cy="11" r="1" />
+      <rect x="7" y="5" width="2" height="4" rx="0.5" />
+    </svg>
+  ),
+  success: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="8" cy="8" r="7" />
+      <path d="M5 8L7 10L11 6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  error: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="8" cy="8" r="7" />
+      <path d="M5 5L11 11M11 5L5 11" strokeLinecap="round" />
+    </svg>
+  ),
+  note: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M3 2h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" />
+      <line x1="5" y1="5" x2="11" y2="5" />
+      <line x1="5" y1="8" x2="11" y2="8" />
+      <line x1="5" y1="11" x2="8" y2="11" />
+    </svg>
+  ),
+  tip: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M8 1a5 5 0 013 9v2a1 1 0 01-1 1H6a1 1 0 01-1-1v-2a5 5 0 013-9z" />
+      <line x1="6" y1="14" x2="10" y2="14" />
+    </svg>
+  ),
+  quote: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+      <path d="M3 4h4l-1 4h2v4H3V8l1-4zm6 0h4l-1 4h2v4H9V8l1-4z" />
+    </svg>
+  ),
+  noIcon: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeOpacity="0.4">
+      <line x1="3" y1="3" x2="13" y2="13" />
+      <line x1="13" y1="3" x2="3" y2="13" />
+    </svg>
+  ),
+  // Actions
+  check: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M3 8L6 11L13 4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+  trash: (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M3 4h10M6 4V3a1 1 0 011-1h2a1 1 0 011 1v1M5 4v9a1 1 0 001 1h4a1 1 0 001-1V4" />
+    </svg>
+  ),
+}
+
+const BORDER_STYLES: { id: BorderStyle; label: string; icon: React.ReactNode }[] = [
+  { id: 'left', label: 'Left border', icon: Icons.borderLeft },
+  { id: 'right', label: 'Right border', icon: Icons.borderRight },
+  { id: 'top', label: 'Top border', icon: Icons.borderTop },
+  { id: 'bottom', label: 'Bottom border', icon: Icons.borderBottom },
+  { id: 'full', label: 'Full border', icon: Icons.borderFull },
+  { id: 'none', label: 'No border', icon: Icons.borderNone },
+]
+
+const CALLOUT_ICON_OPTIONS: { id: string | null; label: string; icon: React.ReactNode }[] = [
+  { id: null, label: 'No icon', icon: Icons.noIcon },
+  { id: 'info', label: 'Info', icon: Icons.info },
+  { id: 'warning', label: 'Warning', icon: Icons.warning },
+  { id: 'success', label: 'Success', icon: Icons.success },
+  { id: 'error', label: 'Error', icon: Icons.error },
+  { id: 'note', label: 'Note', icon: Icons.note },
+  { id: 'tip', label: 'Tip', icon: Icons.tip },
+  { id: 'quote', label: 'Quote', icon: Icons.quote },
+]
 
 export function CalloutContextMenu({
   position,
   currentColor,
   currentIcon,
   currentBorderStyle,
-  currentFloat = 'none',
   isCollapsible,
   onChangeColor,
   onChangeIcon,
   onChangeBorderStyle,
-  onChangeFloat,
   onToggleCollapsible,
   onDelete,
   onClose,
@@ -72,7 +174,6 @@ export function CalloutContextMenu({
       }
     }
 
-    // Delay to prevent immediate close from the right-click
     const timeoutId = setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside)
     }, 100)
@@ -110,41 +211,27 @@ export function CalloutContextMenu({
   const handleColorChange = useCallback(
     (colorId: string) => {
       onChangeColor(colorId)
-      onClose()
     },
-    [onChangeColor, onClose]
+    [onChangeColor]
   )
 
   const handleIconChange = useCallback(
-    (icon: string | null) => {
-      onChangeIcon(icon)
-      onClose()
+    (iconId: string | null) => {
+      onChangeIcon(iconId)
     },
-    [onChangeIcon, onClose]
+    [onChangeIcon]
   )
 
   const handleBorderStyleChange = useCallback(
     (style: BorderStyle) => {
       onChangeBorderStyle(style)
-      onClose()
     },
-    [onChangeBorderStyle, onClose]
-  )
-
-  const handleFloatChange = useCallback(
-    (float: FloatOption) => {
-      if (onChangeFloat) {
-        onChangeFloat(float)
-      }
-      onClose()
-    },
-    [onChangeFloat, onClose]
+    [onChangeBorderStyle]
   )
 
   const handleToggleCollapsible = useCallback(() => {
     onToggleCollapsible()
-    onClose()
-  }, [onToggleCollapsible, onClose])
+  }, [onToggleCollapsible])
 
   const handleDelete = useCallback(() => {
     onDelete()
@@ -154,25 +241,26 @@ export function CalloutContextMenu({
   return (
     <div
       ref={menuRef}
-      className="callout-context-menu"
+      className="table-context-menu" // Use table context menu styles for consistency
       style={{
         left: position.x,
         top: position.y,
       }}
     >
       {/* Color Selection */}
-      <div className="callout-context-menu-section">
-        <div className="callout-context-menu-label">Color</div>
-        <div className="callout-context-menu-colors">
+      <div className="table-context-menu-section">
+        <div className="table-context-menu-label">Color</div>
+        <div className="table-context-menu-colors">
           {CALLOUT_COLORS.map((c) => (
             <button
               key={c.id}
-              className={`callout-context-menu-color-btn ${currentColor === c.id ? 'active' : ''}`}
+              className={`table-context-menu-color-btn ${currentColor === c.id ? 'active' : ''}`}
               title={c.name}
               onClick={() => handleColorChange(c.id)}
+              onMouseDown={(e) => e.preventDefault()}
               style={{
                 backgroundColor: c.bgLight,
-                borderColor: c.borderLight,
+                borderColor: currentColor === c.id ? 'var(--color-primary, #3b82f6)' : c.borderLight,
               }}
             />
           ))}
@@ -180,42 +268,48 @@ export function CalloutContextMenu({
       </div>
 
       {/* Icon Selection */}
-      <div className="callout-context-menu-section">
-        <div className="callout-context-menu-label">Icon</div>
-        <div className="callout-context-menu-icons">
-          <button
-            className={`callout-context-menu-icon-btn ${!currentIcon ? 'active' : ''}`}
-            title="No icon"
-            onClick={() => handleIconChange(null)}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" opacity="0.3">
-              <line x1="3" y1="3" x2="13" y2="13" stroke="currentColor" strokeWidth="2" />
-              <line x1="13" y1="3" x2="3" y2="13" stroke="currentColor" strokeWidth="2" />
-            </svg>
-          </button>
-          {CALLOUT_ICONS.map((i) => (
+      <div className="table-context-menu-section">
+        <div className="table-context-menu-label">Icon</div>
+        <div className="table-context-menu-colors" style={{ gap: '4px' }}>
+          {CALLOUT_ICON_OPTIONS.map((opt) => (
             <button
-              key={i.id}
-              className={`callout-context-menu-icon-btn ${currentIcon === i.icon ? 'active' : ''}`}
-              title={i.label}
-              onClick={() => handleIconChange(i.icon)}
+              key={opt.id || 'none'}
+              className={`table-context-menu-color-btn ${currentIcon === opt.id ? 'active' : ''}`}
+              title={opt.label}
+              onClick={() => handleIconChange(opt.id)}
+              onMouseDown={(e) => e.preventDefault()}
+              style={{
+                backgroundColor: 'transparent',
+                border: currentIcon === opt.id ? '2px solid var(--color-primary, #3b82f6)' : '1px solid var(--color-border, #e5e7eb)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
             >
-              {i.icon}
+              {opt.icon}
             </button>
           ))}
         </div>
       </div>
 
       {/* Border Style */}
-      <div className="callout-context-menu-section">
-        <div className="callout-context-menu-label">Border</div>
-        <div className="callout-context-menu-icons">
+      <div className="table-context-menu-section">
+        <div className="table-context-menu-label">Border</div>
+        <div className="table-context-menu-colors" style={{ gap: '4px' }}>
           {BORDER_STYLES.map((b) => (
             <button
               key={b.id}
-              className={`callout-context-menu-icon-btn ${currentBorderStyle === b.id ? 'active' : ''}`}
+              className={`table-context-menu-color-btn ${currentBorderStyle === b.id ? 'active' : ''}`}
               title={b.label}
               onClick={() => handleBorderStyleChange(b.id)}
+              onMouseDown={(e) => e.preventDefault()}
+              style={{
+                backgroundColor: 'transparent',
+                border: currentBorderStyle === b.id ? '2px solid var(--color-primary, #3b82f6)' : '1px solid var(--color-border, #e5e7eb)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
             >
               {b.icon}
             </button>
@@ -223,43 +317,31 @@ export function CalloutContextMenu({
         </div>
       </div>
 
-      {/* Float / Text Wrap */}
-      {onChangeFloat && (
-        <div className="callout-context-menu-section">
-          <div className="callout-context-menu-label">Text Wrap</div>
-          <div className="callout-context-menu-icons">
-            {FLOAT_OPTIONS.map((f) => (
-              <button
-                key={f.id}
-                className={`callout-context-menu-icon-btn ${currentFloat === f.id ? 'active' : ''}`}
-                title={f.label}
-                onClick={() => handleFloatChange(f.id)}
-              >
-                {f.icon}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Collapsible Toggle */}
-      <div className="callout-context-menu-section">
-        <button className="callout-context-menu-item" onClick={handleToggleCollapsible}>
-          <span className="callout-context-menu-item-icon">
-            {isCollapsible ? '✓' : ' '}
+      <div className="table-context-menu-section">
+        <button
+          className="table-context-menu-item"
+          onClick={handleToggleCollapsible}
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          <span className="table-context-menu-item-icon" style={{ opacity: isCollapsible ? 1 : 0.3 }}>
+            {Icons.check}
           </span>
           Collapsible
         </button>
       </div>
 
       {/* Delete */}
-      <div className="callout-context-menu-section">
+      <div className="table-context-menu-section">
         <button
-          className="callout-context-menu-item"
+          className="table-context-menu-item"
           onClick={handleDelete}
+          onMouseDown={(e) => e.preventDefault()}
           style={{ color: '#dc2626' }}
         >
-          <span className="callout-context-menu-item-icon">X</span>
+          <span className="table-context-menu-item-icon">
+            {Icons.trash}
+          </span>
           Delete callout
         </button>
       </div>

@@ -16,7 +16,6 @@ declare module '@tiptap/core' {
         collapsed?: boolean
         collapsible?: boolean
         borderStyle?: 'left' | 'right' | 'top' | 'bottom' | 'full' | 'none'
-        float?: 'none' | 'left' | 'right' | 'center-wrap'
       }) => ReturnType
     }
   }
@@ -67,14 +66,6 @@ export const Callout = Node.create({
           'data-border-style': attributes.borderStyle,
         }),
       },
-      float: {
-        default: 'none',
-        parseHTML: (element) => element.getAttribute('data-float') || 'none',
-        renderHTML: (attributes) => {
-          if (!attributes.float || attributes.float === 'none') return {}
-          return { 'data-float': attributes.float }
-        },
-      },
     }
   },
 
@@ -104,7 +95,6 @@ export const Callout = Node.create({
                 collapsed: attrs.collapsed ?? false,
                 collapsible: attrs.collapsible ?? false,
                 borderStyle: attrs.borderStyle ?? 'left',
-                float: attrs.float ?? 'none',
               },
               content: [{ type: 'paragraph' }],
             })

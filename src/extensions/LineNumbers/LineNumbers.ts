@@ -1,153 +1,148 @@
 /**
  * LineNumbers Extension
- * Renders line numbers in a gutter or margin with viewport optimization
- * Supports code-style (1, 2, 3...) or legal-style (5, 10, 15...)
+ * Two modes:
+ * - Regular: Numbers each paragraph/block
+ * - Legal: Numbers every visual line (including wrapped lines)
  */
 import { Extension } from '@tiptap/core';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import type { EditorView } from '@tiptap/pm/view';
+import { useEditorStore } from '../../stores/editorStore';
 import type { LineNumberSettings } from '../../stores/editorStore';
 
 export interface LineNumbersOptions {
-  /** Callback to get current settings from store */
   getSettings: () => LineNumberSettings;
 }
 
-// Plugin key for state tracking
 const lineNumbersPluginKey = new PluginKey('lineNumbers');
-
-// CSS class for the gutter container
 const GUTTER_CLASS = 'line-number-gutter';
-const LINE_NUMBER_CLASS = 'line-number';
 
 /**
- * Create or get the gutter DOM element
+ * Get line positions for REGULAR mode (per paragraph/block)
+ * Centers the number with the first line of each block
  */
-function getOrCreateGutter(view: EditorView): HTMLElement {
-  const editorWrapper = view.dom.closest('.editor-wrapper');
-  if (!editorWrapper) return document.createElement('div');
-
-  let gutter = editorWrapper.querySelector(`.${GUTTER_CLASS}`) as HTMLElement;
-  if (!gutter) {
-    gutter = document.createElement('div');
-    gutter.className = GUTTER_CLASS;
-    editorWrapper.insertBefore(gutter, editorWrapper.firstChild);
-  }
-  return gutter;
-}
-
-/**
- * Get line positions in the document
- * Returns array of { lineNumber, top } for each block-level node
- */
-function getLinePositions(view: EditorView): Array<{ lineNumber: number; top: number }> {
-  const lines: Array<{ lineNumber: number; top: number }> = [];
+function getRegularLinePositions(view: EditorView): number[] {
+  const tiptap = view.dom;
+  const tiptapRect = tiptap.getBoundingClientRect();
   const { doc } = view.state;
-  let lineNumber = 1;
+  const positions: number[] = [];
 
-  // Get the editor DOM rect for relative positioning
-  const editorRect = view.dom.getBoundingClientRect();
+  doc.forEach((node, offset) => {
+    try {
+      const coords = view.coordsAtPos(offset + 1);
+      if (coords) {
+        // Get the DOM node for this position to calculate proper centering
+        const domNode = view.nodeDOM(offset) as HTMLElement | null;
+        let lineHeight = 24; // fallback
 
-  // Iterate through top-level nodes
-  doc.forEach((_node: unknown, offset: number) => {
-    // Get coordinates at the start of this node
-    const coords = view.coordsAtPos(offset + 1);
-    if (coords) {
-      lines.push({
-        lineNumber,
-        top: coords.top - editorRect.top,
-      });
+        if (domNode) {
+          const style = window.getComputedStyle(domNode);
+          lineHeight = parseFloat(style.lineHeight);
+          if (isNaN(lineHeight) || style.lineHeight === 'normal') {
+            const fontSize = parseFloat(style.fontSize) || 16;
+            lineHeight = fontSize * 1.4;
+          }
+        }
+
+        // Center: top position + half line height - half number height (13px font ~ 7px)
+        const centeredTop = (coords.top - tiptapRect.top) + (lineHeight / 2) - 7;
+        positions.push(centeredTop);
+      }
+    } catch {
+      // coordsAtPos can throw
     }
-    lineNumber++;
   });
 
-  return lines;
+  return positions;
 }
 
 /**
- * Get visible viewport bounds
+ * Get line positions for LEGAL mode (every visual line)
+ * Walks through actual block elements and calculates real line positions
  */
-function getViewportBounds(): { top: number; bottom: number } {
-  return {
-    top: window.scrollY,
-    bottom: window.scrollY + window.innerHeight,
-  };
+function getLegalLinePositions(view: EditorView): number[] {
+  const tiptap = view.dom;
+  const tiptapRect = tiptap.getBoundingClientRect();
+  const positions: number[] = [];
+
+  // Get all block-level elements (paragraphs, headings, list items, etc.)
+  const blocks = tiptap.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, blockquote > p, .callout-content > p, pre');
+
+  blocks.forEach((block) => {
+    const blockEl = block as HTMLElement;
+    const blockRect = blockEl.getBoundingClientRect();
+    const blockStyle = window.getComputedStyle(blockEl);
+
+    // Get the actual line height for this block
+    let lineHeight = parseFloat(blockStyle.lineHeight);
+    if (isNaN(lineHeight) || blockStyle.lineHeight === 'normal') {
+      // 'normal' is typically 1.2 * font-size
+      const fontSize = parseFloat(blockStyle.fontSize) || 16;
+      lineHeight = fontSize * 1.4;
+    }
+
+    // Calculate how many visual lines this block contains
+    const blockHeight = blockRect.height;
+    const numLines = Math.max(1, Math.round(blockHeight / lineHeight));
+
+    // Position relative to tiptap
+    const blockTop = blockRect.top - tiptapRect.top;
+
+    // Add a position for each line in this block
+    for (let i = 0; i < numLines; i++) {
+      // Center the number vertically within each line
+      const lineTop = blockTop + (i * lineHeight) + (lineHeight / 2) - 7; // -7 to center the 13px font
+      positions.push(lineTop);
+    }
+  });
+
+  return positions;
 }
 
 /**
- * Filter lines to only those visible in viewport (with buffer)
+ * Render line numbers
  */
-function getVisibleLines(
-  lines: Array<{ lineNumber: number; top: number }>,
-  editorRect: DOMRect,
-  viewportBounds: { top: number; bottom: number }
-): Array<{ lineNumber: number; top: number }> {
-  const buffer = 200; // Render a bit outside viewport for smooth scrolling
-  const viewportTop = viewportBounds.top - editorRect.top - buffer;
-  const viewportBottom = viewportBounds.bottom - editorRect.top + buffer;
+function renderLineNumbers(view: EditorView, settings: LineNumberSettings): void {
+  const editorContent = view.dom.parentElement;
+  if (!editorContent) return;
 
-  return lines.filter(line =>
-    line.top >= viewportTop && line.top <= viewportBottom
-  );
-}
-
-/**
- * Render line numbers to gutter
- */
-function renderLineNumbers(
-  view: EditorView,
-  settings: LineNumberSettings
-): void {
-  const gutter = getOrCreateGutter(view);
+  let gutter = editorContent.querySelector(`.${GUTTER_CLASS}`) as HTMLElement;
 
   if (!settings.enabled) {
-    gutter.style.display = 'none';
-    gutter.innerHTML = '';
+    if (gutter) {
+      gutter.style.display = 'none';
+    }
     return;
   }
 
-  gutter.style.display = 'block';
-  gutter.dataset.position = settings.position;
-
-  const lines = getLinePositions(view);
-  const editorRect = view.dom.getBoundingClientRect();
-  const viewportBounds = getViewportBounds();
-
-  // Only render visible lines (viewport optimization)
-  const visibleLines = getVisibleLines(lines, editorRect, viewportBounds);
-
-  // Build line number elements
-  const fragment = document.createDocumentFragment();
-
-  for (const line of visibleLines) {
-    // Legal style: only show every 5th line
-    if (settings.style === 'legal' && line.lineNumber % 5 !== 0) {
-      continue;
-    }
-
-    const lineEl = document.createElement('span');
-    lineEl.className = LINE_NUMBER_CLASS;
-    lineEl.textContent = String(line.lineNumber);
-    lineEl.style.top = `${line.top}px`;
-    fragment.appendChild(lineEl);
+  if (!gutter) {
+    gutter = document.createElement('div');
+    gutter.className = GUTTER_CLASS;
+    editorContent.insertBefore(gutter, view.dom);
   }
 
-  gutter.innerHTML = '';
-  gutter.appendChild(fragment);
-}
+  gutter.style.display = 'block';
 
-/**
- * Debounce function for scroll/resize handlers
- */
-function debounce<T extends (...args: unknown[]) => void>(
-  fn: T,
-  delay: number
-): (...args: Parameters<T>) => void {
-  let timeoutId: ReturnType<typeof setTimeout>;
-  return (...args: Parameters<T>) => {
-    clearTimeout(timeoutId);
-    timeoutId = setTimeout(() => fn(...args), delay);
-  };
+  // Position gutter to match tiptap's vertical position
+  const tiptapRect = view.dom.getBoundingClientRect();
+  const editorContentRect = editorContent.getBoundingClientRect();
+  const tiptapOffset = tiptapRect.top - editorContentRect.top;
+  gutter.style.top = `${tiptapOffset}px`;
+
+  // Get line positions based on style
+  const positions = settings.style === 'legal'
+    ? getLegalLinePositions(view)
+    : getRegularLinePositions(view);
+
+  // Build line numbers
+  gutter.innerHTML = '';
+  positions.forEach((top, index) => {
+    const span = document.createElement('span');
+    span.className = 'line-number';
+    span.textContent = String(index + 1);
+    span.style.top = `${top}px`;
+    gutter.appendChild(span);
+  });
 }
 
 export const LineNumbers = Extension.create<LineNumbersOptions>({
@@ -157,8 +152,7 @@ export const LineNumbers = Extension.create<LineNumbersOptions>({
     return {
       getSettings: () => ({
         enabled: false,
-        position: 'gutter' as const,
-        style: 'code' as const,
+        style: 'regular' as const,
       }),
     };
   },
@@ -171,44 +165,33 @@ export const LineNumbers = Extension.create<LineNumbersOptions>({
         key: lineNumbersPluginKey,
 
         view(editorView) {
+          // Subscribe to store changes
+          let prevSettings = { ...getSettings() };
+          const unsubscribe = useEditorStore.subscribe((state) => {
+            const current = state.lineNumbers;
+            if (current.enabled !== prevSettings.enabled || current.style !== prevSettings.style) {
+              prevSettings = { ...current };
+              renderLineNumbers(editorView, current);
+            }
+          });
+
           // Initial render
-          const settings = getSettings();
-          renderLineNumbers(editorView, settings);
-
-          // Create debounced scroll handler
-          const handleScroll = debounce(() => {
-            const currentSettings = getSettings();
-            if (currentSettings.enabled) {
-              renderLineNumbers(editorView, currentSettings);
-            }
-          }, 16); // ~60fps
-
-          // Create resize handler
-          const handleResize = debounce(() => {
-            const currentSettings = getSettings();
-            if (currentSettings.enabled) {
-              renderLineNumbers(editorView, currentSettings);
-            }
+          setTimeout(() => {
+            renderLineNumbers(editorView, getSettings());
           }, 100);
-
-          // Add scroll and resize listeners
-          window.addEventListener('scroll', handleScroll, { passive: true });
-          window.addEventListener('resize', handleResize, { passive: true });
 
           return {
             update(view) {
-              // Re-render on doc changes
-              const currentSettings = getSettings();
-              renderLineNumbers(view, currentSettings);
+              const settings = getSettings();
+              if (settings.enabled) {
+                renderLineNumbers(view, settings);
+              }
             },
 
             destroy() {
-              // Clean up
-              window.removeEventListener('scroll', handleScroll);
-              window.removeEventListener('resize', handleResize);
-
-              // Remove gutter
-              const gutter = editorView.dom.closest('.editor-wrapper')?.querySelector(`.${GUTTER_CLASS}`);
+              unsubscribe();
+              const editorContent = editorView.dom.parentElement;
+              const gutter = editorContent?.querySelector(`.${GUTTER_CLASS}`);
               gutter?.remove();
             },
           };

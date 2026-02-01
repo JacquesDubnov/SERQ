@@ -80,17 +80,18 @@ export const CALLOUT_COLORS: CalloutColor[] = [
 ]
 
 /**
- * Callout icon presets (emojis for quick selection)
+ * Callout icon presets (text-based icons for quick selection)
+ * Using Unicode symbols and text rather than emojis
  */
 export const CALLOUT_ICONS = [
   { id: 'info', icon: 'i', label: 'Info' },
-  { id: 'tip', icon: '💡', label: 'Tip' },
-  { id: 'warning', icon: '⚠️', label: 'Warning' },
-  { id: 'danger', icon: '🚫', label: 'Danger' },
-  { id: 'note', icon: '📝', label: 'Note' },
-  { id: 'question', icon: '❓', label: 'Question' },
-  { id: 'check', icon: '✅', label: 'Check' },
-  { id: 'star', icon: '⭐', label: 'Star' },
+  { id: 'tip', icon: '!', label: 'Tip' },
+  { id: 'warning', icon: '⚠', label: 'Warning' },
+  { id: 'danger', icon: '⊘', label: 'Danger' },
+  { id: 'note', icon: '✎', label: 'Note' },
+  { id: 'question', icon: '?', label: 'Question' },
+  { id: 'check', icon: '✓', label: 'Check' },
+  { id: 'star', icon: '★', label: 'Star' },
 ]
 
 /**

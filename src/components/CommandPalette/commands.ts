@@ -364,6 +364,30 @@ export const commands: CommandItem[] = [
       // This will be handled by CommandPalette via onShowVersionHistory callback
     },
   },
+  {
+    id: 'line-numbers-regular',
+    title: 'Line Numbers (Regular)',
+    group: 'view',
+    action: () => {
+      useEditorStore.getState().setLineNumberStyle('regular')
+    },
+  },
+  {
+    id: 'line-numbers-legal',
+    title: 'Line Numbers (Legal)',
+    group: 'view',
+    action: () => {
+      useEditorStore.getState().setLineNumberStyle('legal')
+    },
+  },
+  {
+    id: 'line-numbers-off',
+    title: 'Line Numbers Off',
+    group: 'view',
+    action: () => {
+      useEditorStore.getState().setLineNumbers({ enabled: false })
+    },
+  },
 
   // File group - Export commands
   {

@@ -5,10 +5,19 @@
 
 import { useEffect, useRef, useCallback } from 'react'
 import type { Editor } from '@tiptap/core'
+import type { Selection } from '@tiptap/pm/state'
+
+interface SelectionInfo {
+  cellCount: number
+  rowCount: number
+  colCount: number
+}
 
 interface TableContextMenuProps {
   editor: Editor
   position: { x: number; y: number }
+  selectionInfo: SelectionInfo
+  savedSelection: Selection
   onClose: () => void
 }
 
@@ -24,8 +33,17 @@ const CELL_COLORS = [
   { id: 'purple', color: '#e9d5ff', label: 'Purple' },
 ]
 
-export function TableContextMenu({ editor, position, onClose }: TableContextMenuProps) {
+export function TableContextMenu({ editor, position, selectionInfo, savedSelection, onClose }: TableContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
+
+  // Helper to restore selection before executing commands
+  const restoreSelection = useCallback(() => {
+    // First restore the selection
+    const tr = editor.state.tr.setSelection(savedSelection)
+    editor.view.dispatch(tr)
+    // Then focus the editor to ensure commands work
+    editor.view.focus()
+  }, [editor, savedSelection])
 
   // Close on click outside or Escape
   useEffect(() => {
@@ -77,60 +95,70 @@ export function TableContextMenu({ editor, position, onClose }: TableContextMenu
   }, [position])
 
   // Check if multiple cells are selected (for merge option)
-  const canMerge = editor.can().mergeCells()
+  const canMerge = selectionInfo.cellCount > 1
   const canSplit = editor.can().splitCell()
 
   // Row operations
   const addRowAbove = useCallback(() => {
+    restoreSelection()
     editor.chain().focus().addRowBefore().run()
     onClose()
-  }, [editor, onClose])
+  }, [editor, onClose, restoreSelection])
 
   const addRowBelow = useCallback(() => {
+    restoreSelection()
     editor.chain().focus().addRowAfter().run()
     onClose()
-  }, [editor, onClose])
+  }, [editor, onClose, restoreSelection])
 
   const deleteRow = useCallback(() => {
+    restoreSelection()
     editor.chain().focus().deleteRow().run()
     onClose()
-  }, [editor, onClose])
+  }, [editor, onClose, restoreSelection])
 
   // Column operations
   const addColumnLeft = useCallback(() => {
+    restoreSelection()
     editor.chain().focus().addColumnBefore().run()
     onClose()
-  }, [editor, onClose])
+  }, [editor, onClose, restoreSelection])
 
   const addColumnRight = useCallback(() => {
+    restoreSelection()
     editor.chain().focus().addColumnAfter().run()
     onClose()
-  }, [editor, onClose])
+  }, [editor, onClose, restoreSelection])
 
   const deleteColumn = useCallback(() => {
+    restoreSelection()
     editor.chain().focus().deleteColumn().run()
     onClose()
-  }, [editor, onClose])
+  }, [editor, onClose, restoreSelection])
 
   // Cell operations
   const mergeCells = useCallback(() => {
+    restoreSelection()
     editor.chain().focus().mergeCells().run()
     onClose()
-  }, [editor, onClose])
+  }, [editor, onClose, restoreSelection])
 
   const splitCell = useCallback(() => {
+    restoreSelection()
     editor.chain().focus().splitCell().run()
     onClose()
-  }, [editor, onClose])
+  }, [editor, onClose, restoreSelection])
 
   // Header operations
   const toggleHeaderRow = useCallback(() => {
+    restoreSelection()
     editor.chain().focus().toggleHeaderRow().run()
     onClose()
-  }, [editor, onClose])
+  }, [editor, onClose, restoreSelection])
 
   // Background color
   const setCellBackground = useCallback((color: string) => {
+    restoreSelection()
     if (color === 'transparent') {
       // Remove background by setting to transparent
       editor.chain().focus().setCellAttribute('backgroundColor', null).run()
@@ -138,13 +166,14 @@ export function TableContextMenu({ editor, position, onClose }: TableContextMenu
       editor.chain().focus().setCellAttribute('backgroundColor', color).run()
     }
     onClose()
-  }, [editor, onClose])
+  }, [editor, onClose, restoreSelection])
 
   // Delete table
   const deleteTable = useCallback(() => {
+    restoreSelection()
     editor.chain().focus().deleteTable().run()
     onClose()
-  }, [editor, onClose])
+  }, [editor, onClose, restoreSelection])
 
   return (
     <div
@@ -155,37 +184,45 @@ export function TableContextMenu({ editor, position, onClose }: TableContextMenu
         top: position.y,
       }}
     >
+      {/* Header - moved to top */}
+      <div className="table-context-menu-section">
+        <button className="table-context-menu-item" onClick={toggleHeaderRow} onMouseDown={(e) => e.preventDefault()}>
+          <span className="table-context-menu-item-icon">H</span>
+          Toggle header row
+        </button>
+      </div>
+
       {/* Row Operations */}
       <div className="table-context-menu-section">
         <div className="table-context-menu-label">Row</div>
-        <button className="table-context-menu-item" onClick={addRowAbove}>
+        <button className="table-context-menu-item" onClick={addRowAbove} onMouseDown={(e) => e.preventDefault()}>
           <span className="table-context-menu-item-icon">+</span>
           Insert row above
         </button>
-        <button className="table-context-menu-item" onClick={addRowBelow}>
+        <button className="table-context-menu-item" onClick={addRowBelow} onMouseDown={(e) => e.preventDefault()}>
           <span className="table-context-menu-item-icon">+</span>
           Insert row below
         </button>
-        <button className="table-context-menu-item" onClick={deleteRow}>
+        <button className="table-context-menu-item" onClick={deleteRow} onMouseDown={(e) => e.preventDefault()}>
           <span className="table-context-menu-item-icon">-</span>
-          Delete row
+          {selectionInfo.rowCount > 1 ? `Delete ${selectionInfo.rowCount} rows` : 'Delete row'}
         </button>
       </div>
 
       {/* Column Operations */}
       <div className="table-context-menu-section">
         <div className="table-context-menu-label">Column</div>
-        <button className="table-context-menu-item" onClick={addColumnLeft}>
+        <button className="table-context-menu-item" onClick={addColumnLeft} onMouseDown={(e) => e.preventDefault()}>
           <span className="table-context-menu-item-icon">+</span>
           Insert column left
         </button>
-        <button className="table-context-menu-item" onClick={addColumnRight}>
+        <button className="table-context-menu-item" onClick={addColumnRight} onMouseDown={(e) => e.preventDefault()}>
           <span className="table-context-menu-item-icon">+</span>
           Insert column right
         </button>
-        <button className="table-context-menu-item" onClick={deleteColumn}>
+        <button className="table-context-menu-item" onClick={deleteColumn} onMouseDown={(e) => e.preventDefault()}>
           <span className="table-context-menu-item-icon">-</span>
-          Delete column
+          {selectionInfo.colCount > 1 ? `Delete ${selectionInfo.colCount} columns` : 'Delete column'}
         </button>
       </div>
 
@@ -195,26 +232,20 @@ export function TableContextMenu({ editor, position, onClose }: TableContextMenu
         <button
           className="table-context-menu-item"
           onClick={mergeCells}
+          onMouseDown={(e) => e.preventDefault()}
           disabled={!canMerge}
         >
           <span className="table-context-menu-item-icon">M</span>
-          Merge cells
+          {selectionInfo.cellCount > 1 ? `Merge ${selectionInfo.cellCount} cells` : 'Merge cells'}
         </button>
         <button
           className="table-context-menu-item"
           onClick={splitCell}
+          onMouseDown={(e) => e.preventDefault()}
           disabled={!canSplit}
         >
           <span className="table-context-menu-item-icon">S</span>
           Split cell
-        </button>
-      </div>
-
-      {/* Header */}
-      <div className="table-context-menu-section">
-        <button className="table-context-menu-item" onClick={toggleHeaderRow}>
-          <span className="table-context-menu-item-icon">H</span>
-          Toggle header row
         </button>
       </div>
 
@@ -246,6 +277,7 @@ export function TableContextMenu({ editor, position, onClose }: TableContextMenu
         <button
           className="table-context-menu-item"
           onClick={deleteTable}
+          onMouseDown={(e) => e.preventDefault()}
           style={{ color: '#dc2626' }}
         >
           <span className="table-context-menu-item-icon">X</span>

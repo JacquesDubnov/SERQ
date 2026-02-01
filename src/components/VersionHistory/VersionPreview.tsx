@@ -178,7 +178,7 @@ export function VersionPreview({ version, interfaceColors }: VersionPreviewProps
         minHeight: 0,
         overflow: 'hidden',
         backgroundColor: interfaceColors.bgSurface,
-        padding: '40px',
+        padding: '24px',
       }}
     >
       {/* Scrollable wrapper */}
@@ -200,7 +200,7 @@ export function VersionPreview({ version, interfaceColors }: VersionPreviewProps
             flexShrink: 0,
             backgroundColor: canvasColors.bg,
             color: canvasColors.text,
-            padding: '80px 100px',
+            padding: '7px 24px',
             borderRadius: '8px',
             boxShadow: '0 10px 40px rgba(0, 0, 0, 0.15)',
             ...typographyStyles,
@@ -212,8 +212,14 @@ export function VersionPreview({ version, interfaceColors }: VersionPreviewProps
 
       {/* Additional styles for read-only preview */}
       <style>{`
-        .preview-editor {
+        .preview-editor,
+        .editor-content .tiptap.preview-editor {
           outline: none;
+          /* Override main editor padding/margins */
+          padding: 0 !important;
+          padding-bottom: 1rem !important;
+          margin: 0 !important;
+          max-width: none !important;
         }
         .preview-editor:focus {
           outline: none;

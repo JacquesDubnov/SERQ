@@ -36,6 +36,8 @@
     "@tiptap/starter-kit": "^3.18.0",
     "@tiptap/suggestion": "^3.18.0",
     "cmdk": "^1.1.1",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.0.0",
     "mammoth": "^1.11.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

@@ -1,7 +1,6 @@
 @import './float.css';
 @import './columns.css';
 @import './line-numbers.css';
-@import './paragraph-numbers.css';
 
 /* Editor wrapper - natural height, don't expand to fill parent */
 .editor-wrapper {
@@ -41,6 +40,13 @@
 
   /* Contain table overflow during column resize */
   overflow-x: hidden;
+
+  /* CRITICAL: Prevent word breaking and hyphenation globally */
+  word-break: normal;
+  overflow-wrap: normal;
+  hyphens: none;
+  -webkit-hyphens: none;
+  -ms-hyphens: none;
 }
 
 /* When editor is empty or has minimal content, ensure it's visible at top of viewport */
@@ -97,6 +103,10 @@
   text-align: var(--layout-text-align, left);
   margin-bottom: var(--layout-paragraph-spacing, 1rem);
   text-indent: var(--layout-paragraph-indent, 0);
+  /* Prevent word breaking */
+  word-break: normal;
+  overflow-wrap: normal;
+  hyphens: none;
 }
 
 /* Inline styles */

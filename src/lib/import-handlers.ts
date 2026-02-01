@@ -6,6 +6,7 @@ import type { Editor } from '@tiptap/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import { readFile, readTextFile } from '@tauri-apps/plugin-fs'
 import mammoth from 'mammoth'
+import JSZip from 'jszip'
 import { useEditorStore } from '../stores/editorStore'
 
 /**
@@ -290,4 +291,112 @@ function extractFileName(path: string): string {
   const fileName = parts[parts.length - 1]
   // Remove extension
   return fileName.replace(/\.[^.]+$/, '')
+}
+
+/**
+ * Import an EPUB file
+ * Extracts content from EPUB structure and converts to HTML
+ */
+export async function importEPUBFile(editor: Editor): Promise<boolean> {
+  // Check for unsaved changes
+  if (!(await confirmImportIfDirty())) {
+    return false
+  }
+
+  // Open file dialog
+  const selected = await open({
+    multiple: false,
+    filters: [{ name: 'EPUB', extensions: ['epub'] }],
+  })
+
+  if (!selected) return false
+
+  try {
+    // Read file as binary
+    const fileData = await readFile(selected)
+
+    // Parse EPUB (which is a ZIP file)
+    const zip = await JSZip.loadAsync(fileData)
+
+    // Find the OPF file (package document) by reading container.xml
+    const containerXml = await zip.file('META-INF/container.xml')?.async('text')
+    if (!containerXml) {
+      throw new Error('Invalid EPUB: Missing container.xml')
+    }
+
+    // Parse rootfile path from container.xml
+    const rootfileMatch = containerXml.match(/full-path="([^"]+)"/)
+    if (!rootfileMatch) {
+      throw new Error('Invalid EPUB: Cannot find rootfile path')
+    }
+    const opfPath = rootfileMatch[1]
+    const opfDir = opfPath.substring(0, opfPath.lastIndexOf('/') + 1)
+
+    // Read OPF content
+    const opfContent = await zip.file(opfPath)?.async('text')
+    if (!opfContent) {
+      throw new Error('Invalid EPUB: Cannot read OPF file')
+    }
+
+    // Extract title from OPF
+    const titleMatch = opfContent.match(/<dc:title[^>]*>([^<]+)<\/dc:title>/i)
+    const epubTitle = titleMatch ? titleMatch[1] : extractFileName(selected)
+
+    // Find spine items (reading order)
+    const spineMatches = opfContent.matchAll(/<itemref[^>]+idref="([^"]+)"/g)
+    const spineIds = [...spineMatches].map(m => m[1])
+
+    // Build id -> href mapping from manifest
+    const manifestItems: Map<string, string> = new Map()
+    const manifestMatches = opfContent.matchAll(/<item[^>]+id="([^"]+)"[^>]+href="([^"]+)"/g)
+    for (const match of manifestMatches) {
+      manifestItems.set(match[1], match[2])
+    }
+
+    // Also try reverse order (href before id)
+    const manifestMatches2 = opfContent.matchAll(/<item[^>]+href="([^"]+)"[^>]+id="([^"]+)"/g)
+    for (const match of manifestMatches2) {
+      manifestItems.set(match[2], match[1])
+    }
+
+    // Read content from spine items in order
+    const contentParts: string[] = []
+    for (const spineId of spineIds) {
+      const href = manifestItems.get(spineId)
+      if (!href) continue
+
+      // Skip nav document
+      if (href.includes('nav') || href.includes('toc')) continue
+
+      const contentPath = opfDir + href
+      const xhtmlContent = await zip.file(contentPath)?.async('text')
+      if (!xhtmlContent) continue
+
+      // Extract body content
+      const bodyMatch = xhtmlContent.match(/<body[^>]*>([\s\S]*?)<\/body>/i)
+      if (bodyMatch) {
+        contentParts.push(bodyMatch[1])
+      }
+    }
+
+    if (contentParts.length === 0) {
+      throw new Error('No readable content found in EPUB')
+    }
+
+    // Combine all content
+    const combinedHTML = contentParts.join('\n<hr />\n')
+
+    // Set content in editor
+    editor.commands.setContent(combinedHTML)
+
+    // Update document state
+    useEditorStore.getState().setDocument(null, `Imported - ${epubTitle}`)
+    useEditorStore.getState().markDirty()
+
+    return true
+  } catch (err) {
+    console.error('[Import] Failed to import EPUB:', err)
+    alert(`Failed to import EPUB: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    return false
+  }
 }

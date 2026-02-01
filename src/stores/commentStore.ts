@@ -12,27 +12,35 @@ export interface Comment {
   resolvedAt: number | null;
   from: number;
   to: number;
+  textDeleted?: boolean; // True if the commented text was deleted from document
 }
 
 interface CommentState {
   comments: Comment[];
   activeCommentId: string | null;
   isPanelOpen: boolean;
+  showTooltips: boolean;
+  isContextMenuOpen: boolean; // Track context menu to hide tooltip
 
   // Actions
   setComments: (comments: Comment[]) => void;
   addComment: (comment: Comment) => void;
   updateComment: (id: string, updates: Partial<Comment>) => void;
   removeComment: (id: string) => void;
+  markTextDeleted: (id: string) => void; // Auto-resolve when text is deleted
   setActiveComment: (id: string | null) => void;
   setPanelOpen: (open: boolean) => void;
   togglePanel: () => void;
+  setShowTooltips: (show: boolean) => void;
+  setContextMenuOpen: (open: boolean) => void;
 }
 
 export const useCommentStore = create<CommentState>((set) => ({
   comments: [],
   activeCommentId: null,
   isPanelOpen: false,
+  showTooltips: true,
+  isContextMenuOpen: false,
 
   setComments: (comments) => set({ comments }),
 
@@ -54,11 +62,24 @@ export const useCommentStore = create<CommentState>((set) => ({
       activeCommentId: state.activeCommentId === id ? null : state.activeCommentId,
     })),
 
+  markTextDeleted: (id) =>
+    set((state) => ({
+      comments: state.comments.map((c) =>
+        c.id === id
+          ? { ...c, textDeleted: true, resolvedAt: c.resolvedAt || Date.now() }
+          : c
+      ),
+    })),
+
   setActiveComment: (id) => set({ activeCommentId: id }),
 
   setPanelOpen: (open) => set({ isPanelOpen: open }),
 
   togglePanel: () => set((state) => ({ isPanelOpen: !state.isPanelOpen })),
+
+  setShowTooltips: (show) => set({ showTooltips: show }),
+
+  setContextMenuOpen: (open) => set({ isContextMenuOpen: open }),
 }));
 
 /**

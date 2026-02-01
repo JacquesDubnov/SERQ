@@ -25,7 +25,6 @@ import { ResizableImage } from '../../extensions/ResizableImage';
 import { TypewriterMode } from '../../extensions/TypewriterMode';
 import { Comment } from '../../extensions/Comment';
 import { LineNumbers } from '../../extensions/LineNumbers';
-import { ParagraphNumbers } from '../../extensions/ParagraphNumbers';
 import { useEditorStore, type OutlineAnchor } from '../../stores/editorStore';
 import { useCommentStore } from '../../stores/commentStore';
 import { isImageFile, isLargeImage, fileToBase64, formatFileSize } from '../../lib/imageUtils';
@@ -136,17 +135,257 @@ const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
         LineNumbers.configure({
           getSettings: () => useEditorStore.getState().lineNumbers,
         }),
-        ParagraphNumbers.configure({
-          getSettings: () => useEditorStore.getState().paragraphNumbers,
-        }),
       ],
       content: initialContent || '',
 
       // Handle image drag/drop and paste
       editorProps: {
+        handleDOMEvents: {
+          // Show drop cursor during internal drags (images, content)
+          dragstart: (view, event) => {
+            console.log('[dragstart] fired', event.target)
+            // Store the dragged content and view reference for later
+            const { selection } = view.state
+            if (selection) {
+              (window as any).__draggedSelection = {
+                from: selection.from,
+                to: selection.to,
+                content: view.state.doc.slice(selection.from, selection.to),
+                view: view,
+              }
+            }
+
+            // Create thumbnail drag image for images
+            const target = event.target as HTMLElement
+            const img = target.closest('.resizable-image-wrapper')?.querySelector('img') ||
+                        target.querySelector('img') ||
+                        (target.tagName === 'IMG' ? target : null)
+
+            if (img && event.dataTransfer) {
+              // Create a small thumbnail clone
+              const thumbnail = document.createElement('div')
+              thumbnail.style.cssText = `
+                position: absolute;
+                left: -9999px;
+                width: 80px;
+                height: 80px;
+                background-image: url(${(img as HTMLImageElement).src});
+                background-size: cover;
+                background-position: center;
+                border-radius: 4px;
+                border: 2px solid #2563eb;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                opacity: 0.9;
+              `
+              document.body.appendChild(thumbnail)
+
+              // Set as drag image with cursor at top-left corner
+              event.dataTransfer.setDragImage(thumbnail, 0, 0)
+
+              // Remove thumbnail after a short delay
+              setTimeout(() => thumbnail.remove(), 0)
+
+              // Add one-time drop listener to document to catch the drop
+              const handleDocDrop = (dropEvent: DragEvent) => {
+                console.log('[Document drop]', dropEvent.clientX, dropEvent.clientY)
+                document.removeEventListener('drop', handleDocDrop, true)
+
+                const draggedSelection = (window as any).__draggedSelection
+                if (!draggedSelection) return
+
+                const editorView = draggedSelection.view
+                const coordinates = editorView.posAtCoords({
+                  left: dropEvent.clientX,
+                  top: dropEvent.clientY,
+                })
+
+                if (coordinates) {
+                  dropEvent.preventDefault()
+                  dropEvent.stopPropagation()
+
+                  const { state } = editorView
+                  const { tr } = state
+
+                  const content = draggedSelection.content.content
+                  const deleteFrom = draggedSelection.from
+                  const deleteTo = draggedSelection.to
+                  let insertPos = coordinates.pos
+
+                  if (insertPos > deleteFrom) {
+                    insertPos = insertPos - (deleteTo - deleteFrom)
+                  }
+
+                  tr.delete(deleteFrom, deleteTo)
+                  tr.insert(Math.max(0, insertPos), content)
+
+                  const newPos = Math.min(insertPos + content.size, tr.doc.content.size)
+                  tr.setSelection(TextSelection.near(tr.doc.resolve(newPos)))
+
+                  editorView.dispatch(tr)
+
+                  // Hide cursor
+                  const cursor = document.getElementById('editor-drop-cursor')
+                  if (cursor) cursor.style.display = 'none'
+                }
+
+                delete (window as any).__draggedSelection
+              }
+
+              document.addEventListener('drop', handleDocDrop, true)
+
+              // Also listen for dragend to see if drag completes
+              const handleDragEnd = (e: DragEvent) => {
+                console.log('[Document dragend]', e.type, 'dropEffect:', e.dataTransfer?.dropEffect)
+                document.removeEventListener('dragend', handleDragEnd, true)
+                document.removeEventListener('drop', handleDocDrop, true)
+                // Hide cursor
+                const cursor = document.getElementById('editor-drop-cursor')
+                if (cursor) cursor.style.display = 'none'
+                delete (window as any).__draggedSelection
+              }
+              document.addEventListener('dragend', handleDragEnd, true)
+
+              console.log('[dragstart] Document drop listener attached')
+            }
+
+            // Create drop cursor if it doesn't exist
+            let cursor = document.getElementById('editor-drop-cursor')
+            if (!cursor) {
+              cursor = document.createElement('div')
+              cursor.id = 'editor-drop-cursor'
+              cursor.style.cssText = `
+                position: fixed;
+                width: 3px;
+                background-color: #2563eb;
+                pointer-events: none;
+                z-index: 10000;
+                display: none;
+                box-shadow: 0 0 8px rgba(37, 99, 235, 0.8), 0 0 2px rgba(37, 99, 235, 1);
+                border-radius: 2px;
+              `
+              document.body.appendChild(cursor)
+            }
+            return false
+          },
+          dragover: (view, event) => {
+            // Only show cursor if we have a dragged selection (internal drag)
+            if (!(window as any).__draggedSelection) return false
+
+            const cursor = document.getElementById('editor-drop-cursor')
+            if (!cursor) return false
+
+            // Get drop position
+            const coordinates = view.posAtCoords({
+              left: event.clientX,
+              top: event.clientY,
+            })
+
+            if (coordinates) {
+              try {
+                const cursorCoords = view.coordsAtPos(coordinates.pos)
+                cursor.style.display = 'block'
+                cursor.style.left = `${cursorCoords.left}px`
+                cursor.style.top = `${cursorCoords.top}px`
+                cursor.style.height = `${Math.max(20, cursorCoords.bottom - cursorCoords.top)}px`
+              } catch {
+                // coordsAtPos can throw - hide cursor
+                cursor.style.display = 'none'
+              }
+            } else {
+              cursor.style.display = 'none'
+            }
+
+            return false
+          },
+          dragend: () => {
+            const cursor = document.getElementById('editor-drop-cursor')
+            if (cursor) cursor.style.display = 'none'
+            // Clear stored selection
+            delete (window as any).__draggedSelection
+            return false
+          },
+          drop: (view, event) => {
+            console.log('[drop] Event fired', {
+              hasDraggedSelection: !!(window as any).__draggedSelection,
+              clientX: event.clientX,
+              clientY: event.clientY
+            })
+
+            const cursor = document.getElementById('editor-drop-cursor')
+            if (cursor) cursor.style.display = 'none'
+
+            // Check if we have stored dragged content (internal drag)
+            const draggedSelection = (window as any).__draggedSelection
+            if (draggedSelection) {
+              const coordinates = view.posAtCoords({
+                left: event.clientX,
+                top: event.clientY,
+              })
+
+              console.log('[drop] coordinates', coordinates, 'draggedSelection', draggedSelection)
+
+              if (coordinates) {
+                event.preventDefault()
+                event.stopPropagation()
+
+                const { state } = view
+                const { tr } = state
+
+                // Get the content to move
+                const content = draggedSelection.content.content
+
+                // Calculate positions
+                const deleteFrom = draggedSelection.from
+                const deleteTo = draggedSelection.to
+                let insertPos = coordinates.pos
+
+                // If dropping after the original position, adjust for the deletion
+                if (insertPos > deleteFrom) {
+                  insertPos = insertPos - (deleteTo - deleteFrom)
+                }
+
+                // Delete original, then insert at new position
+                tr.delete(deleteFrom, deleteTo)
+                tr.insert(Math.max(0, insertPos), content)
+
+                // Set selection after the inserted content
+                const newPos = Math.min(insertPos + content.size, tr.doc.content.size)
+                tr.setSelection(TextSelection.near(tr.doc.resolve(newPos)))
+
+                view.dispatch(tr)
+
+                console.log('[drop] Transaction dispatched')
+
+                // Clear the stored selection
+                delete (window as any).__draggedSelection
+
+                return true
+              }
+            }
+
+            // Clear stored selection even if drop didn't work
+            delete (window as any).__draggedSelection
+            return false
+          },
+          dragleave: (view, event) => {
+            // Only hide if leaving the editor entirely
+            const relatedTarget = event.relatedTarget as Node | null
+            if (!relatedTarget || !view.dom.contains(relatedTarget)) {
+              const cursor = document.getElementById('editor-drop-cursor')
+              if (cursor) cursor.style.display = 'none'
+            }
+            return false
+          },
+        },
         handleDrop: (view, event, slice, moved) => {
+          // Hide drop cursor
+          const cursor = document.getElementById('editor-drop-cursor')
+          if (cursor) cursor.style.display = 'none'
+
+          console.log('[handleDrop]', { moved, hasSlice: !!slice, sliceContent: slice?.content.childCount, selection: view.state.selection.toJSON() })
+
           // Handle internal moves (dragging content within the editor)
-          if (moved && slice && slice.content.childCount > 0) {
+          if (slice && slice.content.childCount > 0) {
             const coordinates = view.posAtCoords({
               left: event.clientX,
               top: event.clientY,
@@ -157,7 +396,11 @@ const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
               const { state } = view
               const { tr } = state
 
-              tr.deleteSelection()
+              // If this is a move operation, delete the original first
+              if (moved) {
+                tr.deleteSelection()
+              }
+
               const insertPos = tr.mapping.map(coordinates.pos)
               tr.insert(insertPos, slice.content)
 

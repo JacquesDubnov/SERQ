@@ -1,53 +1,49 @@
 /* ========================================
-   Block Float System for Text Wrapping
+   Image Text Wrap System
    ======================================== */
 
 /**
- * Float options for block elements (images, callouts):
- * - none: Default, no float (block centered or aligned)
- * - left: Float left, text wraps on right
- * - right: Float right, text wraps on left
- * - center-wrap: Centered with text wrapping below (treated as no float with center alignment)
+ * Text wrap for images - based on alignment:
+ * - alignment=left + textWrap=true → float left, text wraps on right
+ * - alignment=right + textWrap=true → float right, text wraps on left
+ * - alignment=center + textWrap=true → centered, text flows below
  */
 
 /* ========================================
-   Float Left
+   Wrap Left (Float Left)
    ======================================== */
 
-.block-float-left,
-[data-float="left"] {
+.image-wrap-left,
+.resizable-image-wrapper.image-wrap-left {
   float: left;
-  margin-right: 1.5rem;
-  margin-bottom: 1rem;
-  margin-top: 0.25rem;
-  max-width: 50%;
-}
-
-/* ========================================
-   Float Right
-   ======================================== */
-
-.block-float-right,
-[data-float="right"] {
-  float: right;
-  margin-left: 1.5rem;
-  margin-bottom: 1rem;
-  margin-top: 0.25rem;
-  max-width: 50%;
-}
-
-/* ========================================
-   Center Wrap (No float, just centered)
-   ======================================== */
-
-.block-float-center-wrap,
-[data-float="center-wrap"] {
   display: block;
-  margin-left: auto;
-  margin-right: auto;
-  margin-bottom: 1rem;
-  max-width: 80%;
+  width: auto;
+  margin-right: 24px;
+  margin-bottom: 24px;
+  margin-top: 0;
+  /* No max-width limit - image can be any size, text wraps accordingly */
 }
+
+/* ========================================
+   Wrap Right (Float Right)
+   ======================================== */
+
+.image-wrap-right,
+.resizable-image-wrapper.image-wrap-right {
+  float: right;
+  display: block;
+  width: auto;
+  margin-left: 24px;
+  margin-bottom: 24px;
+  margin-top: 0;
+  /* No max-width limit - image can be any size, text wraps accordingly */
+}
+
+/* ========================================
+   Center Alignment (No wrap - wrap only available for left/right)
+   ======================================== */
+
+/* Center alignment never wraps - handled by alignment-center class instead */
 
 /* ========================================
    Headings Clear Floats
@@ -76,48 +72,13 @@
 }
 
 /* ========================================
-   Image-specific Float Adjustments
-   ======================================== */
-
-/* Override wrapper flex behavior when floating */
-.resizable-image-wrapper[data-float="left"],
-.resizable-image-wrapper[data-float="right"] {
-  display: block;
-  width: auto;
-}
-
-/* Ensure floated images don't use alignment justify */
-.resizable-image-wrapper[data-float="left"],
-.resizable-image-wrapper[data-float="right"] {
-  justify-content: unset;
-}
-
-/* ========================================
-   Callout-specific Float Adjustments
-   ======================================== */
-
-/* Floated callouts get constrained width */
-.callout[data-float="left"],
-.callout[data-float="right"] {
-  max-width: 45%;
-  min-width: 200px;
-}
-
-/* Center-wrap callout */
-.callout[data-float="center-wrap"] {
-  max-width: 90%;
-}
-
-/* ========================================
    Print Styles
    ======================================== */
 
 @media print {
   /* Clear floats before page breaks */
-  .block-float-left,
-  .block-float-right,
-  [data-float="left"],
-  [data-float="right"] {
+  .image-wrap-left,
+  .image-wrap-right {
     page-break-inside: avoid;
   }
 }
@@ -127,10 +88,8 @@
    ======================================== */
 
 @media (max-width: 640px) {
-  .block-float-left,
-  .block-float-right,
-  [data-float="left"],
-  [data-float="right"] {
+  .image-wrap-left,
+  .image-wrap-right {
     float: none;
     margin-left: auto;
     margin-right: auto;

@@ -30,7 +30,9 @@ export function useAutoSnapshot(
   // Debounced save function
   const performSnapshot = useDebouncedCallback(
     async () => {
+      console.log('[AutoSnapshot] Triggered - enabled:', enabled, 'editor:', !!editor, 'path:', documentPath);
       if (!enabled || !editor || !documentPath) {
+        console.log('[AutoSnapshot] Skipped - missing requirements');
         return;
       }
 
