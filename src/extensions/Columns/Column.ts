@@ -1,18 +1,19 @@
 import { Node, mergeAttributes } from '@tiptap/core'
-import { ReactNodeViewRenderer } from '@tiptap/react'
-import ColumnView from './ColumnView'
 
 /**
  * Column node - individual column within a ColumnSection
  * Content: block+ (allows any block type inside)
  *
- * Uses ReactNodeViewRenderer so each column is a proper editable container.
- * This is CRITICAL - without it, TipTap can't handle click/focus in nested columns.
+ * Note: This node does NOT use ReactNodeViewRenderer because nested
+ * NodeViews with the parent ColumnsView cause React crashes.
+ * Click handling is done via CSS and the parent ColumnsView.
  */
 export const Column = Node.create({
   name: 'column',
   content: 'block+',
   isolating: true,
+  // Defining as true ensures TipTap treats this as an editable content container
+  defining: true,
 
   // Priority > 100 to avoid TipTap extension conflicts
   priority: 110,
@@ -22,10 +23,18 @@ export const Column = Node.create({
   },
 
   renderHTML({ HTMLAttributes }) {
-    return ['div', mergeAttributes({ 'data-column': '' }, HTMLAttributes), 0]
-  },
-
-  addNodeView() {
-    return ReactNodeViewRenderer(ColumnView)
+    return [
+      'div',
+      mergeAttributes(
+        {
+          'data-column': '',
+          class: 'column',
+          // Ensure the column is focusable and editable
+          style: 'min-height: 2rem; padding: 0.5rem;',
+        },
+        HTMLAttributes
+      ),
+      0,
+    ]
   },
 })

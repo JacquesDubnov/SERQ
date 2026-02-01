@@ -36,10 +36,18 @@
   margin-bottom: var(--layout-margin-bottom, 2rem);
   margin-left: var(--layout-margin-left, auto);
   margin-right: var(--layout-margin-right, auto);
-  min-height: calc(100vh - 12rem);
+  /* Fill viewport height - ensures empty canvas shows cursor at top */
+  min-height: calc(100vh - 4rem);
 
   /* Contain table overflow during column resize */
   overflow-x: hidden;
+}
+
+/* When editor is empty or has minimal content, ensure it's visible at top of viewport */
+.editor-content .tiptap:empty,
+.editor-content .tiptap:has(> p.is-editor-empty:only-child) {
+  /* Reset any bottom padding that might cause visual issues */
+  padding-bottom: calc(100vh - 8rem);
 }
 
 /* Prose typography */

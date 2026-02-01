@@ -35,6 +35,14 @@
 }
 
 /* ================================
+   Grid Container
+   ================================ */
+
+.column-section-grid {
+  position: relative;
+}
+
+/* ================================
    Column Content Wrapper
    NodeViewContent wrapper uses display: contents so columns are direct grid items
    ================================ */
@@ -44,57 +52,36 @@
 }
 
 /* ================================
-   Column NodeViewWrapper
-   Each column has its own NodeView, this is the wrapper element
+   Individual Column Styling
    ================================ */
 
-.column {
+.column,
+.column-section [data-column] {
   min-height: 2rem;
   padding: 0.5rem;
   position: relative;
   border-radius: 4px;
-  /* Ensure column content fills available space */
-  display: flex;
-  flex-direction: column;
 }
 
-.column:focus-within {
+.column:focus-within,
+.column-section [data-column]:focus-within {
   background-color: rgba(0, 0, 0, 0.02);
 }
 
-:root[data-theme="dark"] .column:focus-within {
+:root[data-theme="dark"] .column:focus-within,
+:root[data-theme="dark"] .column-section [data-column]:focus-within {
   background-color: rgba(255, 255, 255, 0.03);
 }
 
-.column-selected {
-  outline: 1px solid var(--color-primary, #3b82f6);
-  outline-offset: -1px;
-}
-
-/* Column content - the actual editable area */
-.column-content {
-  flex: 1;
-}
-
-/* First/last child margins inside column content */
-.column-content > *:first-child {
+/* First/last child margins inside columns */
+.column > *:first-child,
+.column-section [data-column] > *:first-child {
   margin-top: 0;
 }
 
-.column-content > *:last-child {
+.column > *:last-child,
+.column-section [data-column] > *:last-child {
   margin-bottom: 0;
-}
-
-/* ================================
-   Individual Column Styling (legacy fallback for [data-column])
-   Prefer using .column class from ColumnView
-   ================================ */
-
-.column-section [data-column]:not(.column) {
-  min-height: 2rem;
-  padding: 0.5rem;
-  position: relative;
-  border-radius: 4px;
 }
 
 /* ================================
@@ -135,12 +122,14 @@
    Bordered Column Style
    ================================ */
 
-.column-section-bordered .column {
+.column-section-bordered .column,
+.column-section-bordered [data-column] {
   border: 1px dashed var(--border-color, #e5e7eb);
   background-color: rgba(0, 0, 0, 0.01);
 }
 
-:root[data-theme="dark"] .column-section-bordered .column {
+:root[data-theme="dark"] .column-section-bordered .column,
+:root[data-theme="dark"] .column-section-bordered [data-column] {
   border-color: var(--border-color-dark, #374151);
   background-color: rgba(255, 255, 255, 0.01);
 }
@@ -187,7 +176,7 @@
 
 @media (max-width: 640px) {
   /* Stack columns on small screens */
-  .column-section {
+  .column-section-grid {
     display: block !important;
   }
 
@@ -195,11 +184,13 @@
     display: block;
   }
 
-  .column {
+  .column,
+  .column-section [data-column] {
     margin-bottom: 1rem;
   }
 
-  .column:last-child {
+  .column:last-child,
+  .column-section [data-column]:last-child {
     margin-bottom: 0;
   }
 

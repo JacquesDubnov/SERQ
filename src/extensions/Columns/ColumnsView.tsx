@@ -5,8 +5,6 @@ import { ColumnContextMenu } from './ColumnContextMenu'
 
 /**
  * ColumnsView - React NodeView for column section with CSS Grid and resize handles
- *
- * This is the parent container. Individual Column nodes have their own ColumnView.
  */
 export default function ColumnsView({
   node,
@@ -66,7 +64,7 @@ export default function ColumnsView({
       }
 
       // Calculate new width for the left column
-      const leftColWidth = Math.max(50, mouseX - cumulativeWidth + (resizing > 0 ? 0 : 0))
+      const leftColWidth = Math.max(50, mouseX - cumulativeWidth)
       const rightColWidth = Math.max(
         50,
         cumulativeWidth + (localWidths[resizing] / totalFr + localWidths[resizing + 1] / totalFr) * availableWidth - mouseX
@@ -119,46 +117,55 @@ export default function ColumnsView({
         ref={containerRef}
         className={`column-section ${selected ? 'column-section-selected' : ''} ${showBorders ? 'column-section-bordered' : ''}`}
         data-column-count={columnCount}
-        style={{
-          display: 'grid',
-          gridTemplateColumns,
-          gap,
-          position: 'relative',
-        }}
         onContextMenu={handleContextMenu}
       >
-        {/* NodeViewContent renders the column children - each column is a ColumnView */}
-        <NodeViewContent className="column-section-content" />
+        {/* Grid container for columns */}
+        <div
+          className="column-section-grid"
+          style={{
+            display: 'grid',
+            gridTemplateColumns,
+            gap,
+            position: 'relative',
+          }}
+        >
+          {/* NodeViewContent renders the column children */}
+          <NodeViewContent
+            as="div"
+            className="column-section-content"
+            style={{ display: 'contents' }}
+          />
 
-        {/* Resize handles between columns */}
-        {Array(columnCount - 1)
-          .fill(null)
-          .map((_, index) => {
-            // Calculate handle position
-            const widthsBefore = localWidths.slice(0, index + 1)
-            const totalFr = localWidths.reduce((sum, w) => sum + w, 0)
-            const percentBefore = widthsBefore.reduce((sum, w) => sum + w, 0) / totalFr
+          {/* Resize handles between columns */}
+          {Array(columnCount - 1)
+            .fill(null)
+            .map((_, index) => {
+              // Calculate handle position
+              const widthsBefore = localWidths.slice(0, index + 1)
+              const totalFr = localWidths.reduce((sum, w) => sum + w, 0)
+              const percentBefore = widthsBefore.reduce((sum, w) => sum + w, 0) / totalFr
 
-            return (
-              <div
-                key={index}
-                className={`column-resize-handle ${resizing === index ? 'column-resize-handle-active' : ''}`}
-                style={{
-                  position: 'absolute',
-                  left: `calc(${percentBefore * 100}% - 4px)`,
-                  top: 0,
-                  bottom: 0,
-                  width: '8px',
-                  cursor: 'col-resize',
-                  zIndex: 10,
-                }}
-                onMouseDown={(e) => handleResizeStart(index, e)}
-                contentEditable={false}
-              >
-                <div className="column-resize-handle-bar" />
-              </div>
-            )
-          })}
+              return (
+                <div
+                  key={index}
+                  className={`column-resize-handle ${resizing === index ? 'column-resize-handle-active' : ''}`}
+                  style={{
+                    position: 'absolute',
+                    left: `calc(${percentBefore * 100}% - 4px)`,
+                    top: 0,
+                    bottom: 0,
+                    width: '8px',
+                    cursor: 'col-resize',
+                    zIndex: 10,
+                  }}
+                  onMouseDown={(e) => handleResizeStart(index, e)}
+                  contentEditable={false}
+                >
+                  <div className="column-resize-handle-bar" />
+                </div>
+              )
+            })}
+        </div>
       </NodeViewWrapper>
 
       {/* Context Menu */}
