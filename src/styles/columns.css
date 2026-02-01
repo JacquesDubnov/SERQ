@@ -36,7 +36,7 @@
 
 /* ================================
    Column Content Wrapper
-   NodeViewContent uses display: contents to participate in grid
+   NodeViewContent wrapper uses display: contents so columns are direct grid items
    ================================ */
 
 .column-section-content {
@@ -44,31 +44,57 @@
 }
 
 /* ================================
-   Individual Column Styling
+   Column NodeViewWrapper
+   Each column has its own NodeView, this is the wrapper element
    ================================ */
 
-.column-section [data-column] {
+.column {
   min-height: 2rem;
   padding: 0.5rem;
   position: relative;
   border-radius: 4px;
+  /* Ensure column content fills available space */
+  display: flex;
+  flex-direction: column;
 }
 
-.column-section [data-column]:focus-within {
+.column:focus-within {
   background-color: rgba(0, 0, 0, 0.02);
 }
 
-:root[data-theme="dark"] .column-section [data-column]:focus-within {
+:root[data-theme="dark"] .column:focus-within {
   background-color: rgba(255, 255, 255, 0.03);
 }
 
-/* First/last child margins */
-.column-section [data-column] > *:first-child {
+.column-selected {
+  outline: 1px solid var(--color-primary, #3b82f6);
+  outline-offset: -1px;
+}
+
+/* Column content - the actual editable area */
+.column-content {
+  flex: 1;
+}
+
+/* First/last child margins inside column content */
+.column-content > *:first-child {
   margin-top: 0;
 }
 
-.column-section [data-column] > *:last-child {
+.column-content > *:last-child {
   margin-bottom: 0;
+}
+
+/* ================================
+   Individual Column Styling (legacy fallback for [data-column])
+   Prefer using .column class from ColumnView
+   ================================ */
+
+.column-section [data-column]:not(.column) {
+  min-height: 2rem;
+  padding: 0.5rem;
+  position: relative;
+  border-radius: 4px;
 }
 
 /* ================================
@@ -109,12 +135,12 @@
    Bordered Column Style
    ================================ */
 
-.column-section-bordered [data-column] {
+.column-section-bordered .column {
   border: 1px dashed var(--border-color, #e5e7eb);
   background-color: rgba(0, 0, 0, 0.01);
 }
 
-:root[data-theme="dark"] .column-section-bordered [data-column] {
+:root[data-theme="dark"] .column-section-bordered .column {
   border-color: var(--border-color-dark, #374151);
   background-color: rgba(255, 255, 255, 0.01);
 }
@@ -165,11 +191,15 @@
     display: block !important;
   }
 
-  .column-section [data-column] {
+  .column-section-content {
+    display: block;
+  }
+
+  .column {
     margin-bottom: 1rem;
   }
 
-  .column-section [data-column]:last-child {
+  .column:last-child {
     margin-bottom: 0;
   }
 
