@@ -1,4 +1,5 @@
 @import './float.css';
+@import './columns.css';
 
 /* Editor wrapper - natural height, don't expand to fill parent */
 .editor-wrapper {

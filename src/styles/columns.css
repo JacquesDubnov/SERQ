@@ -1,0 +1,179 @@
+/* Column Layout Styles */
+
+/* ================================
+   Column Section Container
+   ================================ */
+
+.column-section {
+  position: relative;
+  margin: 1rem 0;
+  padding: 0.5rem 0;
+  border-radius: 4px;
+  min-height: 3rem;
+}
+
+.column-section:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+:root[data-theme="dark"] .column-section:hover {
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+.column-section-selected {
+  outline: 2px solid var(--color-primary, #3b82f6);
+  outline-offset: 2px;
+}
+
+.column-section-bordered {
+  border: 1px solid var(--border-color, #e5e7eb);
+  padding: 0.5rem;
+}
+
+:root[data-theme="dark"] .column-section-bordered {
+  border-color: var(--border-color-dark, #374151);
+}
+
+/* ================================
+   Column Content Wrapper
+   NodeViewContent uses display: contents to participate in grid
+   ================================ */
+
+.column-section-content {
+  display: contents;
+}
+
+/* ================================
+   Individual Column Styling
+   ================================ */
+
+.column-section [data-column] {
+  min-height: 2rem;
+  padding: 0.5rem;
+  position: relative;
+  border-radius: 4px;
+}
+
+.column-section [data-column]:focus-within {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+:root[data-theme="dark"] .column-section [data-column]:focus-within {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+/* First/last child margins */
+.column-section [data-column] > *:first-child {
+  margin-top: 0;
+}
+
+.column-section [data-column] > *:last-child {
+  margin-bottom: 0;
+}
+
+/* ================================
+   Resize Handles
+   ================================ */
+
+.column-resize-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.column-resize-handle-bar {
+  width: 4px;
+  height: 24px;
+  background-color: transparent;
+  border-radius: 2px;
+  transition: background-color 0.15s, height 0.15s;
+}
+
+.column-resize-handle:hover .column-resize-handle-bar {
+  background-color: var(--color-primary, #3b82f6);
+  height: 40px;
+}
+
+.column-resize-handle-active .column-resize-handle-bar {
+  background-color: var(--color-primary, #3b82f6);
+  height: 100%;
+}
+
+/* ================================
+   Bordered Column Style
+   ================================ */
+
+.column-section-bordered [data-column] {
+  border: 1px dashed var(--border-color, #e5e7eb);
+  background-color: rgba(0, 0, 0, 0.01);
+}
+
+:root[data-theme="dark"] .column-section-bordered [data-column] {
+  border-color: var(--border-color-dark, #374151);
+  background-color: rgba(255, 255, 255, 0.01);
+}
+
+/* ================================
+   Columns Inside Table Cells
+   ================================ */
+
+.editor-content .tiptap td .column-section,
+.editor-content .tiptap th .column-section {
+  margin: 0.5rem 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.editor-content .tiptap td .column-section:first-child,
+.editor-content .tiptap th .column-section:first-child {
+  margin-top: 0;
+}
+
+.editor-content .tiptap td .column-section:last-child,
+.editor-content .tiptap th .column-section:last-child {
+  margin-bottom: 0;
+}
+
+/* ================================
+   Print Styles
+   ================================ */
+
+@media print {
+  .column-section {
+    page-break-inside: avoid;
+  }
+
+  .column-resize-handle {
+    display: none;
+  }
+}
+
+/* ================================
+   Responsive Adjustments
+   ================================ */
+
+@media (max-width: 640px) {
+  /* Stack columns on small screens */
+  .column-section {
+    display: block !important;
+  }
+
+  .column-section [data-column] {
+    margin-bottom: 1rem;
+  }
+
+  .column-section [data-column]:last-child {
+    margin-bottom: 0;
+  }
+
+  .column-resize-handle {
+    display: none;
+  }
+}
