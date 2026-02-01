@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 7 of 7 (Layout and Numbering) - IN PROGRESS
-Plan: 5 of 5 in current phase (07-01 complete)
-Status: Executing
-Last activity: 2026-02-01 - Completed 07-01-PLAN.md (Multi-Column Layout)
+Plan: 5 of 5 in current phase (all complete)
+Status: Phase 7 complete
+Last activity: 2026-02-01 - Completed 07-05-PLAN.md (Paragraph Numbering)
 
-Progress: [██████████] 100% (Phase 5 complete) + Phase 7 in progress (5/5)
+Progress: [██████████] 100% (Phase 5 complete) + Phase 7 complete (5/5)
 
 ## Performance Metrics
 
@@ -116,6 +116,11 @@ Progress: [██████████] 100% (Phase 5 complete) + Phase 7 in 
 | D-07-01-001 | Use CSS Grid with display:contents for NodeViewContent | Allows column children to participate directly in parent grid |
 | D-07-01-002 | Priority > 100 for column extensions | Prevents TipTap extension resolution conflicts |
 | D-07-01-003 | Content type column+ for ColumnSection | Enforces structural hierarchy, only columns as children |
+| D-07-05-001 | Widget decorations with side: -1 for number placement | Insert before node content for inline number display |
+| D-07-05-002 | Preset formatNumber callback pattern | Flexible formatting without hardcoded number styles |
+| D-07-05-003 | Heading level tracking for hierarchy | Enables proper 1.1, 1.2, 2.1 multi-level numbering |
+| D-07-05-004 | Skip empty paragraphs from numbering | Avoid cluttering document with numbers on blank lines |
+| D-07-05-005 | contentEditable=false on number spans | Prevent user from editing/selecting numbers |
 
 ### Technical Patterns Established
 
@@ -527,7 +532,7 @@ See `.planning/DESIGN-REFERENCE.md` for UI/UX inspiration from:
 ## Session Continuity
 
 Last session: 2026-02-01
-Stopped at: Completed 07-01-PLAN.md (Multi-Column Layout)
+Stopped at: Completed 07-05-PLAN.md (Paragraph Numbering)
 Resume file: None
 
 ---
@@ -554,3 +559,4 @@ Resume file: None
 *Plan 07-02 complete: 2026-02-01*
 *Plan 07-04 complete: 2026-02-01*
 *Plan 07-01 complete: 2026-02-01*
+*Plan 07-05 complete: 2026-02-01*
