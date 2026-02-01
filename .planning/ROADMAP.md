@@ -239,10 +239,14 @@ Plans:
 **Implementation Notes:**
 - Columns use CSS Grid (NOT CSS columns - terrible editing UX)
 - Up to 6 columns with draggable gutters for resize
-- Column modes: flowing (magazine) or rigid (side-by-side)
+- Column modes: flowing (magazine) or fixed (independent content per column, default)
 - Text wrapping via CSS float on block elements
 - Paragraph number presets: sequential (numeric/roman/alpha/hex), hierarchical, legal multi-level
 - Line numbers via ProseMirror plugin with gutter DOM
+
+**Wave Structure:**
+- Wave 1 (parallel): 07-01, 07-02, 07-04, 07-05 (all independent)
+- Wave 2: 07-03 (depends on 07-02 for float attributes)
 
 **Context Document:** `.planning/phases/07-layout-and-numbering/07-CONTEXT.md`
 
@@ -275,5 +279,6 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6 > 7
 *Phase 4 complete: 2026-01-31*
 *Phase 5 planned: 2026-01-31*
 *Phase 6 planned: 2026-02-01*
+*Phase 7 planned: 2026-02-01*
 *Depth: comprehensive*
 *Coverage: 99/99 v1 requirements mapped*
