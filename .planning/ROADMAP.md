@@ -18,6 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Extended Features** - Tables, custom blocks, media, commands
 - [ ] **Phase 5: Polish** - Version history, comments, export, UI panels
 - [ ] **Phase 6: AI Integration** - Claude API, stylization workflow, streaming
+- [ ] **Phase 7: Layout and Numbering** - Multi-column layouts, text wrapping, line/paragraph numbers
 
 ## Phase Details
 
@@ -151,9 +152,8 @@ Plans:
 **Success Criteria** (what must be TRUE):
   1. User can view version history (Time Machine style) and restore any previous version
   2. User can add comments to text selections and see them in margin
-  3. User can export document to HTML, Markdown, and PDF
-  4. User can import Word (.docx), Markdown, and plain text files
-  5. User can toggle focus mode (Cmd+Shift+F) hiding all UI chrome
+  3. User can export document to HTML, Markdown, PDF, and EPUB
+  4. User can import Word (.docx), Markdown, plain text, and EPUB files
 **Plans**: 7 plans
 
 Plans:
@@ -217,10 +217,41 @@ Plans:
 
 ---
 
+### Phase 7: Layout and Numbering
+**Goal**: Users can create professional multi-column layouts, wrap text around elements, and add line/paragraph numbering for reference and legal documents
+**Depends on**: Phase 5
+**Requirements**: LAYOUT-01, LAYOUT-02, LAYOUT-03, NUMBER-01, NUMBER-02
+**Success Criteria** (what must be TRUE):
+  1. User can insert 2-6 column layouts with draggable resize handles
+  2. User can float images/blocks left or right with text wrapping around them
+  3. User can drag images to any position on canvas with drop indicator
+  4. User can toggle line numbers in code-editor or legal style
+  5. User can apply paragraph numbering presets (sequential, hierarchical, legal)
+**Plans**: 5 plans
+
+Plans:
+- [ ] 07-01-PLAN.md — Multi-column extension (Columns/Column nodes, CSS Grid, resize handles)
+- [ ] 07-02-PLAN.md — Text wrapping (float alignment for all block types, context menu)
+- [ ] 07-03-PLAN.md — Draggable image positioning (drag anywhere, drop indicator, position tracking)
+- [ ] 07-04-PLAN.md — Line numbers (gutter plugin, viewport optimization, toggle via context menu)
+- [ ] 07-05-PLAN.md — Paragraph numbering (presets system, widget decorations, hierarchical support)
+
+**Implementation Notes:**
+- Columns use CSS Grid (NOT CSS columns - terrible editing UX)
+- Up to 6 columns with draggable gutters for resize
+- Column modes: flowing (magazine) or rigid (side-by-side)
+- Text wrapping via CSS float on block elements
+- Paragraph number presets: sequential (numeric/roman/alpha/hex), hierarchical, legal multi-level
+- Line numbers via ProseMirror plugin with gutter DOM
+
+**Context Document:** `.planning/phases/07-layout-and-numbering/07-CONTEXT.md`
+
+---
+
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6
+Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6 > 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -230,6 +261,7 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6
 | 4. Extended Features | 6/6 | Complete | 2026-01-31 |
 | 5. Polish | 0/7 | Planned | - |
 | 6. AI Integration | 0/4 | Planned | - |
+| 7. Layout and Numbering | 0/5 | Planned | - |
 
 ---
 *Roadmap created: 2026-01-30*

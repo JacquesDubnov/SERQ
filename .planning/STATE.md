@@ -106,6 +106,7 @@ Progress: [█████████░] 96.0% (24/25 plans)
 | D-05-05-001 | Store comment text in SQLite, only ID in document marks | Keeps document JSON clean, allows comment metadata without polluting content |
 | D-05-05-002 | onCommentActivated callback option on Comment extension | Self-contained extension - click handling wired at registration, no hard dependencies |
 | D-05-05-003 | Group comments by resolved/unresolved | Clear visual separation, open comments are actionable |
+| D-05-07-001 | All panels/toolbars/controls MUST have margins and padding to confining containers | Ubiquitous design rule - applies to every UI component throughout the app |
 
 ### Technical Patterns Established
 
