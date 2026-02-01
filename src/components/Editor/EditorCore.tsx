@@ -20,9 +20,11 @@ import { SlashCommands } from '../../extensions/SlashCommands';
 import { TableWidthLimit } from '../../extensions/TableWidthLimit';
 import { TableKeyboardNavigation } from '../../extensions/TableKeyboardNavigation';
 import { Callout } from '../../extensions/Callout';
+import { ColumnSection, Column } from '../../extensions/Columns';
 import { ResizableImage } from '../../extensions/ResizableImage';
 import { TypewriterMode } from '../../extensions/TypewriterMode';
 import { Comment } from '../../extensions/Comment';
+import { LineNumbers } from '../../extensions/LineNumbers';
 import { useEditorStore, type OutlineAnchor } from '../../stores/editorStore';
 import { useCommentStore } from '../../stores/commentStore';
 import { isImageFile, isLargeImage, fileToBase64, formatFileSize } from '../../lib/imageUtils';
@@ -111,6 +113,8 @@ const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
         TableKeyboardNavigation,
         SlashCommands,
         Callout,
+        ColumnSection,
+        Column,
         ResizableImage,
         TableOfContents.configure({
           onUpdate: handleTocUpdate,
@@ -127,6 +131,9 @@ const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
             useCommentStore.getState().setActiveComment(commentId);
             useCommentStore.getState().setPanelOpen(true);
           },
+        }),
+        LineNumbers.configure({
+          getSettings: () => useEditorStore.getState().lineNumbers,
         }),
       ],
       content: initialContent || '',
@@ -286,6 +293,27 @@ const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
         if (onUpdate) {
           onUpdate(editor.getJSON());
         }
+
+        // Check for deleted comment marks
+        const commentStore = useCommentStore.getState();
+        const comments = commentStore.comments;
+
+        // Collect all comment IDs currently in the document
+        const docCommentIds = new Set<string>();
+        editor.state.doc.descendants((node) => {
+          node.marks.forEach((mark) => {
+            if (mark.type.name === 'comment' && mark.attrs.id) {
+              docCommentIds.add(mark.attrs.id);
+            }
+          });
+        });
+
+        // Mark as textDeleted any comments that are no longer in the document
+        comments.forEach((comment) => {
+          if (!comment.textDeleted && !docCommentIds.has(comment.id)) {
+            commentStore.markTextDeleted(comment.id);
+          }
+        });
       },
     });
 
