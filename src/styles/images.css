@@ -24,6 +24,49 @@
   position: relative;
   display: inline-block;
   max-width: 100%;
+  overflow: visible;
+}
+
+/* Drag handle for moving images */
+.image-drag-handle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 36px;
+  height: 36px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 6px;
+  cursor: grab !important;
+  z-index: 100;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto !important;
+}
+
+.image-drag-handle::before {
+  content: '⋮⋮';
+  color: white;
+  font-size: 16px;
+  letter-spacing: 3px;
+  font-weight: bold;
+}
+
+/* Show drag handle when container is selected */
+.resizable-image-container.selected .image-drag-handle {
+  opacity: 1;
+}
+
+.image-drag-handle:hover {
+  background: rgba(0, 0, 0, 0.8);
+  cursor: grab !important;
+}
+
+.image-drag-handle:active {
+  cursor: grabbing !important;
 }
 
 /* Selection outline */
@@ -41,24 +84,85 @@
   border-radius: 4px;
 }
 
-/* Resize handle (SE corner) */
+/* Resize handles (all 4 corners) */
 .resize-handle {
   position: absolute;
-  bottom: -4px;
-  right: -4px;
-  width: 12px;
-  height: 12px;
-  background-color: var(--color-primary, #3b82f6);
+  width: 14px;
+  height: 14px;
+  background-color: #3b82f6;
   border: 2px solid white;
-  border-radius: 2px;
-  cursor: se-resize;
-  z-index: 10;
+  border-radius: 3px;
+  z-index: 9999 !important;
   transition: transform 0.1s ease;
+  pointer-events: auto !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
 }
 
 .resize-handle:hover,
 .resize-handle.resizing {
-  transform: scale(1.2);
+  transform: scale(1.3);
+  background-color: #1d4ed8;
+}
+
+/* Force cursor on resize handles - override everything */
+.editor-content .resize-handle,
+.editor-content .tiptap .resize-handle,
+.resizable-image-container .resize-handle {
+  cursor: se-resize !important;
+}
+
+.editor-content .resize-handle-nw,
+.editor-content .tiptap .resize-handle-nw,
+.resizable-image-container .resize-handle-nw {
+  cursor: nwse-resize !important;
+}
+
+.editor-content .resize-handle-ne,
+.editor-content .tiptap .resize-handle-ne,
+.resizable-image-container .resize-handle-ne {
+  cursor: nesw-resize !important;
+}
+
+.editor-content .resize-handle-sw,
+.editor-content .tiptap .resize-handle-sw,
+.resizable-image-container .resize-handle-sw {
+  cursor: nesw-resize !important;
+}
+
+.editor-content .resize-handle-se,
+.editor-content .tiptap .resize-handle-se,
+.resizable-image-container .resize-handle-se {
+  cursor: nwse-resize !important;
+}
+
+/* Corner positions */
+.resize-handle-nw {
+  top: -6px;
+  left: -6px;
+}
+
+.resize-handle-ne {
+  top: -6px;
+  right: -6px;
+}
+
+.resize-handle-sw {
+  bottom: -6px;
+  left: -6px;
+}
+
+.resize-handle-se {
+  bottom: -6px;
+  right: -6px;
+}
+
+/* Ensure cursor updates immediately when clicking outside image */
+.resizable-image-wrapper {
+  transition: none;
+}
+
+.resizable-image-container {
+  transition: outline 0.1s ease;
 }
 
 /* Alignment toolbar */
@@ -100,6 +204,80 @@
 .image-toolbar .toolbar-btn.active {
   background-color: var(--color-primary, #3b82f6);
   color: white;
+}
+
+/* Images inside table cells */
+.editor-content .tiptap td .resizable-image-wrapper,
+.editor-content .tiptap th .resizable-image-wrapper {
+  margin: 0.5rem 0;
+}
+
+.editor-content .tiptap td .resizable-image-container,
+.editor-content .tiptap th .resizable-image-container {
+  max-width: 100%;
+}
+
+.editor-content .tiptap td .resizable-image-container img,
+.editor-content .tiptap th .resizable-image-container img {
+  max-width: 100%;
+}
+
+/* Ensure resize handle is visible in table cells */
+.editor-content .tiptap td .resize-handle,
+.editor-content .tiptap th .resize-handle {
+  z-index: 30;
+}
+
+/* Ensure toolbar is visible above table */
+.editor-content .tiptap td .image-toolbar,
+.editor-content .tiptap th .image-toolbar {
+  z-index: 35;
+}
+
+/* Prevent cell from clipping resize handles */
+.editor-content .tiptap td:has(.resizable-image-container.selected),
+.editor-content .tiptap th:has(.resizable-image-container.selected) {
+  overflow: visible;
+}
+
+/* ========================================
+   Free Position Mode
+   ======================================== */
+
+/* Parent container needs relative positioning for absolute children */
+.editor-content .tiptap {
+  position: relative;
+}
+
+/* Free position wrapper - absolute positioned */
+.resizable-image-wrapper.free-position-mode {
+  position: absolute;
+  z-index: 10;
+  margin: 0;
+}
+
+/* Visual indicator for free position mode */
+.resizable-image-wrapper.free-position-mode .resizable-image-container {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.resizable-image-wrapper.free-position-mode .resizable-image-container.selected {
+  outline-color: #10b981; /* Green to indicate special mode */
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.3);
+}
+
+/* Free position drag handle indicator */
+.resizable-image-wrapper.free-position-mode .image-drag-handle {
+  background: rgba(16, 185, 129, 0.8);
+}
+
+.resizable-image-wrapper.free-position-mode .image-drag-handle:hover {
+  background: rgba(16, 185, 129, 1);
+}
+
+/* When dragging in free position mode */
+.resizable-image-wrapper.free-position-mode:active {
+  cursor: grabbing !important;
 }
 
 /* Dark mode support */

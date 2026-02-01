@@ -22,6 +22,9 @@ declare module '@tiptap/core' {
         height?: number
         alignment?: 'left' | 'center' | 'right'
         float?: 'none' | 'left' | 'right' | 'center-wrap'
+        freePosition?: boolean
+        positionX?: number
+        positionY?: number
       }) => ReturnType
     }
   }
@@ -76,6 +79,30 @@ export const ResizableImage = Node.create<ImageOptions>({
         renderHTML: (attributes) => {
           if (!attributes.float || attributes.float === 'none') return {}
           return { 'data-float': attributes.float }
+        },
+      },
+      freePosition: {
+        default: false,
+        parseHTML: (element) => element.getAttribute('data-free-position') === 'true',
+        renderHTML: (attributes) => {
+          if (!attributes.freePosition) return {}
+          return { 'data-free-position': 'true' }
+        },
+      },
+      positionX: {
+        default: 50,
+        parseHTML: (element) => parseFloat(element.getAttribute('data-position-x') || '50'),
+        renderHTML: (attributes) => {
+          if (!attributes.freePosition) return {}
+          return { 'data-position-x': String(attributes.positionX) }
+        },
+      },
+      positionY: {
+        default: 0,
+        parseHTML: (element) => parseFloat(element.getAttribute('data-position-y') || '0'),
+        renderHTML: (attributes) => {
+          if (!attributes.freePosition) return {}
+          return { 'data-position-y': String(attributes.positionY) }
         },
       },
     }
