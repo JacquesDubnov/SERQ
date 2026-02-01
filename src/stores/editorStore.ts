@@ -38,6 +38,14 @@ export interface StoredSelection {
   to: number
 }
 
+/**
+ * Paragraph numbering settings
+ */
+export interface ParagraphNumberSettings {
+  enabled: boolean
+  presetId: string | null // null = off, string = preset ID
+}
+
 interface EditorState {
   document: DocumentMeta
   canvasWidth: 'narrow' | 'normal' | 'wide' | 'full'
@@ -46,6 +54,7 @@ interface EditorState {
   storedSelection: StoredSelection | null
   showSaveGlow: boolean
   lineNumbers: LineNumberSettings
+  paragraphNumbers: ParagraphNumberSettings
 
   setDocument: (path: string | null, name: string) => void
   markDirty: () => void
@@ -58,6 +67,8 @@ interface EditorState {
   triggerSaveGlow: () => void
   setLineNumbers: (settings: Partial<LineNumberSettings>) => void
   toggleLineNumbers: () => void
+  setParagraphNumbers: (settings: Partial<ParagraphNumberSettings>) => void
+  toggleParagraphNumbers: () => void
 }
 
 export const useEditorStore = create<EditorState>((set) => ({
@@ -76,6 +87,10 @@ export const useEditorStore = create<EditorState>((set) => ({
     enabled: false,
     position: 'gutter',
     style: 'code',
+  },
+  paragraphNumbers: {
+    enabled: false,
+    presetId: null,
   },
 
   setDocument: (path, name) => set({
@@ -117,6 +132,18 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   toggleLineNumbers: () => set((state) => ({
     lineNumbers: { ...state.lineNumbers, enabled: !state.lineNumbers.enabled }
+  })),
+
+  setParagraphNumbers: (settings) => set((state) => ({
+    paragraphNumbers: { ...state.paragraphNumbers, ...settings }
+  })),
+
+  toggleParagraphNumbers: () => set((state) => ({
+    paragraphNumbers: {
+      ...state.paragraphNumbers,
+      enabled: !state.paragraphNumbers.enabled,
+      presetId: state.paragraphNumbers.enabled ? null : 'seq-numeric',
+    }
   })),
 }))
 
