@@ -13,6 +13,10 @@ interface BlockContextMenuProps {
   onChangeFloat: (float: FloatOption) => void
   onInsertClearBreak?: () => void
   onClose: () => void
+  // Free positioning options (images only)
+  freePosition?: boolean
+  onToggleFreePosition?: (enabled: boolean) => void
+  showFreePositionOption?: boolean
 }
 
 const FLOAT_OPTIONS: { value: FloatOption; label: string; icon: ReactNode }[] = [
@@ -75,6 +79,9 @@ export function BlockContextMenu({
   onChangeFloat,
   onInsertClearBreak,
   onClose,
+  freePosition = false,
+  onToggleFreePosition,
+  showFreePositionOption = false,
 }: BlockContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -140,6 +147,10 @@ export function BlockContextMenu({
   const { x, y } = adjustedPosition()
 
   const handleFloatChange = (float: FloatOption) => {
+    // Disable free position when changing float
+    if (freePosition && onToggleFreePosition) {
+      onToggleFreePosition(false)
+    }
     onChangeFloat(float)
     onClose()
   }
@@ -147,6 +158,13 @@ export function BlockContextMenu({
   const handleClearBreak = () => {
     if (onInsertClearBreak) {
       onInsertClearBreak()
+    }
+    onClose()
+  }
+
+  const handleToggleFreePosition = () => {
+    if (onToggleFreePosition) {
+      onToggleFreePosition(!freePosition)
     }
     onClose()
   }
@@ -231,6 +249,105 @@ export function BlockContextMenu({
           </button>
         ))}
       </div>
+
+      {/* Section: Free Positioning (images only) */}
+      {showFreePositionOption && onToggleFreePosition && (
+        <>
+          {/* Divider */}
+          <div
+            style={{
+              height: '1px',
+              backgroundColor: 'var(--border-color, #e5e7eb)',
+              margin: '0.5rem 0',
+            }}
+          />
+          <div className="block-context-menu-section">
+            <div
+              className="block-context-menu-label"
+              style={{
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                color: 'var(--text-secondary, #6b7280)',
+                padding: '0.25rem 0.5rem',
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+              }}
+            >
+              Positioning
+            </div>
+            <button
+              className={`block-context-menu-item ${freePosition ? 'active' : ''}`}
+              onClick={handleToggleFreePosition}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                width: '100%',
+                padding: '0.5rem',
+                fontSize: '0.875rem',
+                textAlign: 'left',
+                background: freePosition ? 'var(--bg-hover, #f3f4f6)' : 'none',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                color: 'var(--text-primary, #1f2937)',
+              }}
+              onMouseEnter={(e) => {
+                if (!freePosition) {
+                  e.currentTarget.style.backgroundColor = 'var(--bg-hover, #f3f4f6)'
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!freePosition) {
+                  e.currentTarget.style.backgroundColor = 'transparent'
+                }
+              }}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                style={{ opacity: freePosition ? 1 : 0.7 }}
+              >
+                <path d="M5 9l-3 3 3 3" />
+                <path d="M9 5l3-3 3 3" />
+                <path d="M15 19l3 3 3-3" />
+                <path d="M19 9l3 3-3 3" />
+                <rect x="7" y="7" width="10" height="10" rx="1" />
+              </svg>
+              <span>Free Positioning</span>
+              {freePosition && (
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  style={{ marginLeft: 'auto' }}
+                >
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              )}
+            </button>
+            {freePosition && (
+              <div
+                style={{
+                  fontSize: '0.75rem',
+                  color: 'var(--text-muted, #9ca3af)',
+                  padding: '0.25rem 0.5rem',
+                  fontStyle: 'italic',
+                }}
+              >
+                Click and drag image to reposition
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {/* Divider */}
       <div
