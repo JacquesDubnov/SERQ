@@ -9,6 +9,7 @@ interface CommandPaletteProps {
   isOpen: boolean
   onOpenChange: (open: boolean) => void
   onShowOutline?: () => void
+  onShowVersionHistory?: () => void
 }
 
 /**
@@ -39,7 +40,7 @@ function commandFilter(value: string, search: string): number {
  * Opens with Cmd+K or Cmd+P, filters commands as you type
  * Closes on Escape or clicking outside
  */
-export function CommandPalette({ editor, isOpen, onOpenChange, onShowOutline }: CommandPaletteProps) {
+export function CommandPalette({ editor, isOpen, onOpenChange, onShowOutline, onShowVersionHistory }: CommandPaletteProps) {
   const groupedCommands = getGroupedCommands()
   const dialogRef = useRef<HTMLDivElement>(null)
 
@@ -49,6 +50,13 @@ export function CommandPalette({ editor, isOpen, onOpenChange, onShowOutline }: 
     // Handle show-outline specially
     if (commandId === 'show-outline') {
       onShowOutline?.()
+      onOpenChange(false)
+      return
+    }
+
+    // Handle version history specially
+    if (commandId === 'open-version-history') {
+      onShowVersionHistory?.()
       onOpenChange(false)
       return
     }
@@ -135,6 +143,7 @@ export function CommandPalette({ editor, isOpen, onOpenChange, onShowOutline }: 
         label="Command palette"
         className="command-palette"
         filter={commandFilter}
+        loop={false}
       >
         <Command.Input placeholder="Type a command or search..." className="command-input" autoFocus />
         <Command.List className="command-list">

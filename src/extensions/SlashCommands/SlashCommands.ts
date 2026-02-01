@@ -39,9 +39,9 @@ export const SlashCommands = Extension.create({
         editor: this.editor,
         ...this.options.suggestion,
 
-        // Filter items based on query
+        // Filter items based on query - show all commands
         items: ({ query }: { query: string }) => {
-          return filterSlashCommands(query).slice(0, 10)
+          return filterSlashCommands(query)
         },
 
         // Render the dropdown menu
@@ -56,10 +56,17 @@ export const SlashCommands = Extension.create({
               items: SlashCommandItem[]
               command: (item: SlashCommandItem) => void
             }) => {
+              // Wrap command to ensure popup closes immediately when a command is selected
+              const wrappedCommand = (item: SlashCommandItem) => {
+                // Hide popup immediately before command executes
+                popup?.[0]?.hide()
+                props.command(item)
+              }
+
               component = new ReactRenderer(SlashMenu, {
                 props: {
                   items: props.items,
-                  command: props.command,
+                  command: wrappedCommand,
                 },
                 editor: props.editor,
               })
@@ -86,9 +93,15 @@ export const SlashCommands = Extension.create({
               command: (item: SlashCommandItem) => void
               clientRect: (() => DOMRect | null) | null
             }) => {
+              // Wrap command to ensure popup closes immediately
+              const wrappedCommand = (item: SlashCommandItem) => {
+                popup?.[0]?.hide()
+                props.command(item)
+              }
+
               component?.updateProps({
                 items: props.items,
-                command: props.command,
+                command: wrappedCommand,
               })
 
               if (!props.clientRect) {

@@ -2,17 +2,17 @@
 
 /* ================================
    Column Section Container
+   Using native ProseMirror rendering (no ReactNodeViewRenderer)
+   for proper click/focus handling in all columns
    ================================ */
 
 .column-section {
   position: relative;
   margin: 1rem 0;
-  padding: 0.5rem 0;
   border-radius: 4px;
   min-height: 3rem;
+  /* Grid is set inline via renderHTML */
 }
-
-/* No hover effect - keep clean */
 
 .column-section-selected {
   outline: 2px solid var(--color-primary, #3b82f6);
@@ -20,119 +20,52 @@
 }
 
 /* ================================
-   Bordered Mode - outer frame only
+   Bordered Mode
+   Outer frame only - vertical dividers rendered by ColumnSectionView handles
    ================================ */
 
 .column-section-bordered {
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--border-color, #d1d5db);
   border-radius: 6px;
-  padding: 0.75rem;
+  padding: 0.5rem;
 }
 
 :root[data-theme="dark"] .column-section-bordered {
-  border-color: var(--border-color-dark, #374151);
+  border-color: var(--border-color-dark, #4b5563);
 }
 
-/* Column dividers in bordered mode - vertical lines between columns */
-.column-section-bordered .column-section-grid {
-  /* Use gap for spacing, CSS will add visual dividers */
-}
-
-/* Vertical divider lines between columns when bordered */
-.column-section-bordered .column:not(:last-child),
-.column-section-bordered [data-column]:not(:last-child) {
-  border-right: 1px dashed var(--border-color, #d1d5db);
-  padding-right: 0.75rem;
-  margin-right: -1px; /* Align with gap */
-}
-
-:root[data-theme="dark"] .column-section-bordered .column:not(:last-child),
-:root[data-theme="dark"] .column-section-bordered [data-column]:not(:last-child) {
-  border-right-color: var(--border-color-dark, #4b5563);
-}
-
-/* ================================
-   Grid Container
-   ================================ */
-
-.column-section-grid {
-  position: relative;
-}
-
-/* ================================
-   Column Content Wrapper
-   NodeViewContent wrapper uses display: contents so columns are direct grid items
-   ================================ */
-
-.column-section-content {
-  display: contents;
-}
+/* Note: Vertical dividers are rendered by the handle elements in ColumnSectionView
+   when showBorders is enabled. This ensures they are centered in the gutter
+   and span the full height without gaps. */
 
 /* ================================
    Individual Column Styling
    ================================ */
 
-.column,
-.column-section [data-column] {
+[data-column] {
   min-height: 2rem;
-  min-width: 80px; /* Prevent columns from becoming too narrow */
+  min-width: 80px;
   padding: 0.5rem;
   position: relative;
-  border-radius: 4px;
 }
 
 /* Subtle highlight on focus within column */
-.column:focus-within,
-.column-section [data-column]:focus-within {
-  background-color: rgba(0, 0, 0, 0.015);
+[data-column]:focus-within {
+  background-color: rgba(59, 130, 246, 0.04);
+  border-radius: 4px;
 }
 
-:root[data-theme="dark"] .column:focus-within,
-:root[data-theme="dark"] .column-section [data-column]:focus-within {
-  background-color: rgba(255, 255, 255, 0.02);
+:root[data-theme="dark"] [data-column]:focus-within {
+  background-color: rgba(59, 130, 246, 0.08);
 }
 
 /* First/last child margins inside columns */
-.column > *:first-child,
-.column-section [data-column] > *:first-child {
+[data-column] > *:first-child {
   margin-top: 0;
 }
 
-.column > *:last-child,
-.column-section [data-column] > *:last-child {
+[data-column] > *:last-child {
   margin-bottom: 0;
-}
-
-/* ================================
-   Resize Handles
-   ================================ */
-
-.column-resize-handle {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 8px;
-  cursor: col-resize;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.column-resize-handle-bar {
-  width: 4px;
-  height: 32px;
-  background-color: var(--color-primary, #3b82f6);
-  border-radius: 2px;
-  transition: height 0.15s;
-}
-
-.column-resize-handle:hover .column-resize-handle-bar {
-  height: 48px;
-}
-
-.column-resize-handle-active .column-resize-handle-bar {
-  height: 100%;
 }
 
 /* ================================
@@ -165,10 +98,6 @@
   .column-section {
     page-break-inside: avoid;
   }
-
-  .column-resize-handle {
-    display: none;
-  }
 }
 
 /* ================================
@@ -177,25 +106,15 @@
 
 @media (max-width: 640px) {
   /* Stack columns on small screens */
-  .column-section-grid {
+  .column-section {
     display: block !important;
   }
 
-  .column-section-content {
-    display: block;
-  }
-
-  .column,
-  .column-section [data-column] {
+  [data-column] {
     margin-bottom: 1rem;
   }
 
-  .column:last-child,
-  .column-section [data-column]:last-child {
+  [data-column]:last-child {
     margin-bottom: 0;
-  }
-
-  .column-resize-handle {
-    display: none;
   }
 }
