@@ -188,19 +188,32 @@ Plans:
   2. User sees streaming AI response in real-time
   3. User can preview AI changes in diff view before accepting
   4. User can accept or reject AI suggestions with full undo support
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
-- [ ] 06-01: TBD
-- [ ] 06-02: TBD
+- [ ] 06-01-PLAN.md — Rust backend foundation (keyring plugin, API key storage, command structure)
+- [ ] 06-02-PLAN.md — Claude API streaming via Tauri Channel (SSE parsing, frontend service, AI store)
+- [ ] 06-03-PLAN.md — AI preview UI (diff view, style selector, accept/reject buttons)
+- [ ] 06-04-PLAN.md — Editor integration and human verification
 
 **Implementation Notes:**
 - Claude API via Tauri Rust backend (user provides own API key)
-- Streaming via Tauri IPC channels
-- anthropic-sdk-rust preferred, fallback to direct reqwest HTTP if problematic
-- API key stored in platform keychain (not frontend)
+- Streaming via Tauri Channel API (not events)
+- Direct reqwest + eventsource-stream (not anthropic-sdk-rust - too immature)
+- API key stored in platform keychain via tauri-plugin-keyring (not frontend)
+- Word-level diff view for preview (custom implementation, not TipTap Pro)
 
-**Research Flag:** Claude API streaming to Tauri IPC channel needs validation spike on Day 9
+**Wave Structure:**
+- Wave 1: 06-01 (backend foundation)
+- Wave 2: 06-02 (depends on 06-01, streaming pipeline)
+- Wave 3: 06-03 (depends on 06-02, UI components)
+- Wave 4: 06-04 (depends on 06-03, integration + verification)
+
+**Research Summary:**
+- Use reqwest + eventsource-stream for Claude SSE parsing
+- Use tauri-plugin-keyring for secure API key storage in macOS Keychain
+- Use Tauri Channel API for streaming (not events, for ordering guarantees)
+- Single TipTap transaction for accept (proper undo support)
 
 ---
 
@@ -216,7 +229,7 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6
 | 3. Style System | 4/4 | Complete | 2026-01-31 |
 | 4. Extended Features | 6/6 | Complete | 2026-01-31 |
 | 5. Polish | 0/7 | Planned | - |
-| 6. AI Integration | 0/2 | Not started | - |
+| 6. AI Integration | 0/4 | Planned | - |
 
 ---
 *Roadmap created: 2026-01-30*
@@ -229,5 +242,6 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6
 *Phase 4 planned: 2026-01-31*
 *Phase 4 complete: 2026-01-31*
 *Phase 5 planned: 2026-01-31*
+*Phase 6 planned: 2026-02-01*
 *Depth: comprehensive*
 *Coverage: 99/99 v1 requirements mapped*
