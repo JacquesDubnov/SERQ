@@ -12,6 +12,7 @@ import {
 import { addRecentFile } from '../lib/recentFiles'
 import { getWorkingFolder, updateWorkingFolderFromFile } from '../lib/workingFolder'
 import { getStyleDefaults } from '../lib/preferencesStore'
+import { saveVersion } from '../lib/version-storage'
 import type { EditorCoreRef } from '../components/Editor/EditorCore'
 
 /**
@@ -54,6 +55,7 @@ export interface OpenFileResult {
 export function useFileOperations(editorRef: RefObject<EditorCoreRef | null>) {
   const setDocument = useEditorStore((state) => state.setDocument)
   const markSaved = useEditorStore((state) => state.markSaved)
+  const triggerSaveGlow = useEditorStore((state) => state.triggerSaveGlow)
   const clearDocument = useEditorStore((state) => state.clearDocument)
   const document = useEditorStore((state) => state.document)
 
@@ -158,11 +160,26 @@ export function useFileOperations(editorRef: RefObject<EditorCoreRef | null>) {
     // Write to disk
     await writeTextFile(document.path, fileContent)
 
-    // Update store
+    // Save version snapshot immediately on explicit save
+    try {
+      const editorJSON = editorRef.current?.getEditor()?.getJSON()
+      if (editorJSON) {
+        const editor = editorRef.current?.getEditor()
+        const wordCount = editor?.storage.characterCount?.words?.() ?? 0
+        const charCount = editor?.storage.characterCount?.characters?.() ?? 0
+        await saveVersion(document.path, editorJSON, wordCount, charCount, false)
+        console.log('[FileOps] Version snapshot saved for:', document.path)
+      }
+    } catch (versionErr) {
+      console.error('[FileOps] Failed to save version snapshot:', versionErr)
+    }
+
+    // Update store and trigger visual feedback
     markSaved()
+    triggerSaveGlow()
 
     return document.path
-  }, [document.path, document.name, editorRef, markSaved])
+  }, [document.path, document.name, editorRef, markSaved, triggerSaveGlow])
 
   /**
    * Save document to a new location via native file dialog
@@ -205,10 +222,25 @@ export function useFileOperations(editorRef: RefObject<EditorCoreRef | null>) {
     // Write to disk
     await writeTextFile(filePath, fileContent)
 
+    // Save version snapshot immediately on explicit save
+    try {
+      const editorJSON = editorRef.current?.getEditor()?.getJSON()
+      if (editorJSON) {
+        const editor = editorRef.current?.getEditor()
+        const wordCount = editor?.storage.characterCount?.words?.() ?? 0
+        const charCount = editor?.storage.characterCount?.characters?.() ?? 0
+        await saveVersion(filePath, editorJSON, wordCount, charCount, false)
+        console.log('[FileOps] Version snapshot saved for:', filePath)
+      }
+    } catch (versionErr) {
+      console.error('[FileOps] Failed to save version snapshot:', versionErr)
+    }
+
     // Update store with new path/name
     console.log('[FileOps] SaveAs complete, setting document path:', filePath)
     setDocument(filePath, name)
     markSaved()
+    triggerSaveGlow()
 
     // Add to recent files and update working folder
     console.log('[FileOps] Adding to recent files...')
@@ -218,7 +250,7 @@ export function useFileOperations(editorRef: RefObject<EditorCoreRef | null>) {
     console.log('[FileOps] SaveAs finished successfully')
 
     return filePath
-  }, [document.name, editorRef, setDocument, markSaved])
+  }, [document.name, editorRef, setDocument, markSaved, triggerSaveGlow])
 
   /**
    * Create a new empty document

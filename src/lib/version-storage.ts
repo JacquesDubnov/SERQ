@@ -17,10 +17,35 @@ export interface Version {
 
 // Singleton database instance
 let dbInstance: Awaited<ReturnType<typeof Database.load>> | null = null;
+let dbInitialized = false;
 
 async function getDb() {
   if (!dbInstance) {
-    dbInstance = await Database.load('sqlite:serq.db');
+    console.log('[VersionStorage] Loading database...');
+    try {
+      dbInstance = await Database.load('sqlite:serq.db');
+      console.log('[VersionStorage] Database loaded successfully');
+
+      // Verify tables exist (migrations should have run)
+      if (!dbInitialized) {
+        try {
+          const tables = await dbInstance.select<{ name: string }[]>(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='versions'"
+          );
+          if (tables.length > 0) {
+            console.log('[VersionStorage] versions table confirmed');
+            dbInitialized = true;
+          } else {
+            console.error('[VersionStorage] WARNING: versions table not found! Migrations may not have run.');
+          }
+        } catch (checkErr) {
+          console.error('[VersionStorage] Failed to check tables:', checkErr);
+        }
+      }
+    } catch (loadErr) {
+      console.error('[VersionStorage] Failed to load database:', loadErr);
+      throw loadErr;
+    }
   }
   return dbInstance;
 }
@@ -36,24 +61,32 @@ export async function saveVersion(
   isCheckpoint: boolean = false,
   checkpointName?: string
 ): Promise<number> {
-  const db = await getDb();
+  console.log('[VersionStorage] saveVersion called:', { documentPath, isCheckpoint, wordCount, charCount });
 
-  const result = await db.execute(
-    `INSERT INTO versions
-     (document_path, content, timestamp, is_checkpoint, checkpoint_name, word_count, char_count)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [
-      documentPath,
-      JSON.stringify(editorJSON),
-      Date.now(),
-      isCheckpoint ? 1 : 0,
-      checkpointName || null,
-      wordCount,
-      charCount,
-    ]
-  );
+  try {
+    const db = await getDb();
 
-  return result.lastInsertId ?? 0;
+    const result = await db.execute(
+      `INSERT INTO versions
+       (document_path, content, timestamp, is_checkpoint, checkpoint_name, word_count, char_count)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        documentPath,
+        JSON.stringify(editorJSON),
+        Date.now(),
+        isCheckpoint ? 1 : 0,
+        checkpointName || null,
+        wordCount,
+        charCount,
+      ]
+    );
+
+    console.log('[VersionStorage] Version saved with ID:', result.lastInsertId);
+    return result.lastInsertId ?? 0;
+  } catch (err) {
+    console.error('[VersionStorage] Failed to save version:', err);
+    throw err;
+  }
 }
 
 /**
@@ -63,11 +96,14 @@ export async function getVersions(
   documentPath: string,
   limit: number = 100
 ): Promise<Version[]> {
+  console.log('[VersionStorage] getVersions for path:', documentPath);
   const db = await getDb();
-  return await db.select<Version[]>(
+  const results = await db.select<Version[]>(
     'SELECT * FROM versions WHERE document_path = $1 ORDER BY timestamp DESC LIMIT $2',
     [documentPath, limit]
   );
+  console.log('[VersionStorage] Found versions:', results.length);
+  return results;
 }
 
 /**
