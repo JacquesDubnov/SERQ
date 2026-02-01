@@ -5,6 +5,8 @@ import { ColumnContextMenu } from './ColumnContextMenu'
 
 /**
  * ColumnsView - React NodeView for column section with CSS Grid and resize handles
+ *
+ * Resize handles only appear on hover. Minimum column width prevents overflow.
  */
 export default function ColumnsView({
   node,
@@ -16,10 +18,15 @@ export default function ColumnsView({
   const { columnCount, columnWidths, showBorders, gap } = node.attrs
   const containerRef = useRef<HTMLDivElement>(null)
   const [resizing, setResizing] = useState<number | null>(null)
+  const [isHovered, setIsHovered] = useState(false)
+  const [isFocusedWithin, setIsFocusedWithin] = useState(false)
   const [localWidths, setLocalWidths] = useState<number[]>(() => {
     return columnWidths || Array(columnCount).fill(1)
   })
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null)
+
+  // Minimum column width in pixels (prevents resize handles from overlapping text)
+  const MIN_COLUMN_WIDTH_PX = 80
 
   // Update local widths when props change
   useEffect(() => {
@@ -27,7 +34,7 @@ export default function ColumnsView({
   }, [columnWidths, columnCount])
 
   // Calculate grid template from widths
-  const gridTemplateColumns = localWidths.map((w) => `${w}fr`).join(' ')
+  const gridTemplateColumns = localWidths.map((w) => `minmax(${MIN_COLUMN_WIDTH_PX}px, ${w}fr)`).join(' ')
 
   // Handle resize start
   const handleResizeStart = useCallback(
@@ -55,6 +62,9 @@ export default function ColumnsView({
       const totalGapWidth = gapPx * (columnCount - 1)
       const availableWidth = containerWidth - totalGapWidth
 
+      // Calculate minimum fr value based on MIN_COLUMN_WIDTH_PX
+      const minFr = (MIN_COLUMN_WIDTH_PX / availableWidth) * localWidths.reduce((sum, w) => sum + w, 0)
+
       // Calculate cumulative width up to the resize handle
       let cumulativeWidth = 0
       const totalFr = localWidths.reduce((sum, w) => sum + w, 0)
@@ -63,10 +73,10 @@ export default function ColumnsView({
         cumulativeWidth += (localWidths[i] / totalFr) * availableWidth + gapPx
       }
 
-      // Calculate new width for the left column
-      const leftColWidth = Math.max(50, mouseX - cumulativeWidth)
+      // Calculate new width for the left column (enforce minimum)
+      const leftColWidth = Math.max(MIN_COLUMN_WIDTH_PX, mouseX - cumulativeWidth)
       const rightColWidth = Math.max(
-        50,
+        MIN_COLUMN_WIDTH_PX,
         cumulativeWidth + (localWidths[resizing] / totalFr + localWidths[resizing + 1] / totalFr) * availableWidth - mouseX
       )
 
@@ -75,10 +85,10 @@ export default function ColumnsView({
       const leftFr = (leftColWidth / totalWidth) * (localWidths[resizing] + localWidths[resizing + 1])
       const rightFr = (rightColWidth / totalWidth) * (localWidths[resizing] + localWidths[resizing + 1])
 
-      // Update local widths
+      // Update local widths (enforce minimum fr)
       const newWidths = [...localWidths]
-      newWidths[resizing] = Math.max(0.2, leftFr)
-      newWidths[resizing + 1] = Math.max(0.2, rightFr)
+      newWidths[resizing] = Math.max(minFr, leftFr)
+      newWidths[resizing + 1] = Math.max(minFr, rightFr)
       setLocalWidths(newWidths)
     }
 
@@ -97,10 +107,17 @@ export default function ColumnsView({
     }
   }, [resizing, localWidths, columnCount, gap, updateAttributes])
 
-  // Handle context menu
+  // Handle context menu - prevent selection
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
+
+    // Prevent any selection that might occur
+    const selection = window.getSelection()
+    if (selection) {
+      selection.removeAllRanges()
+    }
+
     setContextMenu({ x: e.clientX, y: e.clientY })
   }, [])
 
@@ -108,8 +125,22 @@ export default function ColumnsView({
     setContextMenu(null)
   }, [])
 
+  // Track hover and focus state
+  const handleMouseEnter = useCallback(() => setIsHovered(true), [])
+  const handleMouseLeave = useCallback(() => setIsHovered(false), [])
+  const handleFocusIn = useCallback(() => setIsFocusedWithin(true), [])
+  const handleFocusOut = useCallback((e: React.FocusEvent) => {
+    // Only set to false if focus is leaving the column section entirely
+    if (!containerRef.current?.contains(e.relatedTarget as Node)) {
+      setIsFocusedWithin(false)
+    }
+  }, [])
+
   // Get the node position (getPos can return undefined)
   const nodePos = typeof getPos === 'function' ? (getPos() ?? 0) : 0
+
+  // Show resize handles only when hovered, focused within, selected, or actively resizing
+  const showHandles = isHovered || isFocusedWithin || selected || resizing !== null
 
   return (
     <>
@@ -118,6 +149,10 @@ export default function ColumnsView({
         className={`column-section ${selected ? 'column-section-selected' : ''} ${showBorders ? 'column-section-bordered' : ''}`}
         data-column-count={columnCount}
         onContextMenu={handleContextMenu}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onFocus={handleFocusIn}
+        onBlur={handleFocusOut}
       >
         {/* Grid container for columns */}
         <div
@@ -136,8 +171,8 @@ export default function ColumnsView({
             style={{ display: 'contents' }}
           />
 
-          {/* Resize handles between columns */}
-          {Array(columnCount - 1)
+          {/* Resize handles between columns - only visible on hover/focus */}
+          {showHandles && Array(columnCount - 1)
             .fill(null)
             .map((_, index) => {
               // Calculate handle position

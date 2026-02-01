@@ -12,26 +12,43 @@
   min-height: 3rem;
 }
 
-.column-section:hover {
-  background-color: rgba(0, 0, 0, 0.02);
-}
-
-:root[data-theme="dark"] .column-section:hover {
-  background-color: rgba(255, 255, 255, 0.02);
-}
+/* No hover effect - keep clean */
 
 .column-section-selected {
   outline: 2px solid var(--color-primary, #3b82f6);
   outline-offset: 2px;
 }
 
+/* ================================
+   Bordered Mode - outer frame only
+   ================================ */
+
 .column-section-bordered {
   border: 1px solid var(--border-color, #e5e7eb);
-  padding: 0.5rem;
+  border-radius: 6px;
+  padding: 0.75rem;
 }
 
 :root[data-theme="dark"] .column-section-bordered {
   border-color: var(--border-color-dark, #374151);
+}
+
+/* Column dividers in bordered mode - vertical lines between columns */
+.column-section-bordered .column-section-grid {
+  /* Use gap for spacing, CSS will add visual dividers */
+}
+
+/* Vertical divider lines between columns when bordered */
+.column-section-bordered .column:not(:last-child),
+.column-section-bordered [data-column]:not(:last-child) {
+  border-right: 1px dashed var(--border-color, #d1d5db);
+  padding-right: 0.75rem;
+  margin-right: -1px; /* Align with gap */
+}
+
+:root[data-theme="dark"] .column-section-bordered .column:not(:last-child),
+:root[data-theme="dark"] .column-section-bordered [data-column]:not(:last-child) {
+  border-right-color: var(--border-color-dark, #4b5563);
 }
 
 /* ================================
@@ -58,19 +75,21 @@
 .column,
 .column-section [data-column] {
   min-height: 2rem;
+  min-width: 80px; /* Prevent columns from becoming too narrow */
   padding: 0.5rem;
   position: relative;
   border-radius: 4px;
 }
 
+/* Subtle highlight on focus within column */
 .column:focus-within,
 .column-section [data-column]:focus-within {
-  background-color: rgba(0, 0, 0, 0.02);
+  background-color: rgba(0, 0, 0, 0.015);
 }
 
 :root[data-theme="dark"] .column:focus-within,
 :root[data-theme="dark"] .column-section [data-column]:focus-within {
-  background-color: rgba(255, 255, 255, 0.03);
+  background-color: rgba(255, 255, 255, 0.02);
 }
 
 /* First/last child margins inside columns */
@@ -102,36 +121,18 @@
 
 .column-resize-handle-bar {
   width: 4px;
-  height: 24px;
-  background-color: transparent;
+  height: 32px;
+  background-color: var(--color-primary, #3b82f6);
   border-radius: 2px;
-  transition: background-color 0.15s, height 0.15s;
+  transition: height 0.15s;
 }
 
 .column-resize-handle:hover .column-resize-handle-bar {
-  background-color: var(--color-primary, #3b82f6);
-  height: 40px;
+  height: 48px;
 }
 
 .column-resize-handle-active .column-resize-handle-bar {
-  background-color: var(--color-primary, #3b82f6);
   height: 100%;
-}
-
-/* ================================
-   Bordered Column Style
-   ================================ */
-
-.column-section-bordered .column,
-.column-section-bordered [data-column] {
-  border: 1px dashed var(--border-color, #e5e7eb);
-  background-color: rgba(0, 0, 0, 0.01);
-}
-
-:root[data-theme="dark"] .column-section-bordered .column,
-:root[data-theme="dark"] .column-section-bordered [data-column] {
-  border-color: var(--border-color-dark, #374151);
-  background-color: rgba(255, 255, 255, 0.01);
 }
 
 /* ================================
