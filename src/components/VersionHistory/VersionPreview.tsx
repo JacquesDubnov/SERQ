@@ -16,7 +16,7 @@ import Subscript from '@tiptap/extension-subscript';
 import Superscript from '@tiptap/extension-superscript';
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
-import { TableCell } from '@tiptap/extension-table-cell';
+import { CustomTableCell } from '../../extensions/CustomTableCell';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { Callout } from '../../extensions/Callout';
 import { ColumnSection, Column } from '../../extensions/Columns';
@@ -85,7 +85,7 @@ export function VersionPreview({ version, interfaceColors }: VersionPreviewProps
         resizable: false,
       }),
       TableRow,
-      TableCell,
+      CustomTableCell,
       TableHeader,
       Callout,
       ColumnSection,
@@ -206,7 +206,7 @@ export function VersionPreview({ version, interfaceColors }: VersionPreviewProps
             ...typographyStyles,
           }}
         >
-          <EditorContent editor={previewEditor} />
+          <EditorContent editor={previewEditor} className="editor-content" />
         </div>
       </div>
 
@@ -215,15 +215,22 @@ export function VersionPreview({ version, interfaceColors }: VersionPreviewProps
         .preview-editor {
           outline: none;
         }
-        .preview-editor .ProseMirror {
-          outline: none;
-        }
-        .preview-editor .ProseMirror:focus {
+        .preview-editor:focus {
           outline: none;
         }
         /* Hide any interactive elements in preview */
         .preview-editor .column-layout-handle,
-        .preview-editor .column-handles-container {
+        .preview-editor .column-handles-container,
+        .preview-editor .column-section-wrapper .column-handles-container {
+          display: none !important;
+        }
+        /* Hide table resize handles in preview */
+        .preview-editor .column-resize-handle,
+        .preview-editor .tableWrapper .resize-cursor {
+          display: none !important;
+        }
+        /* Hide image resize handles in preview */
+        .preview-editor .image-resizer {
           display: none !important;
         }
       `}</style>
