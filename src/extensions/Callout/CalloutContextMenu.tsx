@@ -6,13 +6,36 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { CALLOUT_COLORS, CALLOUT_ICONS } from '../../lib/calloutColors'
 
+type BorderStyle = 'left' | 'right' | 'top' | 'bottom' | 'full' | 'none'
+type FloatOption = 'none' | 'left' | 'right' | 'center-wrap'
+
+const BORDER_STYLES: { id: BorderStyle; label: string; icon: string }[] = [
+  { id: 'left', label: 'Left border', icon: '⊏' },
+  { id: 'right', label: 'Right border', icon: '⊐' },
+  { id: 'top', label: 'Top border', icon: '⊓' },
+  { id: 'bottom', label: 'Bottom border', icon: '⊔' },
+  { id: 'full', label: 'Full border', icon: '▢' },
+  { id: 'none', label: 'No border', icon: '○' },
+]
+
+const FLOAT_OPTIONS: { id: FloatOption; label: string; icon: string }[] = [
+  { id: 'none', label: 'No float', icon: '▣' },
+  { id: 'left', label: 'Float left', icon: '◧' },
+  { id: 'right', label: 'Float right', icon: '◨' },
+  { id: 'center-wrap', label: 'Center (text below)', icon: '◫' },
+]
+
 interface CalloutContextMenuProps {
   position: { x: number; y: number }
   currentColor: string
   currentIcon: string | null
+  currentBorderStyle: BorderStyle
+  currentFloat?: FloatOption
   isCollapsible: boolean
   onChangeColor: (color: string) => void
   onChangeIcon: (icon: string | null) => void
+  onChangeBorderStyle: (style: BorderStyle) => void
+  onChangeFloat?: (float: FloatOption) => void
   onToggleCollapsible: () => void
   onDelete: () => void
   onClose: () => void
@@ -22,9 +45,13 @@ export function CalloutContextMenu({
   position,
   currentColor,
   currentIcon,
+  currentBorderStyle,
+  currentFloat = 'none',
   isCollapsible,
   onChangeColor,
   onChangeIcon,
+  onChangeBorderStyle,
+  onChangeFloat,
   onToggleCollapsible,
   onDelete,
   onClose,
@@ -96,6 +123,24 @@ export function CalloutContextMenu({
     [onChangeIcon, onClose]
   )
 
+  const handleBorderStyleChange = useCallback(
+    (style: BorderStyle) => {
+      onChangeBorderStyle(style)
+      onClose()
+    },
+    [onChangeBorderStyle, onClose]
+  )
+
+  const handleFloatChange = useCallback(
+    (float: FloatOption) => {
+      if (onChangeFloat) {
+        onChangeFloat(float)
+      }
+      onClose()
+    },
+    [onChangeFloat, onClose]
+  )
+
   const handleToggleCollapsible = useCallback(() => {
     onToggleCollapsible()
     onClose()
@@ -160,6 +205,42 @@ export function CalloutContextMenu({
           ))}
         </div>
       </div>
+
+      {/* Border Style */}
+      <div className="callout-context-menu-section">
+        <div className="callout-context-menu-label">Border</div>
+        <div className="callout-context-menu-icons">
+          {BORDER_STYLES.map((b) => (
+            <button
+              key={b.id}
+              className={`callout-context-menu-icon-btn ${currentBorderStyle === b.id ? 'active' : ''}`}
+              title={b.label}
+              onClick={() => handleBorderStyleChange(b.id)}
+            >
+              {b.icon}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Float / Text Wrap */}
+      {onChangeFloat && (
+        <div className="callout-context-menu-section">
+          <div className="callout-context-menu-label">Text Wrap</div>
+          <div className="callout-context-menu-icons">
+            {FLOAT_OPTIONS.map((f) => (
+              <button
+                key={f.id}
+                className={`callout-context-menu-icon-btn ${currentFloat === f.id ? 'active' : ''}`}
+                title={f.label}
+                onClick={() => handleFloatChange(f.id)}
+              >
+                {f.icon}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Collapsible Toggle */}
       <div className="callout-context-menu-section">
