@@ -521,7 +521,14 @@ See `.planning/DESIGN-REFERENCE.md` for UI/UX inspiration from:
 
 ### Pending Todos
 
-1. **Add Excel-like formula support to tables** (2026-01-31)
+25 pending — `/gsd:check-todos` to review
+
+Recent additions:
+1. **Add Markdown source mode with toggle** (2026-02-01)
+   - Area: feature
+   - File: `.planning/todos/pending/2026-02-01-markdown-source-mode.md`
+
+2. **Add Excel-like formula support to tables** (2026-01-31)
    - Area: ui
    - File: `.planning/todos/pending/2026-01-31-excel-like-table-formulas.md`
 
