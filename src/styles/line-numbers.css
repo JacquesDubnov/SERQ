@@ -1,0 +1,122 @@
+/* ========================================
+   Line Numbers Gutter Styles
+   ======================================== */
+
+/* Editor wrapper needs relative positioning for absolute gutter */
+.editor-wrapper {
+  position: relative;
+}
+
+/* Gutter container - positioned in left margin */
+.line-number-gutter {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 48px;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+  z-index: 5;
+  display: none; /* Hidden by default */
+}
+
+/* Gutter position: gutter (outside content area) */
+.line-number-gutter[data-position="gutter"] {
+  left: calc(50% - var(--layout-page-max-width, 720px) / 2 - 60px);
+}
+
+/* Gutter position: margin (inside content area, with background) */
+.line-number-gutter[data-position="margin"] {
+  left: calc(50% - var(--layout-page-max-width, 720px) / 2 + 8px);
+}
+
+.line-number-gutter[data-position="margin"] .line-number {
+  background-color: var(--color-bg-surface, rgba(0, 0, 0, 0.03));
+  padding: 0 8px;
+  border-radius: 4px;
+}
+
+/* Individual line number */
+.line-number {
+  position: absolute;
+  right: 8px;
+  font-family: var(--font-mono, 'SF Mono', 'Monaco', 'Inconsolata', monospace);
+  font-size: 12px;
+  line-height: var(--line-height-body, 1.6);
+  color: var(--color-text-muted, #9ca3af);
+  text-align: right;
+  transform: translateY(2px); /* Align with first line of paragraph */
+  transition: color 0.15s ease;
+}
+
+/* Hover state for line numbers */
+.line-number:hover {
+  color: var(--color-text-secondary, #6b7280);
+}
+
+/* ========================================
+   Responsive Adjustments
+   ======================================== */
+
+/* Hide line numbers on narrow screens */
+@media (max-width: 768px) {
+  .line-number-gutter[data-position="gutter"] {
+    display: none !important;
+  }
+
+  /* Margin position still works on mobile */
+  .line-number-gutter[data-position="margin"] {
+    left: 8px;
+  }
+}
+
+/* Adjust for different canvas widths */
+.canvas-content[data-width="narrow"] .line-number-gutter[data-position="gutter"] {
+  left: calc(50% - var(--canvas-width-narrow) / 2 - 60px);
+}
+
+.canvas-content[data-width="wide"] .line-number-gutter[data-position="gutter"] {
+  left: calc(50% - var(--canvas-width-wide) / 2 - 60px);
+}
+
+.canvas-content[data-width="full"] .line-number-gutter[data-position="gutter"] {
+  left: 8px;
+}
+
+.canvas-content[data-width="narrow"] .line-number-gutter[data-position="margin"] {
+  left: calc(50% - var(--canvas-width-narrow) / 2 + 8px);
+}
+
+.canvas-content[data-width="wide"] .line-number-gutter[data-position="margin"] {
+  left: calc(50% - var(--canvas-width-wide) / 2 + 8px);
+}
+
+.canvas-content[data-width="full"] .line-number-gutter[data-position="margin"] {
+  left: 24px;
+}
+
+/* ========================================
+   Dark Mode
+   ======================================== */
+
+:root[data-theme="dark"] .line-number {
+  color: var(--color-text-muted, #6b7280);
+}
+
+:root[data-theme="dark"] .line-number:hover {
+  color: var(--color-text-secondary, #9ca3af);
+}
+
+:root[data-theme="dark"] .line-number-gutter[data-position="margin"] .line-number {
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* ========================================
+   Print Styles
+   ======================================== */
+
+@media print {
+  .line-number-gutter {
+    display: none !important;
+  }
+}
