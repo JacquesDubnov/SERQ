@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Extended Features** - Tables, custom blocks, media, commands
 - [ ] **Phase 5: Polish** - Version history, comments, export, UI panels
 - [ ] **Phase 6: AI Integration** - Claude API, stylization workflow, streaming
-- [ ] **Phase 7: Layout and Numbering** - Multi-column layouts, text wrapping, line/paragraph numbers
+- [x] **Phase 7: Layout and Numbering** - Multi-column layouts, text wrapping, line/paragraph numbers
 
 ## Phase Details
 
@@ -230,11 +230,11 @@ Plans:
 **Plans**: 5 plans
 
 Plans:
-- [ ] 07-01-PLAN.md — Multi-column extension (Columns/Column nodes, CSS Grid, resize handles)
-- [ ] 07-02-PLAN.md — Text wrapping (float alignment for all block types, context menu)
-- [ ] 07-03-PLAN.md — Draggable image positioning (drag anywhere, drop indicator, position tracking)
-- [ ] 07-04-PLAN.md — Line numbers (gutter plugin, viewport optimization, toggle via context menu)
-- [ ] 07-05-PLAN.md — Paragraph numbering (presets system, widget decorations, hierarchical support)
+- [x] 07-01-PLAN.md — Multi-column extension (Columns/Column nodes, CSS Grid, resize handles)
+- [x] 07-02-PLAN.md — Text wrapping (float alignment for all block types, context menu)
+- [x] 07-03-PLAN.md — Draggable image positioning (drag anywhere, drop indicator, position tracking)
+- [x] 07-04-PLAN.md — Line numbers (gutter plugin, viewport optimization, toggle via context menu)
+- [x] 07-05-PLAN.md — Paragraph numbering (presets system, widget decorations, hierarchical support)
 
 **Implementation Notes:**
 - Columns use CSS Grid (NOT CSS columns - terrible editing UX)
@@ -265,7 +265,7 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6 > 7
 | 4. Extended Features | 6/6 | Complete | 2026-01-31 |
 | 5. Polish | 0/7 | Planned | - |
 | 6. AI Integration | 0/4 | Planned | - |
-| 7. Layout and Numbering | 0/5 | Planned | - |
+| 7. Layout and Numbering | 5/5 | Complete | 2026-02-01 |
 
 ---
 *Roadmap created: 2026-01-30*
@@ -280,5 +280,6 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6 > 7
 *Phase 5 planned: 2026-01-31*
 *Phase 6 planned: 2026-02-01*
 *Phase 7 planned: 2026-02-01*
+*Phase 7 complete: 2026-02-01*
 *Depth: comprehensive*
 *Coverage: 99/99 v1 requirements mapped*
