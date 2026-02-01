@@ -1,8 +1,9 @@
 /**
  * Version Preview Component
  * Zoomed-out canvas replica showing version content with full styling
+ * Matches the main editor canvas appearance exactly
  */
-import { useMemo, useRef, useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import type { Version } from '../../lib/version-storage';
 import { useStyleStore } from '../../stores/styleStore';
 
@@ -21,14 +22,9 @@ interface VersionPreviewProps {
 }
 
 export function VersionPreview({ version, interfaceColors }: VersionPreviewProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(0.5);
-
   // Get current style presets for rendering
   const {
     typography,
-    colors: colorPreset,
     canvas: canvasPreset,
   } = useStyleStore();
 
@@ -44,35 +40,6 @@ export function VersionPreview({ version, interfaceColors }: VersionPreviewProps
       return '<p style="color: red;">Failed to load preview</p>';
     }
   }, [version]);
-
-  // Calculate scale to fit content in viewport
-  useEffect(() => {
-    if (!containerRef.current || !contentRef.current) return;
-
-    const updateScale = () => {
-      const container = containerRef.current;
-      const content = contentRef.current;
-      if (!container || !content) return;
-
-      const containerWidth = container.clientWidth - 80; // padding
-      const containerHeight = container.clientHeight - 80;
-
-      // Canvas width (matching editor canvas)
-      const canvasWidth = 800; // normal width
-      const contentHeight = content.scrollHeight || 1000;
-
-      const scaleX = containerWidth / canvasWidth;
-      const scaleY = containerHeight / contentHeight;
-
-      // Use smaller scale but cap at reasonable values
-      const newScale = Math.min(Math.max(scaleX, 0.3), 0.8);
-      setScale(newScale);
-    };
-
-    updateScale();
-    window.addEventListener('resize', updateScale);
-    return () => window.removeEventListener('resize', updateScale);
-  }, [version, htmlContent]);
 
   // Get canvas colors based on preset
   const getCanvasColors = () => {
@@ -109,12 +76,14 @@ export function VersionPreview({ version, interfaceColors }: VersionPreviewProps
   if (!version) {
     return (
       <div
-        className="flex-1 flex items-center justify-center p-8"
-        style={{ color: interfaceColors.textMuted }}
+        className="flex-1 flex items-center justify-center"
+        style={{
+          backgroundColor: interfaceColors.bgSurface,
+        }}
       >
-        <div className="text-center">
+        <div className="text-center" style={{ color: interfaceColors.textMuted }}>
           <svg
-            className="w-12 h-12 mx-auto mb-4 opacity-30"
+            className="w-16 h-16 mx-auto mb-4 opacity-20"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -122,11 +91,12 @@ export function VersionPreview({ version, interfaceColors }: VersionPreviewProps
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
-              strokeWidth={1.5}
+              strokeWidth={1}
               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
             />
           </svg>
           <p className="text-sm">Select a version to preview</p>
+          <p className="text-xs mt-2 opacity-60">Use ↑↓ arrow keys to navigate</p>
         </div>
       </div>
     );
@@ -134,32 +104,31 @@ export function VersionPreview({ version, interfaceColors }: VersionPreviewProps
 
   return (
     <div
-      ref={containerRef}
-      className="flex-1 overflow-auto p-10"
+      className="flex-1 flex items-center justify-center overflow-hidden"
       style={{
         backgroundColor: interfaceColors.bgSurface,
+        padding: '40px',
       }}
     >
-      {/* Centered canvas replica */}
+      {/* Canvas container - centered with shadow and rounded corners */}
       <div
-        className="mx-auto"
+        className="relative"
         style={{
-          width: `${800 * scale}px`,
-          transformOrigin: 'top center',
+          width: '100%',
+          maxWidth: '700px',
+          height: '100%',
+          maxHeight: 'calc(100vh - 250px)',
+          overflow: 'auto',
         }}
       >
-        {/* Canvas paper */}
+        {/* The canvas paper */}
         <div
-          ref={contentRef}
-          className="shadow-lg rounded"
+          className="rounded-lg shadow-lg"
           style={{
-            width: '800px',
-            minHeight: '1000px',
-            padding: '60px 80px',
             backgroundColor: canvasColors.bg,
             color: canvasColors.text,
-            transform: `scale(${scale})`,
-            transformOrigin: 'top left',
+            padding: '80px 100px',
+            minHeight: '100%',
             ...typographyStyles,
           }}
         >
@@ -270,6 +239,10 @@ export function VersionPreview({ version, interfaceColors }: VersionPreviewProps
         }
         .preview-content s {
           text-decoration: line-through;
+        }
+        .preview-content mark {
+          padding: 0.1em 0.2em;
+          border-radius: 2px;
         }
       `}</style>
     </div>

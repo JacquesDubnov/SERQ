@@ -41,6 +41,7 @@ export function VersionHistoryPanel({
   } = useVersionHistory();
 
   const [isRestoring, setIsRestoring] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // Load versions when panel opens
   useEffect(() => {
@@ -57,28 +58,59 @@ export function VersionHistoryPanel({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        if (showConfirmModal) {
+          setShowConfirmModal(false);
+        } else {
+          onClose();
+        }
+        return;
+      }
+
+      // Up/Down arrow navigation for version list
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+
+        if (versions.length === 0) return;
+
+        const currentIndex = selectedVersion
+          ? versions.findIndex(v => v.id === selectedVersion.id)
+          : -1;
+
+        let newIndex: number;
+        if (e.key === 'ArrowUp') {
+          newIndex = currentIndex <= 0 ? versions.length - 1 : currentIndex - 1;
+        } else {
+          newIndex = currentIndex >= versions.length - 1 ? 0 : currentIndex + 1;
+        }
+
+        selectVersion(versions[newIndex].id);
+      }
+
+      // Enter to restore
+      if (e.key === 'Enter' && selectedVersion && !showConfirmModal) {
+        setShowConfirmModal(true);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, versions, selectedVersion, selectVersion, showConfirmModal]);
 
-  // Handle restore
-  const handleRestore = useCallback(async () => {
+  // Handle restore click - show confirmation modal
+  const handleRestoreClick = useCallback(() => {
+    if (!selectedVersion) return;
+    setShowConfirmModal(true);
+  }, [selectedVersion]);
+
+  // Confirm restore
+  const handleConfirmRestore = useCallback(async () => {
     if (!editor || !selectedVersion || isRestoring) return;
-
-    const confirmed = window.confirm(
-      `Restore document to version from ${new Date(selectedVersion.timestamp).toLocaleString()}?\n\nYour current work will be saved as a checkpoint before restore.`
-    );
-
-    if (!confirmed) return;
 
     setIsRestoring(true);
     try {
       const success = await restoreVersion(editor);
       if (success) {
+        setShowConfirmModal(false);
         onClose();
       } else {
         alert('Failed to restore version. Please try again.');
@@ -131,7 +163,7 @@ export function VersionHistoryPanel({
       >
         {/* Left sidebar - version list */}
         <div
-          className="w-80 flex flex-col shrink-0"
+          className="w-72 flex flex-col shrink-0"
           style={{
             backgroundColor: interfaceColors.bgSurface,
             borderRight: `1px solid ${interfaceColors.border}`,
@@ -139,7 +171,7 @@ export function VersionHistoryPanel({
         >
           {/* Header */}
           <div
-            className="px-5 py-4 shrink-0"
+            className="px-4 py-4 shrink-0"
             style={{ borderBottom: `1px solid ${interfaceColors.border}` }}
           >
             <h2
@@ -153,16 +185,16 @@ export function VersionHistoryPanel({
             </p>
           </div>
 
-          {/* Version list */}
+          {/* Version list - scrollable */}
           <div className="flex-1 overflow-y-auto">
             {isLoading && versions.length === 0 ? (
-              <div className="p-5 text-center">
+              <div className="p-4 text-center">
                 <p className="text-sm" style={{ color: interfaceColors.textMuted }}>
                   Loading versions...
                 </p>
               </div>
             ) : versions.length === 0 ? (
-              <div className="p-5 text-center">
+              <div className="p-4 text-center">
                 <p className="text-sm" style={{ color: interfaceColors.textMuted }}>
                   No versions saved yet.
                 </p>
@@ -188,8 +220,8 @@ export function VersionHistoryPanel({
           </div>
         </div>
 
-        {/* Right side - preview */}
-        <div className="flex-1 flex flex-col">
+        {/* Right side - preview (no overflow, fixed height) */}
+        <div className="flex-1 flex flex-col overflow-hidden">
           {/* Preview header with restore button */}
           <div
             className="flex items-center justify-between px-5 py-4 shrink-0"
@@ -201,16 +233,14 @@ export function VersionHistoryPanel({
               </h3>
               {selectedVersion && (
                 <p className="text-xs mt-1" style={{ color: interfaceColors.textMuted }}>
-                  Version {versions.findIndex(v => v.id === selectedVersion.id) >= 0
-                    ? getVersionNumber(versions.findIndex(v => v.id === selectedVersion.id))
-                    : '?'} • {selectedVersion.word_count.toLocaleString()} words
+                  {selectedVersion.word_count.toLocaleString()} words
                 </p>
               )}
             </div>
             <div className="flex items-center gap-3">
               {selectedVersion && (
                 <button
-                  onClick={handleRestore}
+                  onClick={handleRestoreClick}
                   disabled={isRestoring}
                   className="px-4 py-2 text-sm font-medium rounded transition-colors"
                   style={{
@@ -220,7 +250,7 @@ export function VersionHistoryPanel({
                     cursor: isRestoring ? 'not-allowed' : 'pointer',
                   }}
                 >
-                  {isRestoring ? 'Restoring...' : 'Restore This Version'}
+                  Restore This Version
                 </button>
               )}
               <button
@@ -237,13 +267,73 @@ export function VersionHistoryPanel({
             </div>
           </div>
 
-          {/* Preview content */}
+          {/* Preview content - fixed height, internal scroll only */}
           <VersionPreview
             version={selectedVersion}
             interfaceColors={interfaceColors}
           />
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && selectedVersion && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+          onClick={() => setShowConfirmModal(false)}
+        >
+          <div
+            className="rounded-lg shadow-xl p-6 max-w-md mx-4"
+            style={{ backgroundColor: interfaceColors.bg }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3
+              className="text-lg font-semibold mb-3"
+              style={{ color: interfaceColors.textPrimary }}
+            >
+              Restore Version?
+            </h3>
+            <p
+              className="text-sm mb-4"
+              style={{ color: interfaceColors.textSecondary }}
+            >
+              This will restore your document to the version from{' '}
+              <strong>{new Date(selectedVersion.timestamp).toLocaleString()}</strong>.
+            </p>
+            <p
+              className="text-sm mb-6"
+              style={{ color: interfaceColors.textMuted }}
+            >
+              Your current work will be saved as a checkpoint before restoring.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="px-4 py-2 text-sm rounded transition-colors"
+                style={{
+                  backgroundColor: interfaceColors.bgSurface,
+                  border: `1px solid ${interfaceColors.border}`,
+                  color: interfaceColors.textPrimary,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmRestore}
+                disabled={isRestoring}
+                className="px-4 py-2 text-sm font-medium rounded transition-colors"
+                style={{
+                  backgroundColor: '#0066cc',
+                  color: '#ffffff',
+                  opacity: isRestoring ? 0.5 : 1,
+                }}
+              >
+                {isRestoring ? 'Restoring...' : 'Restore'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -273,7 +363,6 @@ function VersionCard({
   // Determine tag type and color
   const getTagInfo = (): { label: string; bgColor: string; textColor: string } => {
     if (version.is_checkpoint) {
-      // Check if it's a restore checkpoint
       if (version.checkpoint_name?.toLowerCase().includes('restore')) {
         return { label: 'Restored', bgColor: '#3b82f620', textColor: '#3b82f6' };
       }
@@ -295,13 +384,14 @@ function VersionCard({
           : `1px solid ${interfaceColors.border}`,
       }}
     >
-      {/* Top row: Version number + Tag */}
+      {/* Top row: Timestamp (bold, large) + Tag */}
       <div className="flex items-center justify-between mb-2">
         <span
-          className="text-sm font-semibold"
+          className="text-sm font-bold"
           style={{ color: interfaceColors.textPrimary }}
+          title={absolute}
         >
-          v{versionNumber}
+          {relative}
         </span>
         <span
           className="px-2 py-0.5 text-[10px] font-medium rounded"
@@ -317,29 +407,28 @@ function VersionCard({
       {/* Checkpoint name if exists */}
       {version.is_checkpoint && version.checkpoint_name && (
         <p
-          className="text-xs font-medium mb-2 truncate"
+          className="text-xs mb-2 truncate"
           style={{ color: interfaceColors.textSecondary }}
         >
           {version.checkpoint_name}
         </p>
       )}
 
-      {/* Time */}
-      <p
-        className="text-xs mb-1"
-        style={{ color: interfaceColors.textMuted }}
-        title={absolute}
-      >
-        {relative}
-      </p>
-
-      {/* Word count */}
-      <p
-        className="text-xs"
-        style={{ color: interfaceColors.textMuted }}
-      >
-        {version.word_count.toLocaleString()} words
-      </p>
+      {/* Bottom row: Version number + Word count */}
+      <div className="flex items-center justify-between">
+        <span
+          className="text-xs"
+          style={{ color: interfaceColors.textMuted }}
+        >
+          v{versionNumber}
+        </span>
+        <span
+          className="text-xs"
+          style={{ color: interfaceColors.textMuted }}
+        >
+          {version.word_count.toLocaleString()} words
+        </span>
+      </div>
     </button>
   );
 }
