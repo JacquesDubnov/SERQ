@@ -1,11 +1,13 @@
 import type { Editor } from '@tiptap/core'
-import { exportToHTML, exportToMarkdown, exportToPDF } from '../../lib/export-handlers'
+import { exportToHTML, exportToMarkdown, exportToPDF, exportToEPUB } from '../../lib/export-handlers'
 import {
   importWordDocument,
   importMarkdownFile,
   importTextFile,
+  importEPUBFile,
 } from '../../lib/import-handlers'
 import { useEditorStore } from '../../stores/editorStore'
+import { useCommentStore } from '../../stores/commentStore'
 
 /**
  * Detect if running on Mac for keyboard shortcut display
@@ -32,7 +34,6 @@ export type CommandGroup =
   | 'insert'
   | 'file'
   | 'view'
-  | 'jump-to'
 
 /**
  * All available commands for the command palette
@@ -77,7 +78,7 @@ export const commands: CommandItem[] = [
   {
     id: 'highlight',
     title: 'Highlight',
-    shortcut: `${modKey}+Shift+H`,
+    shortcut: `${modKey}+Alt+H`,
     group: 'format',
     action: (editor) => editor.chain().focus().toggleHighlight().run(),
   },
@@ -214,11 +215,75 @@ export const commands: CommandItem[] = [
 
   // Insert group
   {
+    id: 'insert-2-columns',
+    title: 'Insert 2 Columns',
+    group: 'insert',
+    action: (editor) => editor.chain().focus().insertColumns({ count: 2 }).run(),
+  },
+  {
+    id: 'insert-3-columns',
+    title: 'Insert 3 Columns',
+    group: 'insert',
+    action: (editor) => editor.chain().focus().insertColumns({ count: 3 }).run(),
+  },
+  {
+    id: 'insert-4-columns',
+    title: 'Insert 4 Columns',
+    group: 'insert',
+    action: (editor) => editor.chain().focus().insertColumns({ count: 4 }).run(),
+  },
+  {
     id: 'insert-table',
     title: 'Insert Table',
     group: 'insert',
     action: (editor) =>
       editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: false }).run(),
+  },
+  {
+    id: 'add-comment',
+    title: 'Add Comment',
+    group: 'insert',
+    action: (editor: Editor) => {
+      // Get the stored selection (captured when command palette opened)
+      const storedSelection = useEditorStore.getState().storedSelection
+
+      // Validate we have a selection
+      if (!storedSelection || storedSelection.from === storedSelection.to) {
+        // No selection - just open panel
+        useCommentStore.getState().setPanelOpen(true)
+        return
+      }
+
+      const { from, to } = storedSelection
+      const commentId = `comment-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+
+      // Add placeholder comment to store (user will edit in panel)
+      useCommentStore.getState().addComment({
+        id: commentId,
+        text: '', // Empty - user types in panel
+        createdAt: Date.now(),
+        resolvedAt: null,
+        from,
+        to,
+      })
+
+      // Use setTimeout to let the command palette close first
+      setTimeout(() => {
+        editor
+          .chain()
+          .focus()
+          .setTextSelection({ from, to })
+          .setComment({ id: commentId })
+          .run()
+
+        // Open panel and set this comment as active
+        useCommentStore.getState().setActiveComment(commentId)
+        useCommentStore.getState().setPanelOpen(true)
+
+        // Clear stored selection
+        useEditorStore.getState().setStoredSelection(null)
+      }, 50)
+    },
   },
   {
     id: 'insert-horizontal-rule',
@@ -274,6 +339,31 @@ export const commands: CommandItem[] = [
       // This will be handled by CommandPalette via onShowOutline callback
     },
   },
+  {
+    id: 'toggle-comment-tooltips',
+    title: 'Toggle Comment Tooltips',
+    group: 'view',
+    action: () => {
+      const store = useCommentStore.getState()
+      store.setShowTooltips(!store.showTooltips)
+    },
+  },
+  {
+    id: 'open-comments-panel',
+    title: 'Open Comments Panel',
+    group: 'view',
+    action: () => {
+      useCommentStore.getState().setPanelOpen(true)
+    },
+  },
+  {
+    id: 'open-version-history',
+    title: 'Open Version History',
+    group: 'view',
+    action: () => {
+      // This will be handled by CommandPalette via onShowVersionHistory callback
+    },
+  },
 
   // File group - Export commands
   {
@@ -303,6 +393,15 @@ export const commands: CommandItem[] = [
       exportToPDF(editor, documentName)
     },
   },
+  {
+    id: 'export-epub',
+    title: 'Export to EPUB',
+    group: 'file',
+    action: (editor: Editor) => {
+      const documentName = useEditorStore.getState().document.name
+      exportToEPUB(editor, documentName)
+    },
+  },
 
   // Import commands
   {
@@ -329,6 +428,14 @@ export const commands: CommandItem[] = [
       importTextFile(editor)
     },
   },
+  {
+    id: 'import-epub',
+    title: 'Import EPUB',
+    group: 'file',
+    action: (editor: Editor) => {
+      importEPUBFile(editor)
+    },
+  },
 ]
 
 /**
@@ -343,7 +450,6 @@ export function getGroupedCommands(): Record<CommandGroup, CommandItem[]> {
     insert: [],
     file: [],
     view: [],
-    'jump-to': [],
   }
 
   for (const command of commands) {
@@ -364,5 +470,4 @@ export const groupLabels: Record<CommandGroup, string> = {
   insert: 'Insert',
   file: 'File',
   view: 'View',
-  'jump-to': 'Jump to',
 }
