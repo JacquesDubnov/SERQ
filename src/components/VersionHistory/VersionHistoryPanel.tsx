@@ -88,21 +88,31 @@ export function VersionHistoryPanel({
     }
   }, [editor, selectedVersion, isRestoring, restoreVersion, onClose]);
 
-  // Format relative time
-  const formatRelativeTime = (timestamp: number): string => {
+  // Format timestamp
+  const formatTimestamp = (timestamp: number): { relative: string; absolute: string } => {
     const now = Date.now();
     const diff = now - timestamp;
+    const date = new Date(timestamp);
 
     const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
     const days = Math.floor(diff / 86400000);
 
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    if (days < 7) return `${days}d ago`;
+    let relative: string;
+    if (minutes < 1) relative = 'Just now';
+    else if (minutes < 60) relative = `${minutes}m ago`;
+    else if (hours < 24) relative = `${hours}h ago`;
+    else if (days < 7) relative = `${days}d ago`;
+    else relative = date.toLocaleDateString();
 
-    return new Date(timestamp).toLocaleDateString();
+    const absolute = date.toLocaleString();
+
+    return { relative, absolute };
+  };
+
+  // Calculate version number (newest = highest number)
+  const getVersionNumber = (index: number): number => {
+    return versions.length - index;
   };
 
   if (!isOpen) return null;
@@ -121,7 +131,7 @@ export function VersionHistoryPanel({
       >
         {/* Left sidebar - version list */}
         <div
-          className="w-72 flex flex-col shrink-0"
+          className="w-80 flex flex-col shrink-0"
           style={{
             backgroundColor: interfaceColors.bgSurface,
             borderRight: `1px solid ${interfaceColors.border}`,
@@ -129,11 +139,11 @@ export function VersionHistoryPanel({
         >
           {/* Header */}
           <div
-            className="p-4 shrink-0"
+            className="px-5 py-4 shrink-0"
             style={{ borderBottom: `1px solid ${interfaceColors.border}` }}
           >
             <h2
-              className="text-lg font-semibold"
+              className="text-base font-semibold"
               style={{ color: interfaceColors.textPrimary }}
             >
               Version History
@@ -144,31 +154,32 @@ export function VersionHistoryPanel({
           </div>
 
           {/* Version list */}
-          <div className="flex-1 overflow-y-auto version-history-list">
+          <div className="flex-1 overflow-y-auto">
             {isLoading && versions.length === 0 ? (
-              <div className="p-4 text-center">
+              <div className="p-5 text-center">
                 <p className="text-sm" style={{ color: interfaceColors.textMuted }}>
                   Loading versions...
                 </p>
               </div>
             ) : versions.length === 0 ? (
-              <div className="p-4 text-center">
+              <div className="p-5 text-center">
                 <p className="text-sm" style={{ color: interfaceColors.textMuted }}>
                   No versions saved yet.
                 </p>
                 <p className="text-xs mt-2" style={{ color: interfaceColors.textMuted }}>
-                  Versions are created automatically every 30 seconds and when you save.
+                  Save your document (Cmd+S) to create versions.
                 </p>
               </div>
             ) : (
-              <div className="py-2">
-                {versions.map((version) => (
-                  <VersionListItem
+              <div className="p-3 space-y-2">
+                {versions.map((version, index) => (
+                  <VersionCard
                     key={version.id}
                     version={version}
+                    versionNumber={getVersionNumber(index)}
                     isSelected={selectedVersion?.id === version.id}
                     onSelect={() => selectVersion(version.id)}
-                    formatRelativeTime={formatRelativeTime}
+                    formatTimestamp={formatTimestamp}
                     interfaceColors={interfaceColors}
                   />
                 ))}
@@ -181,12 +192,21 @@ export function VersionHistoryPanel({
         <div className="flex-1 flex flex-col">
           {/* Preview header with restore button */}
           <div
-            className="flex items-center justify-between p-4 shrink-0"
+            className="flex items-center justify-between px-5 py-4 shrink-0"
             style={{ borderBottom: `1px solid ${interfaceColors.border}` }}
           >
-            <h3 className="font-medium" style={{ color: interfaceColors.textPrimary }}>
-              Preview
-            </h3>
+            <div>
+              <h3 className="font-medium" style={{ color: interfaceColors.textPrimary }}>
+                Preview
+              </h3>
+              {selectedVersion && (
+                <p className="text-xs mt-1" style={{ color: interfaceColors.textMuted }}>
+                  Version {versions.findIndex(v => v.id === selectedVersion.id) >= 0
+                    ? getVersionNumber(versions.findIndex(v => v.id === selectedVersion.id))
+                    : '?'} • {selectedVersion.word_count.toLocaleString()} words
+                </p>
+              )}
+            </div>
             <div className="flex items-center gap-3">
               {selectedVersion && (
                 <button
@@ -229,74 +249,93 @@ export function VersionHistoryPanel({
 }
 
 /**
- * Version list item
+ * Version card component
  */
-interface VersionListItemProps {
+interface VersionCardProps {
   version: Version;
+  versionNumber: number;
   isSelected: boolean;
   onSelect: () => void;
-  formatRelativeTime: (timestamp: number) => string;
+  formatTimestamp: (timestamp: number) => { relative: string; absolute: string };
   interfaceColors: InterfaceColors;
 }
 
-function VersionListItem({
+function VersionCard({
   version,
+  versionNumber,
   isSelected,
   onSelect,
-  formatRelativeTime,
+  formatTimestamp,
   interfaceColors,
-}: VersionListItemProps) {
+}: VersionCardProps) {
+  const { relative, absolute } = formatTimestamp(version.timestamp);
+
+  // Determine tag type and color
+  const getTagInfo = (): { label: string; bgColor: string; textColor: string } => {
+    if (version.is_checkpoint) {
+      // Check if it's a restore checkpoint
+      if (version.checkpoint_name?.toLowerCase().includes('restore')) {
+        return { label: 'Restored', bgColor: '#3b82f620', textColor: '#3b82f6' };
+      }
+      return { label: 'Checkpoint', bgColor: '#3b82f620', textColor: '#3b82f6' };
+    }
+    return { label: 'Version', bgColor: '#22c55e20', textColor: '#22c55e' };
+  };
+
+  const tagInfo = getTagInfo();
+
   return (
     <button
       onClick={onSelect}
-      className="w-full text-left px-4 py-3 transition-colors"
+      className="w-full text-left p-4 rounded-lg transition-all"
       style={{
         backgroundColor: isSelected ? interfaceColors.bg : 'transparent',
-        borderLeft: isSelected ? `3px solid #0066cc` : '3px solid transparent',
+        border: isSelected
+          ? `2px solid #0066cc`
+          : `1px solid ${interfaceColors.border}`,
       }}
     >
-      <div className="flex items-center gap-2">
-        {version.is_checkpoint && (
-          <span
-            className="px-1.5 py-0.5 text-[10px] font-medium rounded"
-            style={{
-              backgroundColor: '#0066cc20',
-              color: '#0066cc',
-            }}
-          >
-            Checkpoint
-          </span>
-        )}
+      {/* Top row: Version number + Tag */}
+      <div className="flex items-center justify-between mb-2">
         <span
-          className="text-xs"
+          className="text-sm font-semibold"
+          style={{ color: interfaceColors.textPrimary }}
+        >
+          v{versionNumber}
+        </span>
+        <span
+          className="px-2 py-0.5 text-[10px] font-medium rounded"
           style={{
-            color: isSelected
-              ? interfaceColors.textPrimary
-              : interfaceColors.textMuted,
+            backgroundColor: tagInfo.bgColor,
+            color: tagInfo.textColor,
           }}
         >
-          {formatRelativeTime(version.timestamp)}
+          {tagInfo.label}
         </span>
       </div>
 
-      {version.is_checkpoint && version.checkpoint_name ? (
+      {/* Checkpoint name if exists */}
+      {version.is_checkpoint && version.checkpoint_name && (
         <p
-          className="text-sm font-medium mt-1 truncate"
-          style={{ color: interfaceColors.textPrimary }}
+          className="text-xs font-medium mb-2 truncate"
+          style={{ color: interfaceColors.textSecondary }}
         >
           {version.checkpoint_name}
         </p>
-      ) : (
-        <p
-          className="text-sm mt-1"
-          style={{ color: interfaceColors.textSecondary }}
-        >
-          Auto-save
-        </p>
       )}
 
+      {/* Time */}
       <p
-        className="text-xs mt-1"
+        className="text-xs mb-1"
+        style={{ color: interfaceColors.textMuted }}
+        title={absolute}
+      >
+        {relative}
+      </p>
+
+      {/* Word count */}
+      <p
+        className="text-xs"
         style={{ color: interfaceColors.textMuted }}
       >
         {version.word_count.toLocaleString()} words

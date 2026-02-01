@@ -162,16 +162,21 @@ export function useFileOperations(editorRef: RefObject<EditorCoreRef | null>) {
 
     // Save version snapshot immediately on explicit save
     try {
+      console.log('[FileOps] Attempting to save version snapshot...')
       const editorJSON = editorRef.current?.getEditor()?.getJSON()
       if (editorJSON) {
         const editor = editorRef.current?.getEditor()
         const wordCount = editor?.storage.characterCount?.words?.() ?? 0
         const charCount = editor?.storage.characterCount?.characters?.() ?? 0
-        await saveVersion(document.path, editorJSON, wordCount, charCount, false)
-        console.log('[FileOps] Version snapshot saved for:', document.path)
+        const versionId = await saveVersion(document.path, editorJSON, wordCount, charCount, false)
+        console.log('[FileOps] Version snapshot saved with ID:', versionId, 'for:', document.path)
+      } else {
+        console.warn('[FileOps] No editor JSON available for version snapshot')
       }
     } catch (versionErr) {
       console.error('[FileOps] Failed to save version snapshot:', versionErr)
+      // Show visible error for debugging
+      console.error('[FileOps] Error details:', JSON.stringify(versionErr, Object.getOwnPropertyNames(versionErr)))
     }
 
     // Update store and trigger visual feedback

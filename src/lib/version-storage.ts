@@ -37,9 +37,27 @@ async function getDb() {
             dbInitialized = true;
           } else {
             console.error('[VersionStorage] WARNING: versions table not found! Migrations may not have run.');
+            // Try to create the table manually as fallback
+            console.log('[VersionStorage] Attempting to create versions table manually...');
+            await dbInstance.execute(`
+              CREATE TABLE IF NOT EXISTS versions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                document_path TEXT NOT NULL,
+                content TEXT NOT NULL,
+                timestamp INTEGER NOT NULL,
+                is_checkpoint BOOLEAN NOT NULL DEFAULT 0,
+                checkpoint_name TEXT,
+                word_count INTEGER DEFAULT 0,
+                char_count INTEGER DEFAULT 0
+              )
+            `);
+            await dbInstance.execute(`CREATE INDEX IF NOT EXISTS idx_versions_document_path ON versions(document_path)`);
+            await dbInstance.execute(`CREATE INDEX IF NOT EXISTS idx_versions_timestamp ON versions(timestamp DESC)`);
+            console.log('[VersionStorage] versions table created manually');
+            dbInitialized = true;
           }
         } catch (checkErr) {
-          console.error('[VersionStorage] Failed to check tables:', checkErr);
+          console.error('[VersionStorage] Failed to check/create tables:', checkErr);
         }
       }
     } catch (loadErr) {

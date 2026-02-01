@@ -1,14 +1,10 @@
 /**
  * Version Preview Component
- * Read-only display of a version's content
- *
- * Note: This is a simple content preview, not a diff view.
- * Visual diff comparison (side-by-side, highlighted changes) is a v2 feature.
- * Users can copy text from this preview and paste into their current document
- * for partial restoration (VER-06 workaround).
+ * Zoomed-out canvas replica showing version content with full styling
  */
-import { useMemo } from 'react';
+import { useMemo, useRef, useEffect, useState } from 'react';
 import type { Version } from '../../lib/version-storage';
+import { useStyleStore } from '../../stores/styleStore';
 
 interface InterfaceColors {
   bg: string;
@@ -25,14 +21,23 @@ interface VersionPreviewProps {
 }
 
 export function VersionPreview({ version, interfaceColors }: VersionPreviewProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.5);
+
+  // Get current style presets for rendering
+  const {
+    typography,
+    colors: colorPreset,
+    canvas: canvasPreset,
+  } = useStyleStore();
+
   // Parse and render version content as HTML
   const htmlContent = useMemo(() => {
     if (!version) return '';
 
     try {
       const json = JSON.parse(version.content);
-      // Simple JSON to HTML conversion for preview
-      // This is read-only so we don't need full TipTap rendering
       return jsonToPreviewHTML(json);
     } catch (err) {
       console.error('[VersionPreview] Failed to parse version content:', err);
@@ -40,70 +45,239 @@ export function VersionPreview({ version, interfaceColors }: VersionPreviewProps
     }
   }, [version]);
 
+  // Calculate scale to fit content in viewport
+  useEffect(() => {
+    if (!containerRef.current || !contentRef.current) return;
+
+    const updateScale = () => {
+      const container = containerRef.current;
+      const content = contentRef.current;
+      if (!container || !content) return;
+
+      const containerWidth = container.clientWidth - 80; // padding
+      const containerHeight = container.clientHeight - 80;
+
+      // Canvas width (matching editor canvas)
+      const canvasWidth = 800; // normal width
+      const contentHeight = content.scrollHeight || 1000;
+
+      const scaleX = containerWidth / canvasWidth;
+      const scaleY = containerHeight / contentHeight;
+
+      // Use smaller scale but cap at reasonable values
+      const newScale = Math.min(Math.max(scaleX, 0.3), 0.8);
+      setScale(newScale);
+    };
+
+    updateScale();
+    window.addEventListener('resize', updateScale);
+    return () => window.removeEventListener('resize', updateScale);
+  }, [version, htmlContent]);
+
+  // Get canvas colors based on preset
+  const getCanvasColors = () => {
+    switch (canvasPreset) {
+      case 'cream':
+        return { bg: '#faf8f5', text: '#2c2c2c' };
+      case 'dark':
+        return { bg: '#1a1a1a', text: '#e5e5e5' };
+      case 'sepia':
+        return { bg: '#f4ecd8', text: '#5c4b37' };
+      default:
+        return { bg: '#ffffff', text: '#1a1a1a' };
+    }
+  };
+
+  const canvasColors = getCanvasColors();
+
+  // Get typography styles
+  const getTypographyStyles = () => {
+    switch (typography) {
+      case 'georgia':
+        return { fontFamily: 'Georgia, serif', fontSize: '16px', lineHeight: '1.8' };
+      case 'system':
+        return { fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif', fontSize: '15px', lineHeight: '1.6' };
+      case 'mono':
+        return { fontFamily: 'SF Mono, Menlo, monospace', fontSize: '14px', lineHeight: '1.5' };
+      default:
+        return { fontFamily: '"Source Serif 4", Georgia, serif', fontSize: '16px', lineHeight: '1.75' };
+    }
+  };
+
+  const typographyStyles = getTypographyStyles();
+
   if (!version) {
     return (
       <div
-        className="flex-1 flex items-center justify-center"
+        className="flex-1 flex items-center justify-center p-8"
         style={{ color: interfaceColors.textMuted }}
       >
-        <p className="text-sm">Select a version to preview</p>
+        <div className="text-center">
+          <svg
+            className="w-12 h-12 mx-auto mb-4 opacity-30"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={1.5}
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            />
+          </svg>
+          <p className="text-sm">Select a version to preview</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden">
-      {/* Preview header */}
+    <div
+      ref={containerRef}
+      className="flex-1 overflow-auto p-10"
+      style={{
+        backgroundColor: interfaceColors.bgSurface,
+      }}
+    >
+      {/* Centered canvas replica */}
       <div
-        className="shrink-0 px-4 py-2 text-xs"
+        className="mx-auto"
         style={{
-          backgroundColor: interfaceColors.bgSurface,
-          borderBottom: `1px solid ${interfaceColors.border}`,
-          color: interfaceColors.textMuted,
+          width: `${800 * scale}px`,
+          transformOrigin: 'top center',
         }}
       >
-        {version.is_checkpoint && version.checkpoint_name ? (
-          <span className="font-medium" style={{ color: interfaceColors.textPrimary }}>
-            {version.checkpoint_name}
-          </span>
-        ) : (
-          <span>Auto-save</span>
-        )}
-        <span className="mx-2">|</span>
-        <span>{new Date(version.timestamp).toLocaleString()}</span>
-        <span className="mx-2">|</span>
-        <span>{version.word_count.toLocaleString()} words</span>
-        <span className="mx-2">|</span>
-        <span className="italic" style={{ color: interfaceColors.textMuted }}>
-          Tip: Select and copy text to partially restore
-        </span>
+        {/* Canvas paper */}
+        <div
+          ref={contentRef}
+          className="shadow-lg rounded"
+          style={{
+            width: '800px',
+            minHeight: '1000px',
+            padding: '60px 80px',
+            backgroundColor: canvasColors.bg,
+            color: canvasColors.text,
+            transform: `scale(${scale})`,
+            transformOrigin: 'top left',
+            ...typographyStyles,
+          }}
+        >
+          <div
+            className="preview-content"
+            dangerouslySetInnerHTML={{ __html: htmlContent }}
+          />
+        </div>
       </div>
 
-      {/* Preview content - selectable for copy */}
-      <div
-        className="flex-1 overflow-y-auto p-6"
-        style={{
-          backgroundColor: interfaceColors.bg,
-          color: interfaceColors.textPrimary,
-          userSelect: 'text', // Allow text selection for copy
-        }}
-      >
-        <div
-          className="prose prose-sm max-w-none version-preview-content"
-          style={{
-            fontSize: '14px',
-            lineHeight: '1.6',
-          }}
-          dangerouslySetInnerHTML={{ __html: htmlContent }}
-        />
-      </div>
+      {/* Inline styles for preview content */}
+      <style>{`
+        .preview-content h1 {
+          font-size: 2em;
+          font-weight: 700;
+          margin: 0 0 0.5em 0;
+          line-height: 1.2;
+        }
+        .preview-content h2 {
+          font-size: 1.5em;
+          font-weight: 600;
+          margin: 1.5em 0 0.5em 0;
+          line-height: 1.3;
+        }
+        .preview-content h3 {
+          font-size: 1.25em;
+          font-weight: 600;
+          margin: 1.5em 0 0.5em 0;
+          line-height: 1.4;
+        }
+        .preview-content p {
+          margin: 0 0 1em 0;
+        }
+        .preview-content ul, .preview-content ol {
+          margin: 0 0 1em 0;
+          padding-left: 1.5em;
+        }
+        .preview-content li {
+          margin: 0.25em 0;
+        }
+        .preview-content blockquote {
+          margin: 1em 0;
+          padding: 0.5em 1em;
+          border-left: 4px solid #0066cc;
+          background: rgba(0, 102, 204, 0.05);
+          font-style: italic;
+        }
+        .preview-content pre {
+          margin: 1em 0;
+          padding: 1em;
+          background: rgba(0, 0, 0, 0.05);
+          border-radius: 4px;
+          overflow-x: auto;
+          font-family: SF Mono, Menlo, monospace;
+          font-size: 0.9em;
+        }
+        .preview-content code {
+          font-family: SF Mono, Menlo, monospace;
+          font-size: 0.9em;
+          background: rgba(0, 0, 0, 0.05);
+          padding: 0.1em 0.3em;
+          border-radius: 3px;
+        }
+        .preview-content pre code {
+          background: none;
+          padding: 0;
+        }
+        .preview-content hr {
+          border: none;
+          border-top: 1px solid rgba(0, 0, 0, 0.1);
+          margin: 2em 0;
+        }
+        .preview-content table {
+          border-collapse: collapse;
+          width: 100%;
+          margin: 1em 0;
+        }
+        .preview-content th, .preview-content td {
+          border: 1px solid rgba(0, 0, 0, 0.1);
+          padding: 0.5em 0.75em;
+          text-align: left;
+        }
+        .preview-content th {
+          background: rgba(0, 0, 0, 0.03);
+          font-weight: 600;
+        }
+        .preview-content img {
+          max-width: 100%;
+          height: auto;
+          border-radius: 4px;
+        }
+        .preview-content .callout {
+          margin: 1em 0;
+          padding: 1em;
+          border-left: 4px solid #0066cc;
+          background: rgba(0, 102, 204, 0.05);
+          border-radius: 0 4px 4px 0;
+        }
+        .preview-content a {
+          color: #0066cc;
+          text-decoration: underline;
+        }
+        .preview-content strong {
+          font-weight: 600;
+        }
+        .preview-content em {
+          font-style: italic;
+        }
+        .preview-content s {
+          text-decoration: line-through;
+        }
+      `}</style>
     </div>
   );
 }
 
 /**
  * Simple JSON to HTML conversion for preview
- * Not full fidelity - just enough to show content
  */
 function jsonToPreviewHTML(doc: any): string {
   if (!doc.content) return '';
@@ -116,7 +290,8 @@ function jsonToPreviewHTML(doc: any): string {
 function nodeToHTML(node: any): string {
   switch (node.type) {
     case 'paragraph':
-      return `<p>${inlineHTML(node.content || [])}</p>`;
+      const pContent = inlineHTML(node.content || []);
+      return pContent ? `<p>${pContent}</p>` : '<p><br></p>';
 
     case 'heading':
       const level = node.attrs?.level || 1;
@@ -156,12 +331,12 @@ function nodeToHTML(node: any): string {
       const calloutContent = (node.content || [])
         .map((n: any) => nodeToHTML(n))
         .join('');
-      return `<div class="callout" style="background: #f0f7ff; padding: 12px; border-left: 4px solid #0066cc; margin: 16px 0;">${calloutContent}</div>`;
+      return `<div class="callout">${calloutContent}</div>`;
 
     case 'image':
       const src = node.attrs?.src || '';
       const alt = node.attrs?.alt || '';
-      return `<img src="${src}" alt="${escapeHTML(alt)}" style="max-width: 100%;" />`;
+      return `<img src="${src}" alt="${escapeHTML(alt)}" />`;
 
     default:
       if (node.content) {
@@ -197,10 +372,17 @@ function inlineHTML(content: any[]): string {
             case 'link':
               text = `<a href="${escapeHTML(mark.attrs?.href || '')}">${text}</a>`;
               break;
+            case 'highlight':
+              const color = mark.attrs?.color || '#ffeb3b';
+              text = `<mark style="background-color: ${color}">${text}</mark>`;
+              break;
           }
         }
 
         return text;
+      }
+      if (node.type === 'hardBreak') {
+        return '<br>';
       }
       return '';
     })
@@ -232,14 +414,14 @@ function tableToHTML(node: any): string {
           const content = (cell.content || [])
             .map((n: any) => inlineHTML(n.content || []))
             .join(' ');
-          return `<${tag} style="border: 1px solid #ddd; padding: 8px;">${content}</${tag}>`;
+          return `<${tag}>${content}</${tag}>`;
         })
         .join('');
       return `<tr>${cellsHTML}</tr>`;
     })
     .join('');
 
-  return `<table style="border-collapse: collapse; width: 100%;">${rowsHTML}</table>`;
+  return `<table>${rowsHTML}</table>`;
 }
 
 function escapeHTML(str: string): string {
