@@ -21,6 +21,7 @@ declare module '@tiptap/core' {
         width?: number
         height?: number
         alignment?: 'left' | 'center' | 'right'
+        float?: 'none' | 'left' | 'right' | 'center-wrap'
       }) => ReturnType
     }
   }
@@ -68,6 +69,14 @@ export const ResizableImage = Node.create<ImageOptions>({
       },
       alignment: {
         default: 'center',
+      },
+      float: {
+        default: 'none',
+        parseHTML: (element) => element.getAttribute('data-float') || 'none',
+        renderHTML: (attributes) => {
+          if (!attributes.float || attributes.float === 'none') return {}
+          return { 'data-float': attributes.float }
+        },
       },
     }
   },

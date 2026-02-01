@@ -1,4 +1,5 @@
 import { Node, mergeAttributes } from '@tiptap/core'
+import { TextSelection } from '@tiptap/pm/state'
 import { ReactNodeViewRenderer } from '@tiptap/react'
 import CalloutView from './CalloutView'
 
@@ -14,6 +15,8 @@ declare module '@tiptap/core' {
         icon?: string | null
         collapsed?: boolean
         collapsible?: boolean
+        borderStyle?: 'left' | 'right' | 'top' | 'bottom' | 'full' | 'none'
+        float?: 'none' | 'left' | 'right' | 'center-wrap'
       }) => ReturnType
     }
   }
@@ -57,6 +60,21 @@ export const Callout = Node.create({
           'data-collapsible': attributes.collapsible ? 'true' : 'false',
         }),
       },
+      borderStyle: {
+        default: 'left',
+        parseHTML: (element) => element.getAttribute('data-border-style') || 'left',
+        renderHTML: (attributes) => ({
+          'data-border-style': attributes.borderStyle,
+        }),
+      },
+      float: {
+        default: 'none',
+        parseHTML: (element) => element.getAttribute('data-float') || 'none',
+        renderHTML: (attributes) => {
+          if (!attributes.float || attributes.float === 'none') return {}
+          return { 'data-float': attributes.float }
+        },
+      },
     }
   },
 
@@ -76,17 +94,45 @@ export const Callout = Node.create({
     return {
       insertCallout:
         (attrs = {}) =>
-        ({ commands }) => {
-          return commands.insertContent({
-            type: 'callout',
-            attrs: {
-              color: attrs.color ?? 'blue',
-              icon: attrs.icon ?? null,
-              collapsed: attrs.collapsed ?? false,
-              collapsible: attrs.collapsible ?? false,
-            },
-            content: [{ type: 'paragraph' }],
-          })
+        ({ chain }) => {
+          return chain()
+            .insertContent({
+              type: 'callout',
+              attrs: {
+                color: attrs.color ?? 'blue',
+                icon: attrs.icon ?? null,
+                collapsed: attrs.collapsed ?? false,
+                collapsible: attrs.collapsible ?? false,
+                borderStyle: attrs.borderStyle ?? 'left',
+                float: attrs.float ?? 'none',
+              },
+              content: [{ type: 'paragraph' }],
+            })
+            // Move cursor into the callout's first paragraph
+            .command(({ tr }) => {
+              // Find the callout we just inserted by looking at the end of the document changes
+              const { doc } = tr
+              let calloutContentPos: number | null = null
+
+              // Find the last callout in the document (the one we just inserted)
+              doc.descendants((node, pos) => {
+                if (node.type.name === 'callout') {
+                  // Position inside the first child (paragraph) of the callout
+                  calloutContentPos = pos + 2 // +1 for callout, +1 for paragraph start
+                }
+              })
+
+              if (calloutContentPos !== null) {
+                try {
+                  const $pos = tr.doc.resolve(calloutContentPos)
+                  tr.setSelection(TextSelection.near($pos))
+                } catch {
+                  // Fallback: keep current selection
+                }
+              }
+              return true
+            })
+            .run()
         },
     }
   },
