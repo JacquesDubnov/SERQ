@@ -8,6 +8,8 @@ import { writeTextFile, writeFile } from '@tauri-apps/plugin-fs'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 import JSZip from 'jszip'
+import { Packer } from 'docx'
+import { convertTipTapToDocx } from './docx-converter'
 
 /**
  * Export to standalone HTML file
@@ -537,16 +539,19 @@ export async function exportToPDF(editor: Editor, documentName: string): Promise
       }
 
       // Add this slice to the PDF with proper margins
-      const sliceImgData = pageCanvas.toDataURL('image/png')
+      // Use JPEG with 75% quality for much smaller file sizes (10-30x reduction vs PNG)
+      const sliceImgData = pageCanvas.toDataURL('image/jpeg', 0.75)
       const sliceHeightMm = slice.height * scale
 
       pdf.addImage(
         sliceImgData,
-        'PNG',
+        'JPEG',
         margin,  // Left margin
         margin,  // Top margin (same on every page!)
         contentWidth,
-        sliceHeightMm
+        sliceHeightMm,
+        undefined,  // alias (not needed)
+        'FAST'  // FAST compression for smaller files
       )
 
       console.log(`[PDF Export] Page ${page + 1}: slice height ${sliceHeightMm.toFixed(1)}mm`)
@@ -554,7 +559,8 @@ export async function exportToPDF(editor: Editor, documentName: string): Promise
 
     // Get PDF as array buffer
     const pdfOutput = pdf.output('arraybuffer')
-    console.log('[PDF Export] PDF generated, size:', pdfOutput.byteLength)
+    const sizeInMB = (pdfOutput.byteLength / (1024 * 1024)).toFixed(2)
+    console.log(`[PDF Export] PDF generated, size: ${sizeInMB}MB`)
 
     // Prompt for save location
     const defaultName = documentName.replace(/\.(serq\.html|html)$/i, '') + '.pdf'
@@ -778,4 +784,49 @@ function convertToXHTML(html: string): string {
   xhtml = xhtml.replace(/<img(?![^>]*alt=)([^>]*)\/>/gi, '<img alt=""$1/>')
 
   return xhtml
+}
+
+/**
+ * Export to Word .docx format
+ * Uses docx.js to create a proper Word document
+ */
+export async function exportToWord(
+  editor: Editor,
+  documentName: string
+): Promise<boolean> {
+  console.log('[Word Export] Starting export for:', documentName)
+
+  try {
+    // Get TipTap JSON content
+    const json = editor.getJSON()
+    console.log('[Word Export] Got JSON content')
+
+    // Convert to docx Document
+    const doc = convertTipTapToDocx(json)
+    console.log('[Word Export] Converted to docx Document')
+
+    // Generate the .docx file as ArrayBuffer
+    const buffer = await Packer.toBuffer(doc)
+    console.log('[Word Export] Generated buffer, size:', buffer.byteLength)
+
+    // Prompt for save location
+    const defaultName = documentName.replace(/\.(serq\.html|html)$/i, '') + '.docx'
+    const filePath = await save({
+      defaultPath: defaultName,
+      filters: [{ name: 'Word Document', extensions: ['docx'] }],
+    })
+
+    if (filePath) {
+      await writeFile(filePath, new Uint8Array(buffer))
+      console.log('[Word Export] File saved to:', filePath)
+      return true
+    }
+
+    return false
+  } catch (error) {
+    console.error('[Word Export] Failed with error:', error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    alert(`Word export failed: ${errorMessage}`)
+    return false
+  }
 }
