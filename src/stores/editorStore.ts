@@ -34,6 +34,13 @@ export interface OutlineAnchor {
 type AutoSaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
 /**
+ * View mode for editor display
+ * - 'rendered': WYSIWYG TipTap editor (default)
+ * - 'source': Raw Markdown with syntax highlighting
+ */
+export type ViewMode = 'rendered' | 'source'
+
+/**
  * Line number display settings
  */
 export interface LineNumberSettings {
@@ -59,6 +66,8 @@ interface EditorState {
   showSaveGlow: boolean
   lineNumbers: LineNumberSettings
   pagination: PaginationSettings
+  viewMode: ViewMode
+  markdownSource: string
 
   setDocument: (path: string | null, name: string) => void
   markDirty: () => void
@@ -75,6 +84,9 @@ interface EditorState {
   setPaginationEnabled: (enabled: boolean) => void
   setPageSize: (size: PageSize) => void
   togglePagination: () => void
+  setViewMode: (mode: ViewMode) => void
+  toggleViewMode: () => void
+  setMarkdownSource: (source: string) => void
 }
 
 export const useEditorStore = create<EditorState>((set) => ({
@@ -97,6 +109,8 @@ export const useEditorStore = create<EditorState>((set) => ({
     enabled: false,
     pageSize: 'a4',
   },
+  viewMode: 'rendered',
+  markdownSource: '',
 
   setDocument: (path, name) => set({
     document: { path, name, isDirty: false, lastSaved: null }
@@ -154,6 +168,14 @@ export const useEditorStore = create<EditorState>((set) => ({
   togglePagination: () => set((state) => ({
     pagination: { ...state.pagination, enabled: !state.pagination.enabled }
   })),
+
+  setViewMode: (mode) => set({ viewMode: mode }),
+
+  toggleViewMode: () => set((state) => ({
+    viewMode: state.viewMode === 'rendered' ? 'source' : 'rendered'
+  })),
+
+  setMarkdownSource: (source) => set({ markdownSource: source }),
 }))
 
 // Export types for external use
