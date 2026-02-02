@@ -9,7 +9,7 @@
  * 4. Keep holding Cmd to add more selections
  */
 import { Extension } from '@tiptap/core';
-import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { Plugin, PluginKey, Transaction } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
 
 export interface MultiSelectOptions {
@@ -27,6 +27,17 @@ interface MultiSelectState {
 }
 
 export const multiSelectPluginKey = new PluginKey<MultiSelectState>('multiSelect');
+
+declare module '@tiptap/core' {
+  interface Commands<ReturnType> {
+    multiSelect: {
+      /**
+       * Clear all multi-select ranges
+       */
+      clearMultiSelect: () => ReturnType;
+    };
+  }
+}
 
 export const MultiSelect = Extension.create<MultiSelectOptions>({
   name: 'multiSelect',
@@ -131,7 +142,7 @@ export const MultiSelect = Extension.create<MultiSelectOptions>({
               return false; // Don't prevent default
             },
 
-            mouseup(view, event) {
+            mouseup(_view, _event) {
               if (isDragging && cmdHeldOnMouseDown) {
                 isDragging = false;
                 // The new selection is now the browser's selection
@@ -151,22 +162,12 @@ export const MultiSelect = Extension.create<MultiSelectOptions>({
     return {
       clearMultiSelect:
         () =>
-        ({ tr, dispatch }) => {
+        ({ tr, dispatch }: { tr: Transaction; dispatch?: (tr: Transaction) => void }) => {
           if (dispatch) {
             tr.setMeta(multiSelectPluginKey, { type: 'clear' });
             dispatch(tr);
           }
           return true;
-        },
-
-      getMultiSelectRanges:
-        () =>
-        ({ state }) => {
-          const pluginState = multiSelectPluginKey.getState(state);
-          const { from, to } = state.selection;
-          const currentSelection = from !== to ? [{ from, to }] : [];
-          const additionalRanges = pluginState?.ranges || [];
-          return [...additionalRanges, ...currentSelection];
         },
     };
   },
