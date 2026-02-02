@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-30)
 ## Current Position
 
 Phase: 8 of 8 (Document Output & Pagination) - IN PROGRESS
-Plan: 3 of 5 complete
+Plan: 4 of 5 complete
 Status: In Progress
-Last activity: 2026-02-02 - Completed 08-03 (Pagination mode)
+Last activity: 2026-02-02 - Completed 08-04 (Markdown source view)
 
-Progress: [██████████] 97% (32/33 plans complete, Phase 6 pending)
+Progress: [██████████] 97% (33/34 plans complete, Phase 6 pending)
 
 ### Roadmap Evolution
 - Phase 8 added: Document Output & Pagination (pagination, Word export, PDF fix, Markdown mode)
@@ -39,7 +39,7 @@ Progress: [██████████] 97% (32/33 plans complete, Phase 6 pe
 | 5. Polish | 7/7 | Complete |
 | 6. AI Integration | 0/4 | Planned |
 | 7. Layout and Numbering | 5/5 | Complete |
-| 8. Document Output & Pagination | 3/5 | In Progress |
+| 8. Document Output & Pagination | 4/5 | In Progress |
 
 ## Accumulated Context
 
@@ -142,6 +142,9 @@ Progress: [██████████] 97% (32/33 plans complete, Phase 6 pe
 | D-08-03-001 | PageSize as literal union type | Type safety for 'a4' \| 'letter' \| 'legal' page sizes |
 | D-08-03-002 | Visual page boundaries via repeating gradient | CSS-only solution without JS calculations |
 | D-08-03-003 | Body data-page-size attribute for @page rules | Enables @page rule selection via CSS named pages |
+| D-08-04-001 | Use @uiw/react-codemirror wrapper for CodeMirror 6 | Well-maintained React wrapper with TypeScript support |
+| D-08-04-002 | One-way sync from rendered to source on toggle | Markdown-to-TipTap is lossy; source edits are for viewing |
+| D-08-04-003 | Export jsonToMarkdown from export-handlers.ts | Reuse existing JSON-to-Markdown conversion |
 
 ### Technical Patterns Established
 
@@ -560,15 +563,25 @@ Recent additions:
 ## Session Continuity
 
 Last session: 2026-02-02
-Stopped at: Completed 08-03-PLAN.md (Pagination mode)
+Stopped at: Completed 08-04-PLAN.md (Markdown source view)
 Resume file: None
 
 **Phase 8 Progress:**
 - Plan 08-01: JPEG PDF compression - COMPLETE
 - Plan 08-02: Word export - COMPLETE
 - Plan 08-03: Pagination - COMPLETE
-- Plan 08-04: Markdown source mode - Ready
+- Plan 08-04: Markdown source mode - COMPLETE
 - Plan 08-05: Testing - Ready
+
+### Session 2026-02-02 - Phase 8 Plan 04 Execution
+
+**Completed:**
+- 08-04: Markdown source view with Cmd+/ toggle
+  - e0127b6: Add CodeMirror packages and view mode state
+  - 3e03861: Create MarkdownEditor component with syntax highlighting
+  - 74e3655: Wire view mode toggle with Cmd+/ shortcut
+
+**Key Change:** Users can toggle between WYSIWYG and Markdown source view with syntax highlighting
 
 ### Session 2026-02-02 - Phase 8 Plan 03 Execution
 
@@ -644,3 +657,4 @@ Resume file: None
 *Plan 07-03 complete: 2026-02-01*
 *Plan 08-02 complete: 2026-02-02*
 *Plan 08-03 complete: 2026-02-02*
+*Plan 08-04 complete: 2026-02-02*
