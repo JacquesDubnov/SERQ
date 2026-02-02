@@ -19,6 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5: Polish** - Version history, comments, export, UI panels
 - [ ] **Phase 6: AI Integration** - Claude API, stylization workflow, streaming
 - [x] **Phase 7: Layout and Numbering** - Multi-column layouts, text wrapping, line/paragraph numbers
+- [ ] **Phase 8: Document Output & Pagination** - Print-friendly pagination, Word export, PDF fix, Markdown mode
 
 ## Phase Details
 
@@ -252,6 +253,36 @@ Plans:
 
 ---
 
+### Phase 8: Document Output & Pagination
+**Goal**: Users can create print-ready paginated documents, export to Word, get reasonable PDF file sizes, and work in raw Markdown when preferred
+**Depends on**: Phase 5
+**Requirements**: FOUND-05, MD-01, MD-03, MD-04
+**Success Criteria** (what must be TRUE):
+  1. User can toggle pagination mode for print-friendly A4/Letter/Legal page layouts
+  2. User can export document to Word (.docx) format
+  3. User can export to PDF with reasonable file sizes (not 80MB for simple text)
+  4. User can toggle between rendered view and raw Markdown source (or side-by-side)
+**Plans**: 5 plans
+
+Plans:
+- [ ] 08-01-PLAN.md — PDF optimization (JPEG compression, ~10-30x file size reduction)
+- [ ] 08-02-PLAN.md — Word .docx export (docx.js, TipTap-to-Word converter)
+- [ ] 08-03-PLAN.md — Pagination mode (CSS @page rules, visual page boundaries, page size selector)
+- [ ] 08-04-PLAN.md — Markdown source view (CodeMirror, Cmd+/ toggle, bidirectional sync)
+- [ ] 08-05-PLAN.md — Human verification of all Phase 8 success criteria
+
+**Implementation Notes:**
+- PDF: Switch from PNG to JPEG with 75% quality + FAST compression
+- Word: docx.js handles OOXML complexity, mammoth.js already handles import
+- Pagination: CSS @page for print, visual page boundaries in editor via data attributes
+- Markdown: CodeMirror for source editing, jsonToMarkdown for conversion
+
+**Wave Structure:**
+- Wave 1 (parallel): 08-01, 08-02, 08-03, 08-04 (all independent)
+- Wave 2: 08-05 (human verification after all features complete)
+
+---
+
 ## Progress
 
 **Execution Order:**
@@ -266,6 +297,7 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6 > 7
 | 5. Polish | 7/7 | Complete | 2026-01-31 |
 | 6. AI Integration | 0/4 | Planned | - |
 | 7. Layout and Numbering | 5/5 | Complete | 2026-02-01 |
+| 8. Document Output & Pagination | 0/5 | Planned | - |
 
 ---
 *Roadmap created: 2026-01-30*
@@ -282,5 +314,7 @@ Phases execute in numeric order: 1 > 2 > 3 > 4 > 5 > 6 > 7
 *Phase 6 planned: 2026-02-01*
 *Phase 7 planned: 2026-02-01*
 *Phase 7 complete: 2026-02-01*
+*Phase 8 added: 2026-02-01*
+*Phase 8 planned: 2026-02-02*
 *Depth: comprehensive*
 *Coverage: 99/99 v1 requirements mapped*
