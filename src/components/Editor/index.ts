@@ -1,7 +1,9 @@
 export { default as EditorCore } from './EditorCore';
 export type { EditorCoreRef } from './EditorCore';
 export { EditorToolbar } from './EditorToolbar';
+export { EditorToolbarNew } from './EditorToolbarNew';
 export { EditorWrapper } from './EditorWrapper';
+export { DragHandleComponent } from './DragHandle';
 export { SelectionContextMenu } from './SelectionContextMenu';
 export { BlockContextMenu } from './BlockContextMenu';
 export { FontControls } from './FontControls';

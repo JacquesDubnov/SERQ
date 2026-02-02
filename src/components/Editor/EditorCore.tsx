@@ -38,6 +38,7 @@ import { useCommentStore } from '../../stores/commentStore';
 import { isImageFile, isLargeImage, fileToBase64, formatFileSize } from '../../lib/imageUtils';
 import { jsonToMarkdown } from '../../lib/export-handlers';
 import { MarkdownEditor } from './MarkdownEditor';
+import { DragHandleComponent } from './DragHandle';
 import type { Editor, JSONContent } from '@tiptap/core';
 import { TextSelection } from '@tiptap/pm/state';
 import '../../styles/editor.css';
@@ -691,6 +692,7 @@ const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
 
     return (
       <div className={`editor-wrapper ${className}`}>
+        <DragHandleComponent editor={editor} />
         <EditorContent editor={editor} className="editor-content" />
       </div>
     );
