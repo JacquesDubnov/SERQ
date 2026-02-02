@@ -1,5 +1,18 @@
 import { create } from 'zustand'
 
+/**
+ * Page size options for pagination mode
+ */
+export type PageSize = 'a4' | 'letter' | 'legal'
+
+/**
+ * Pagination settings for print-ready documents
+ */
+export interface PaginationSettings {
+  enabled: boolean
+  pageSize: PageSize
+}
+
 interface DocumentMeta {
   path: string | null       // File path (null = unsaved)
   name: string              // Display name (file name or 'Untitled')
@@ -45,6 +58,7 @@ interface EditorState {
   storedSelection: StoredSelection | null
   showSaveGlow: boolean
   lineNumbers: LineNumberSettings
+  pagination: PaginationSettings
 
   setDocument: (path: string | null, name: string) => void
   markDirty: () => void
@@ -58,6 +72,9 @@ interface EditorState {
   setLineNumbers: (settings: Partial<LineNumberSettings>) => void
   toggleLineNumbers: () => void
   setLineNumberStyle: (style: 'regular' | 'legal') => void
+  setPaginationEnabled: (enabled: boolean) => void
+  setPageSize: (size: PageSize) => void
+  togglePagination: () => void
 }
 
 export const useEditorStore = create<EditorState>((set) => ({
@@ -75,6 +92,10 @@ export const useEditorStore = create<EditorState>((set) => ({
   lineNumbers: {
     enabled: false,
     style: 'regular',
+  },
+  pagination: {
+    enabled: false,
+    pageSize: 'a4',
   },
 
   setDocument: (path, name) => set({
@@ -120,6 +141,18 @@ export const useEditorStore = create<EditorState>((set) => ({
 
   setLineNumberStyle: (style) => set((state) => ({
     lineNumbers: { ...state.lineNumbers, style, enabled: true }
+  })),
+
+  setPaginationEnabled: (enabled) => set((state) => ({
+    pagination: { ...state.pagination, enabled }
+  })),
+
+  setPageSize: (size) => set((state) => ({
+    pagination: { ...state.pagination, pageSize: size, enabled: true }
+  })),
+
+  togglePagination: () => set((state) => ({
+    pagination: { ...state.pagination, enabled: !state.pagination.enabled }
   })),
 }))
 
