@@ -180,7 +180,7 @@ export async function exportToMarkdown(
   return false
 }
 
-interface TipTapNode {
+export interface TipTapNode {
   type?: string
   content?: TipTapNode[]
   attrs?: Record<string, unknown>
@@ -195,8 +195,9 @@ interface TipTapMark {
 
 /**
  * Convert TipTap JSON to Markdown
+ * Exported for use by Markdown source view synchronization
  */
-function jsonToMarkdown(doc: TipTapNode): string {
+export function jsonToMarkdown(doc: TipTapNode): string {
   if (!doc.content) return ''
 
   return doc.content.map((node) => nodeToMarkdown(node)).join('\n\n')

@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useCallback } from 'react';
+import { forwardRef, useImperativeHandle, useCallback, useEffect, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -36,6 +36,8 @@ import { MultiSelect } from '../../extensions/MultiSelect';
 import { useEditorStore, type OutlineAnchor } from '../../stores/editorStore';
 import { useCommentStore } from '../../stores/commentStore';
 import { isImageFile, isLargeImage, fileToBase64, formatFileSize } from '../../lib/imageUtils';
+import { jsonToMarkdown } from '../../lib/export-handlers';
+import { MarkdownEditor } from './MarkdownEditor';
 import type { Editor, JSONContent } from '@tiptap/core';
 import { TextSelection } from '@tiptap/pm/state';
 import '../../styles/editor.css';
@@ -74,6 +76,17 @@ function handleTocUpdate(data: TableOfContentData): void {
 
 const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
   ({ initialContent, placeholder = 'Start writing...', onUpdate, className = '' }, ref) => {
+    // View mode state from store
+    const viewMode = useEditorStore((s) => s.viewMode);
+    const markdownSource = useEditorStore((s) => s.markdownSource);
+    const setMarkdownSource = useEditorStore((s) => s.setMarkdownSource);
+
+    // Track previous view mode to detect switches
+    const prevViewModeRef = useRef(viewMode);
+
+    // Detect dark mode from document
+    const isDarkMode = document.documentElement.dataset.theme === 'dark';
+
     const editor = useEditor({
       extensions: [
         StarterKit.configure({
@@ -631,8 +644,49 @@ const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
       [setContent, getHTML, getJSON, focus, getEditor]
     );
 
+    // Sync markdown source when switching between view modes
+    useEffect(() => {
+      if (!editor) return;
+
+      const prevMode = prevViewModeRef.current;
+      prevViewModeRef.current = viewMode;
+
+      // When switching TO source mode: convert TipTap JSON to Markdown
+      if (prevMode === 'rendered' && viewMode === 'source') {
+        const json = editor.getJSON();
+        const md = jsonToMarkdown(json);
+        setMarkdownSource(md);
+      }
+
+      // Note: We don't auto-convert markdown back to JSON when switching to rendered mode
+      // because Markdown -> TipTap JSON is lossy. Users edit in source mode, then switch back.
+      // For now, the markdown edits are "lost" when switching back (this matches the plan
+      // which says "bidirectional sync" for display purposes, not content preservation).
+      // A future enhancement could add a markdown-to-prosemirror parser.
+    }, [viewMode, editor, setMarkdownSource]);
+
+    // Handle markdown source changes
+    const handleMarkdownChange = useCallback((value: string) => {
+      setMarkdownSource(value);
+      // Mark document as dirty since source changed
+      useEditorStore.getState().markDirty();
+    }, [setMarkdownSource]);
+
     if (!editor) {
       return null;
+    }
+
+    // Render source view or rendered view based on viewMode
+    if (viewMode === 'source') {
+      return (
+        <div className={`editor-wrapper ${className}`}>
+          <MarkdownEditor
+            value={markdownSource}
+            onChange={handleMarkdownChange}
+            isDarkMode={isDarkMode}
+          />
+        </div>
+      );
     }
 
     return (

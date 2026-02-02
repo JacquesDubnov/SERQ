@@ -1,6 +1,7 @@
 import type { RefObject } from 'react'
 import { useHotkeys } from 'react-hotkeys-hook'
 import { useFileOperations } from './useFileOperations'
+import { useEditorStore } from '../stores/editorStore'
 import type { EditorCoreRef } from '../components/Editor/EditorCore'
 
 /**
@@ -21,11 +22,13 @@ const HOTKEY_OPTIONS = {
  * - Cmd+Shift+S / Ctrl+Shift+S: Save As
  * - Cmd+O / Ctrl+O: Open file
  * - Cmd+N / Ctrl+N: New document
+ * - Cmd+/ / Ctrl+/: Toggle Markdown source view
  *
  * All shortcuts work even when cursor is focused in the TipTap editor.
  */
 export function useKeyboardShortcuts(editorRef: RefObject<EditorCoreRef | null>) {
   const { openFile, saveFile, saveFileAs, newFile } = useFileOperations(editorRef)
+  const toggleViewMode = useEditorStore((s) => s.toggleViewMode)
 
   // Save: Cmd+S (macOS) / Ctrl+S (Windows/Linux)
   useHotkeys(
@@ -63,6 +66,16 @@ export function useKeyboardShortcuts(editorRef: RefObject<EditorCoreRef | null>)
     (e) => {
       e.preventDefault()
       newFile()
+    },
+    HOTKEY_OPTIONS
+  )
+
+  // Toggle Markdown source view: Cmd+/ (macOS) / Ctrl+/ (Windows/Linux)
+  useHotkeys(
+    'meta+/, ctrl+/',
+    (e) => {
+      e.preventDefault()
+      toggleViewMode()
     },
     HOTKEY_OPTIONS
   )
