@@ -1,0 +1,259 @@
+/**
+ * Pagination CSS - Page size support for print-ready documents
+ *
+ * Provides:
+ * - Visual page boundaries in editor
+ * - @page rules for different page sizes
+ * - Print break handling to avoid cutting headings/tables
+ */
+
+/* =============================================================================
+   CSS Variables - Page Dimensions
+   ============================================================================= */
+
+:root {
+  /* A4: 210mm x 297mm */
+  --page-width-a4: 210mm;
+  --page-height-a4: 297mm;
+
+  /* US Letter: 8.5in x 11in = 215.9mm x 279.4mm */
+  --page-width-letter: 8.5in;
+  --page-height-letter: 11in;
+
+  /* US Legal: 8.5in x 14in = 215.9mm x 355.6mm */
+  --page-width-legal: 8.5in;
+  --page-height-legal: 14in;
+
+  /* Default margins for print */
+  --page-margin: 1in;
+
+  /* Visual page boundary color */
+  --page-boundary-color: rgba(0, 0, 0, 0.1);
+}
+
+:root[data-theme="dark"] {
+  --page-boundary-color: rgba(255, 255, 255, 0.15);
+}
+
+/* =============================================================================
+   Visual Page Boundaries in Editor
+   ============================================================================= */
+
+/* Pagination mode container styling */
+.canvas-content[data-pagination="true"] {
+  /* Visual page width indicator */
+  position: relative;
+}
+
+/* Page boundary visual indicators using repeating gradient */
+.canvas-content[data-pagination="true"][data-page-size="a4"] {
+  /* A4 paper simulation - show page breaks */
+  background-image:
+    linear-gradient(to bottom,
+      var(--canvas-bg-color, #ffffff) calc(var(--page-height-a4) - 4px),
+      var(--page-boundary-color) calc(var(--page-height-a4) - 4px),
+      var(--page-boundary-color) var(--page-height-a4)
+    );
+  background-size: 100% var(--page-height-a4);
+  background-repeat: repeat-y;
+}
+
+.canvas-content[data-pagination="true"][data-page-size="letter"] {
+  background-image:
+    linear-gradient(to bottom,
+      var(--canvas-bg-color, #ffffff) calc(var(--page-height-letter) - 4px),
+      var(--page-boundary-color) calc(var(--page-height-letter) - 4px),
+      var(--page-boundary-color) var(--page-height-letter)
+    );
+  background-size: 100% var(--page-height-letter);
+  background-repeat: repeat-y;
+}
+
+.canvas-content[data-pagination="true"][data-page-size="legal"] {
+  background-image:
+    linear-gradient(to bottom,
+      var(--canvas-bg-color, #ffffff) calc(var(--page-height-legal) - 4px),
+      var(--page-boundary-color) calc(var(--page-height-legal) - 4px),
+      var(--page-boundary-color) var(--page-height-legal)
+    );
+  background-size: 100% var(--page-height-legal);
+  background-repeat: repeat-y;
+}
+
+/* Page width constraint when pagination is enabled */
+.canvas-page[data-pagination="true"][data-page-size="a4"] {
+  max-width: var(--page-width-a4) !important;
+}
+
+.canvas-page[data-pagination="true"][data-page-size="letter"] {
+  max-width: var(--page-width-letter) !important;
+}
+
+.canvas-page[data-pagination="true"][data-page-size="legal"] {
+  max-width: var(--page-width-legal) !important;
+}
+
+/* =============================================================================
+   Print Media Styles
+   ============================================================================= */
+
+@media print {
+  /* Remove screen-only elements */
+  .toolbar,
+  .style-panel,
+  .outline-panel,
+  .status-bar,
+  .command-palette,
+  .version-history-panel,
+  .comment-panel {
+    display: none !important;
+  }
+
+  /* Full width canvas for print */
+  .canvas-viewport {
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  .canvas-page {
+    max-width: none !important;
+    width: 100% !important;
+  }
+
+  .canvas-content {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    background-image: none !important;
+  }
+
+  /* Ensure content uses full page width */
+  .ProseMirror {
+    padding: 0 !important;
+  }
+}
+
+/* =============================================================================
+   @page Rules - Page Size Definitions
+   ============================================================================= */
+
+/* Default page settings */
+@page {
+  margin: var(--page-margin);
+}
+
+/* A4 page size */
+body[data-page-size="a4"] {
+  /* Hint for print dialog */
+}
+
+@page a4 {
+  size: A4;
+  margin: 1in;
+}
+
+/* Letter page size */
+@page letter {
+  size: letter;
+  margin: 1in;
+}
+
+/* Legal page size */
+@page legal {
+  size: legal;
+  margin: 1in;
+}
+
+/* Apply named page based on body attribute */
+@media print {
+  body[data-page-size="a4"] {
+    page: a4;
+  }
+
+  body[data-page-size="letter"] {
+    page: letter;
+  }
+
+  body[data-page-size="legal"] {
+    page: legal;
+  }
+}
+
+/* =============================================================================
+   Page Break Control - Avoid Cutting Content
+   ============================================================================= */
+
+@media print {
+  /* Headings should not be orphaned at bottom of page */
+  h1, h2, h3, h4, h5, h6,
+  .ProseMirror h1, .ProseMirror h2, .ProseMirror h3,
+  .ProseMirror h4, .ProseMirror h5, .ProseMirror h6 {
+    break-after: avoid;
+    page-break-after: avoid; /* Legacy support */
+  }
+
+  /* Tables should stay together when possible */
+  table, .tableWrapper {
+    break-inside: avoid;
+    page-break-inside: avoid; /* Legacy support */
+  }
+
+  /* Callouts should stay together */
+  .callout, [data-type="callout"] {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Blockquotes should stay together */
+  blockquote {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Code blocks should stay together (up to reasonable size) */
+  pre, .code-block {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Images should not break */
+  img, figure {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Columns should break between, not within */
+  .column-section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Lists: avoid breaking between list items when possible */
+  li {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Don't leave orphan lines */
+  p {
+    orphans: 3;
+    widows: 3;
+  }
+}
+
+/* =============================================================================
+   Page Number Placeholder (for future enhancement)
+   ============================================================================= */
+
+@media print {
+  /* Page number styling placeholder
+   * Note: Actual page numbers require @page margin boxes
+   * which have limited browser support. This is for future use.
+   */
+  @page {
+    @bottom-center {
+      content: counter(page);
+    }
+  }
+}
