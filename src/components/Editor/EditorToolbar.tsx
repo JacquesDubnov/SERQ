@@ -7,6 +7,7 @@ import { FontControls } from './FontControls';
 import { TextColorPicker } from './TextColorPicker';
 import { SpacingControls } from './SpacingControls';
 import { CaseControls } from './CaseControls';
+import { useEditorStore, type PageSize } from '../../stores/editorStore';
 
 interface InterfaceColors {
   bg: string;
@@ -68,6 +69,11 @@ function Divider({ color }: { color: string }) {
 export function EditorToolbar({ editor, interfaceColors }: ToolbarProps) {
   const [showTablePicker, setShowTablePicker] = useState(false);
   const [styleMenuTarget, setStyleMenuTarget] = useState<{ type: string; x: number; y: number } | null>(null);
+
+  // Pagination state from store
+  const pagination = useEditorStore((state) => state.pagination);
+  const togglePagination = useEditorStore((state) => state.togglePagination);
+  const setPageSize = useEditorStore((state) => state.setPageSize);
 
   const handleInsertTable = useCallback((rows: number, cols: number) => {
     editor.chain().focus().insertTable({ rows, cols, withHeaderRow: false }).run();
@@ -563,6 +569,47 @@ export function EditorToolbar({ editor, interfaceColors }: ToolbarProps) {
       >
         Justify
       </ToolbarButton>
+
+      <Divider color={interfaceColors.border} />
+
+      {/* Pagination Controls */}
+      <ToolbarButton
+        onClick={togglePagination}
+        isActive={pagination.enabled}
+        title="Toggle Pagination Mode"
+        colors={interfaceColors}
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="currentColor"
+          style={{ display: 'block' }}
+        >
+          {/* Page icon with break line */}
+          <rect x="2" y="1" width="12" height="14" rx="1" fill="none" stroke="currentColor" strokeWidth="1.5" />
+          <line x1="2" y1="8" x2="14" y2="8" stroke="currentColor" strokeWidth="1" strokeDasharray="2 1" />
+        </svg>
+      </ToolbarButton>
+
+      {/* Page Size Selector - only visible when pagination enabled */}
+      {pagination.enabled && (
+        <select
+          value={pagination.pageSize}
+          onChange={(e) => setPageSize(e.target.value as PageSize)}
+          className="text-xs rounded px-1.5 py-1 focus:outline-none"
+          style={{
+            backgroundColor: interfaceColors.bg,
+            border: `1px solid ${interfaceColors.border}`,
+            color: interfaceColors.textPrimary,
+          }}
+          title="Page Size"
+        >
+          <option value="a4">A4</option>
+          <option value="letter">Letter</option>
+          <option value="legal">Legal</option>
+        </select>
+      )}
 
       <Divider color={interfaceColors.border} />
 

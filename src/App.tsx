@@ -67,6 +67,7 @@ function App() {
   const setCanvasWidth = useEditorStore((state) => state.setCanvasWidth);
   const markDirty = useEditorStore((state) => state.markDirty);
   const showSaveGlow = useEditorStore((state) => state.showSaveGlow);
+  const pagination = useEditorStore((state) => state.pagination);
 
   // Focus mode state
   const { isFocusMode } = useFocusMode();
@@ -344,7 +345,12 @@ function App() {
         className="flex-1 overflow-auto"
         style={{ marginTop: '140px', paddingBottom: '36px' }} // Clear header + toolbar + gap + status bar
       >
-        <Canvas width={canvasWidth} viewportColor={interfaceBgSurface}>
+        <Canvas
+          width={canvasWidth}
+          viewportColor={interfaceBgSurface}
+          paginationEnabled={pagination.enabled}
+          pageSize={pagination.pageSize}
+        >
           <EditorWrapper editor={editor}>
             <EditorCore
               ref={editorRef}

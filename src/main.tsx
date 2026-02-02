@@ -5,6 +5,7 @@ import './index.css';
 import './styles/focus-mode.css';
 import './styles/version-history.css';
 import './styles/comments.css';
+import './styles/pagination.css';
 import { getPreferencesStore } from './lib/preferencesStore';
 
 // Initialize preferences store on app start
