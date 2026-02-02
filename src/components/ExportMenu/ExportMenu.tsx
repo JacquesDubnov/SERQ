@@ -4,7 +4,7 @@
  */
 import { useState, useRef, useEffect, useCallback } from 'react'
 import type { Editor } from '@tiptap/core'
-import { exportToHTML, exportToMarkdown, exportToPDF } from '../../lib/export-handlers'
+import { exportToHTML, exportToMarkdown, exportToPDF, exportToWord } from '../../lib/export-handlers'
 import { useEditorStore } from '../../stores/editorStore'
 
 interface InterfaceColors {
@@ -21,7 +21,7 @@ interface ExportMenuProps {
   interfaceColors: InterfaceColors
 }
 
-type ExportFormat = 'html' | 'markdown' | 'pdf'
+type ExportFormat = 'html' | 'markdown' | 'pdf' | 'word'
 
 interface ExportOption {
   id: ExportFormat
@@ -33,6 +33,7 @@ const EXPORT_OPTIONS: ExportOption[] = [
   { id: 'html', name: 'HTML', description: 'Self-contained HTML file with styles' },
   { id: 'markdown', name: 'Markdown', description: 'Plain text Markdown format' },
   { id: 'pdf', name: 'PDF', description: 'Print to PDF via system dialog' },
+  { id: 'word', name: 'Word (.docx)', description: 'Microsoft Word document format' },
 ]
 
 export function ExportMenu({ editor, interfaceColors }: ExportMenuProps) {
@@ -90,7 +91,10 @@ export function ExportMenu({ editor, interfaceColors }: ExportMenuProps) {
             await exportToMarkdown(editor, documentName)
             break
           case 'pdf':
-            exportToPDF(editor, documentName)
+            await exportToPDF(editor, documentName)
+            break
+          case 'word':
+            await exportToWord(editor, documentName)
             break
         }
       } catch (err) {
