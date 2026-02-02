@@ -173,6 +173,17 @@ const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
         handleDOMEvents: {
           // Show drop cursor during internal drags (images, content)
           dragstart: (view, event) => {
+            const target = event.target as HTMLElement;
+
+            // Set global flag to tell Tauri file drop handler to ignore this drag
+            ;(window as any).__internalDragActive = true
+
+            // Check if this is a DragHandle drag - let the extension handle it
+            if (target.closest('.drag-handle')) {
+              console.log('[dragstart] DragHandle drag - letting extension handle it')
+              return false
+            }
+
             console.log('[dragstart] fired', event.target)
             // Store the dragged content and view reference for later
             const { selection } = view.state
@@ -186,7 +197,6 @@ const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
             }
 
             // Create thumbnail drag image for images
-            const target = event.target as HTMLElement
             const img = target.closest('.resizable-image-wrapper')?.querySelector('img') ||
                         target.querySelector('img') ||
                         (target.tagName === 'IMG' ? target : null)
@@ -331,10 +341,26 @@ const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
             const cursor = document.getElementById('editor-drop-cursor')
             if (cursor) cursor.style.display = 'none'
             // Clear stored selection
-            delete (window as any).__draggedSelection
+            delete (window as any).__draggedSelection;
+            // Clear internal drag flag so Tauri can handle external file drops again
+            ;(window as any).__internalDragActive = false
             return false
           },
           drop: (view, event) => {
+            // DIAGNOSTIC: Log drop event state
+            console.log('[drop DOM] FULL STATE:', {
+              dragHandleDragActive: (window as any).__dragHandleDragActive,
+              viewDragging: (view as any).dragging,
+              defaultPrevented: event.defaultPrevented,
+              draggedSelection: !!(window as any).__draggedSelection,
+            })
+
+            // DragHandle drags - get completely out of the way, let TipTap handle it
+            if ((window as any).__dragHandleDragActive) {
+              console.log('[drop DOM] DragHandle drag - returning false')
+              return false
+            }
+
             console.log('[drop] Event fired', {
               hasDraggedSelection: !!(window as any).__draggedSelection,
               clientX: event.clientX,
@@ -408,14 +434,43 @@ const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
           },
         },
         handleDrop: (view, event, slice, moved) => {
+          // DIAGNOSTIC: Log everything about the drop
+          console.log('[handleDrop] FULL STATE:', {
+            dragHandleDragActive: (window as any).__dragHandleDragActive,
+            viewDragging: (view as any).dragging,
+            hasSlice: !!slice,
+            sliceContent: slice?.content?.toString(),
+            moved,
+            eventDefaultPrevented: event.defaultPrevented,
+          })
+
+          // DragHandle drags - get completely out of the way, let TipTap handle it
+          if ((window as any).__dragHandleDragActive) {
+            console.log('[handleDrop] DragHandle drag - returning false to let ProseMirror native handle it')
+            return false
+          }
+
           // Hide drop cursor
           const cursor = document.getElementById('editor-drop-cursor')
           if (cursor) cursor.style.display = 'none'
 
-          console.log('[handleDrop]', { moved, hasSlice: !!slice, sliceContent: slice?.content.childCount, selection: view.state.selection.toJSON() })
+          console.log('[handleDrop]', {
+            moved,
+            hasSlice: !!slice,
+            sliceContent: slice?.content.childCount,
+            selection: view.state.selection.toJSON(),
+            viewDragging: !!(view as any).dragging
+          })
+
+          // If view.dragging is set (from TipTap DragHandle), let ProseMirror handle it natively
+          if ((view as any).dragging) {
+            console.log('[handleDrop] view.dragging is set - letting ProseMirror handle it')
+            return false
+          }
 
           // Handle internal moves (dragging content within the editor)
-          if (slice && slice.content.childCount > 0) {
+          // This is for text selection / image drags, NOT block drags from DragHandle
+          if (slice && slice.content.childCount > 0 && moved) {
             const coordinates = view.posAtCoords({
               left: event.clientX,
               top: event.clientY,
@@ -426,10 +481,8 @@ const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
               const { state } = view
               const { tr } = state
 
-              // If this is a move operation, delete the original first
-              if (moved) {
-                tr.deleteSelection()
-              }
+              // Delete the original selection first
+              tr.deleteSelection()
 
               const insertPos = tr.mapping.map(coordinates.pos)
               tr.insert(insertPos, slice.content)

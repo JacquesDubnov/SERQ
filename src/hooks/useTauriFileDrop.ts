@@ -5,7 +5,7 @@ import { readFile } from '@tauri-apps/plugin-fs'
 import type { Editor } from '@tiptap/core'
 import { TextSelection } from '@tiptap/pm/state'
 
-// Create a visual drop cursor element
+// Create a visual drop cursor element (vertical line for file drops)
 function createDropCursor(): HTMLDivElement {
   const cursor = document.createElement('div')
   cursor.className = 'tauri-drop-cursor'
@@ -21,6 +21,90 @@ function createDropCursor(): HTMLDivElement {
   `
   document.body.appendChild(cursor)
   return cursor
+}
+
+// Create/get block drop indicator (horizontal line for block drags)
+function getBlockDropIndicator(): HTMLDivElement {
+  let indicator = document.getElementById('block-drop-indicator') as HTMLDivElement
+  if (!indicator) {
+    indicator = document.createElement('div')
+    indicator.id = 'block-drop-indicator'
+    indicator.style.cssText = `
+      position: fixed;
+      height: 3px;
+      background-color: #2563eb;
+      pointer-events: none;
+      z-index: 10000;
+      display: none;
+      border-radius: 2px;
+      box-shadow: 0 0 8px rgba(37, 99, 235, 0.6);
+    `
+    document.body.appendChild(indicator)
+  }
+  return indicator
+}
+
+// Find the nearest block boundary for dropping
+function findBlockDropTarget(editor: any, coords: { x: number; y: number }): number | null {
+  const view = editor.view
+  const doc = editor.state.doc
+  const draggedNode = (window as any).__dragHandleNode
+
+  if (!draggedNode) return null
+
+  // Get position at coordinates
+  const posAtCoords = view.posAtCoords({ left: coords.x, top: coords.y })
+  if (!posAtCoords) return null
+
+  // Find the block node at this position
+  const $pos = doc.resolve(posAtCoords.pos)
+
+  // Walk up to find the top-level block (depth 1 = direct child of doc)
+  let blockPos = posAtCoords.pos
+  let blockNode = null
+
+  for (let d = $pos.depth; d >= 1; d--) {
+    const node = $pos.node(d)
+    if (node.isBlock) {
+      blockPos = $pos.before(d)
+      blockNode = node
+      if (d === 1) break // Found top-level block
+    }
+  }
+
+  if (!blockNode) return null
+
+  // Get the DOM element for this block
+  const domNode = view.nodeDOM(blockPos)
+  if (!domNode || !(domNode instanceof HTMLElement)) return null
+
+  const rect = domNode.getBoundingClientRect()
+
+  // Determine if we're in the top or bottom half of the block
+  const midY = rect.top + rect.height / 2
+  const insertBefore = coords.y < midY
+
+  // Calculate drop position (before or after the block)
+  const dropPos = insertBefore ? blockPos : blockPos + blockNode.nodeSize
+
+  // Update the visual indicator
+  const indicator = getBlockDropIndicator()
+  const indicatorY = insertBefore ? rect.top : rect.bottom
+
+  // Don't show indicator if dropping at same position as dragged node
+  const draggedPos = draggedNode.pos
+  const draggedSize = draggedNode.node.nodeSize
+  if (dropPos === draggedPos || dropPos === draggedPos + draggedSize) {
+    indicator.style.display = 'none'
+    return null
+  }
+
+  indicator.style.display = 'block'
+  indicator.style.left = `${rect.left}px`
+  indicator.style.top = `${indicatorY - 1.5}px`
+  indicator.style.width = `${rect.width}px`
+
+  return dropPos
 }
 
 /**
@@ -54,6 +138,33 @@ export function useTauriFileDrop(editor: Editor | null) {
 
         unlisten = await webview.onDragDropEvent(async (event) => {
           const payload = event.payload
+
+          // For internal drags (DragHandle), show block indicator and track drop position
+          // Tauri intercepts ALL drag events at webview level, blocking browser's native drop
+          // So we handle the visual feedback and position tracking here
+          if ((window as any).__internalDragActive) {
+            const dragEditor = (window as any).__dragHandleEditor
+
+            if (payload.type === 'over' && dragEditor) {
+              const position = payload.position
+              if (position) {
+                // Find block boundary and show indicator
+                const dropPos = findBlockDropTarget(dragEditor, { x: position.x, y: position.y })
+                if (dropPos !== null) {
+                  ;(window as any).__blockDropPosition = dropPos
+                }
+              }
+            }
+
+            // Hide indicator on leave
+            if (payload.type === 'leave') {
+              const indicator = getBlockDropIndicator()
+              indicator.style.display = 'none'
+              delete (window as any).__blockDropPosition
+            }
+
+            return
+          }
 
           // Start tracking on drag enter
           if (payload.type === 'enter') {
