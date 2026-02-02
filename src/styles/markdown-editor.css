@@ -1,0 +1,178 @@
+/**
+ * Markdown Editor Styles
+ * CodeMirror-based Markdown source view
+ */
+
+.markdown-editor {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.markdown-editor .cm-editor {
+  flex: 1;
+  min-height: 0;
+  font-family: var(--font-mono, 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Droid Sans Mono', monospace);
+  font-size: var(--font-size-mono, 14px);
+  line-height: var(--line-height-mono, 1.6);
+  background: transparent;
+}
+
+.markdown-editor .cm-editor.cm-focused {
+  outline: none;
+}
+
+/* Scroller fills available space */
+.markdown-editor .cm-scroller {
+  overflow: auto;
+  font-family: inherit;
+}
+
+/* Content area styling */
+.markdown-editor .cm-content {
+  padding: 24px 32px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* Line styling */
+.markdown-editor .cm-line {
+  padding: 0 4px;
+}
+
+/* Gutter styling */
+.markdown-editor .cm-gutters {
+  background: transparent;
+  border-right: 1px solid var(--color-border, #e0e0e0);
+  padding-right: 8px;
+}
+
+.markdown-editor .cm-lineNumbers .cm-gutterElement {
+  padding: 0 8px;
+  min-width: 40px;
+  color: var(--color-muted, #999);
+  font-size: 12px;
+}
+
+/* Active line highlight */
+.markdown-editor .cm-activeLine {
+  background: var(--color-active-line, rgba(0, 0, 0, 0.03));
+}
+
+.markdown-editor .cm-activeLineGutter {
+  background: var(--color-active-line, rgba(0, 0, 0, 0.03));
+}
+
+/* Selection styling */
+.markdown-editor .cm-selectionBackground {
+  background: var(--color-selection, rgba(37, 99, 235, 0.2)) !important;
+}
+
+.markdown-editor .cm-editor.cm-focused .cm-selectionBackground {
+  background: var(--color-selection-focused, rgba(37, 99, 235, 0.3)) !important;
+}
+
+/* Cursor styling */
+.markdown-editor .cm-cursor {
+  border-left-color: var(--color-cursor, var(--color-accent, #2563eb));
+  border-left-width: 2px;
+}
+
+/* Markdown-specific syntax highlighting */
+
+/* Headings */
+.markdown-editor .cm-header-1 {
+  font-size: 1.5em;
+  font-weight: 700;
+  color: var(--color-heading, #1a1a1a);
+}
+
+.markdown-editor .cm-header-2 {
+  font-size: 1.3em;
+  font-weight: 600;
+  color: var(--color-heading, #1a1a1a);
+}
+
+.markdown-editor .cm-header-3 {
+  font-size: 1.1em;
+  font-weight: 600;
+  color: var(--color-heading, #1a1a1a);
+}
+
+/* Emphasis */
+.markdown-editor .cm-strong {
+  font-weight: 700;
+}
+
+.markdown-editor .cm-em {
+  font-style: italic;
+}
+
+/* Code */
+.markdown-editor .cm-monospace {
+  font-family: var(--font-mono, 'SF Mono', 'Monaco', 'Inconsolata', monospace);
+  background: var(--color-code-bg, rgba(0, 0, 0, 0.05));
+  border-radius: 3px;
+  padding: 0.1em 0.3em;
+}
+
+/* Links */
+.markdown-editor .cm-url,
+.markdown-editor .cm-link {
+  color: var(--color-link, #2563eb);
+  text-decoration: underline;
+}
+
+/* Formatting characters (e.g., **, _, `, #) */
+.markdown-editor .cm-processingInstruction,
+.markdown-editor .cm-meta {
+  color: var(--color-muted, #999);
+}
+
+/* Blockquotes */
+.markdown-editor .cm-quote {
+  color: var(--color-quote, #666);
+  font-style: italic;
+}
+
+/* Lists */
+.markdown-editor .cm-list {
+  color: var(--color-list-marker, #666);
+}
+
+/* Horizontal rules */
+.markdown-editor .cm-hr {
+  color: var(--color-muted, #999);
+}
+
+/* Dark mode overrides */
+:root[data-theme="dark"] .markdown-editor .cm-editor {
+  background: transparent;
+}
+
+:root[data-theme="dark"] .markdown-editor .cm-gutters {
+  border-right-color: var(--color-border-dark, #333);
+}
+
+:root[data-theme="dark"] .markdown-editor .cm-activeLine {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+:root[data-theme="dark"] .markdown-editor .cm-activeLineGutter {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+:root[data-theme="dark"] .markdown-editor .cm-header-1,
+:root[data-theme="dark"] .markdown-editor .cm-header-2,
+:root[data-theme="dark"] .markdown-editor .cm-header-3 {
+  color: var(--color-heading-dark, #f0f0f0);
+}
+
+:root[data-theme="dark"] .markdown-editor .cm-monospace {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="dark"] .markdown-editor .cm-quote {
+  color: var(--color-quote-dark, #aaa);
+}
