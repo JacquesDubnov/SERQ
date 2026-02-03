@@ -18,6 +18,14 @@
   outline: none;
   transform-origin: var(--radix-popover-content-transform-origin);
   max-height: var(--radix-popover-content-available-height);
+  /* Strip ALL styling - let the Card handle everything */
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  padding: 0 !important;
+  overflow: visible !important;
 
   > * {
     max-height: var(--radix-popover-content-available-height);

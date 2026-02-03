@@ -1,82 +1,50 @@
-# Plan 01-04 Summary: Zustand Integration + Human Verification
+# Phase 01-04 Summary: Zustand Store & Phase 1 Complete
 
-## Completion Status: COMPLETE
+**Completed:** 2026-02-02
+**Status:** DONE - PHASE 1 APPROVED
 
-**Duration:** Extended (click-anywhere debugging required significant iteration)
-**Human Verification:** APPROVED
-
-## What Was Built
+## What Was Done
 
 ### Zustand Store for Document State
-- `src/stores/editorStore.ts` - Document metadata store
-- Tracks: path, name, isDirty, lastSaved, canvasWidth
-- Actions: setDocument, markDirty, markSaved, clearDocument, setCanvasWidth
-- Document content NOT in store (TipTap owns content)
+- Created `editorStore.ts` with document metadata
+- Tracks: path, name, isDirty, lastSaved
+- Also tracks: canvasWidth, isDark (theme)
+- Actions: markDirty, markSaved, setDocument, clearDocument
 
-### Title Bar Integration
-- Document name displayed in header
-- Orange dot indicator when document has unsaved changes
-- Window title updates reactively ("• Untitled - SERQ")
-- Canvas width selector in header
-
-### Click-Anywhere Cursor Placement (Major Fix)
-This feature required extensive debugging. The final solution:
-- Document-level click listener with capture phase
-- Detects clicks below actual content (not just below ProseMirror element)
-- Calculates distance from content bottom to click position
-- Inserts appropriate number of empty paragraphs to reach click position
-- Uses `insertContentAt` with array of paragraph objects
-
-**Key Learning:** ProseMirror contenteditable padding is not interactive. Clicks on padding still target the ProseMirror element, so coordinate-based detection is required.
+### App Integration
+- Header shows centered document title with dirty indicator
+- Footer shows "Unsaved changes" / "No changes"
+- Window title updates: "• Untitled - SERQ"
+- Theme and canvas width from store
 
 ## Files Created/Modified
 
 | File | Change |
 |------|--------|
 | `src/stores/editorStore.ts` | Created - Zustand store |
-| `src/stores/index.ts` | Created - Store exports |
-| `src/components/Editor/EditorWrapper.tsx` | Major rewrite - Click-anywhere implementation |
-| `src/styles/editor.css` | Updated - Editor padding for click area |
-| `src/App.tsx` | Updated - Zustand integration, title bar |
+| `src/App.tsx` | Integrated store, added title display |
 
-## Phase 1 Success Criteria Verification
+## Phase 1 Success Criteria - ALL VERIFIED
 
-All criteria verified by human tester:
+- [x] Type and see text without lag (infinite-scroll canvas)
+- [x] Apply formatting via toolbar and shortcuts
+- [x] Click anywhere in empty space, cursor appears there
+- [x] Resize window, content reflows responsively
+- [x] Undo/redo with full history preservation
 
-| Criterion | Status |
-|-----------|--------|
-| Type and see text without lag | ✅ Approved |
-| Apply formatting via toolbar and shortcuts (Cmd+B/I/U) | ✅ Approved |
-| Click anywhere in empty space, cursor appears there | ✅ Approved |
-| Resize window, content reflows | ✅ Approved |
-| Undo/redo with full history (Cmd+Z, Cmd+Shift+Z) | ✅ Approved |
-| Title bar shows document state | ✅ Approved |
+## Phase 1 Complete Component List
 
-## Technical Notes
+| Component | Purpose |
+|-----------|---------|
+| EditorCore | TipTap with critical config |
+| EditorToolbar | Formatting controls with useEditorState |
+| EditorWrapper | TRUE click-anywhere cursor placement |
+| Canvas | Responsive width container |
+| editorStore | Document metadata state |
 
-### Click-Anywhere Implementation Details
-```typescript
-// Document-level listener with capture phase
-document.addEventListener('click', handleDocumentClick, true)
+## Next
 
-// Calculate paragraphs needed to reach click position
-const distanceBelowContent = clickY - contentBottom
-const paragraphsNeeded = Math.max(1, Math.floor(distanceBelowContent / lineHeight))
-
-// Insert paragraphs using insertContentAt
-const paragraphs = Array(paragraphsNeeded).fill({ type: 'paragraph' })
-editor.chain().focus('end').insertContentAt(endPos, paragraphs).focus('end').run()
-```
-
-### Known Warning (Harmless)
-TipTap shows "Duplicate extension names found" warning in development due to React StrictMode double-mounting. Does not appear in production.
-
-## Commits
-
-- `7ceb1f8` - feat(01-04): create Zustand store for document state
-- `301bfbf` - feat(01-04): integrate store and add title bar
-- `a117dc6` - fix: implement click-anywhere cursor placement
-
----
-*Completed: 2026-01-30*
-*Human Verification: Approved*
+**Phase 2: File Management**
+- New/Open/Save/Save As
+- Tauri file system integration
+- Auto-save

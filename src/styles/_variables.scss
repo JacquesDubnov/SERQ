@@ -113,21 +113,37 @@
   --tt-color-red-dec-4: hsla(3, 100%, 16%, 1);
   --tt-color-red-dec-5: hsla(1, 100%, 9%, 1);
 
-  /* Basic colors */
+  /* Basic colors - matched to app theme */
   --white: rgba(255, 255, 255, 1);
-  --black: rgba(14, 14, 17, 1);
+  --black: rgba(26, 26, 26, 1); /* #1a1a1a - matches app dark background */
   --transparent: rgba(255, 255, 255, 0);
 
-  /****************** 
+  /******************
   Shadow variables
   ******************/
 
-  /* Shadows Light */
+  /* Soft, diffused shadows for floating elements */
   --tt-shadow-elevated-md:
-    0px 16px 48px 0px rgba(17, 24, 39, 0.04),
-    0px 12px 24px 0px rgba(17, 24, 39, 0.04),
-    0px 6px 8px 0px rgba(17, 24, 39, 0.02),
-    0px 2px 3px 0px rgba(17, 24, 39, 0.02);
+    0px 4px 16px 0px rgba(0, 0, 0, 0.08),
+    0px 8px 32px 0px rgba(0, 0, 0, 0.06),
+    0px 16px 48px 0px rgba(0, 0, 0, 0.04);
+
+  /* Stronger shadow for canvas */
+  --tt-shadow-canvas:
+    0px 8px 32px 0px rgba(0, 0, 0, 0.12),
+    0px 16px 64px 0px rgba(0, 0, 0, 0.08),
+    0px 32px 96px 0px rgba(0, 0, 0, 0.06);
+
+  /* Toolbar shadow - pointing downward */
+  --tt-shadow-toolbar:
+    0px 4px 24px 0px rgba(0, 0, 0, 0.08),
+    0px 8px 40px 0px rgba(0, 0, 0, 0.05);
+
+  /* Dropdown shadow - soft floating effect */
+  --tt-shadow-dropdown:
+    0px 4px 16px 0px rgba(0, 0, 0, 0.1),
+    0px 12px 40px 0px rgba(0, 0, 0, 0.08),
+    0px 24px 64px 0px rgba(0, 0, 0, 0.05);
 
   /************************************************** 
        Radius variables 
@@ -201,8 +217,23 @@
   --tt-card-border-color: var(--tt-gray-dark-a-50);
 
   --tt-shadow-elevated-md:
-    0px 16px 48px 0px rgba(0, 0, 0, 0.5), 0px 12px 24px 0px rgba(0, 0, 0, 0.24),
-    0px 6px 8px 0px rgba(0, 0, 0, 0.22), 0px 2px 3px 0px rgba(0, 0, 0, 0.12);
+    0px 4px 16px 0px rgba(0, 0, 0, 0.3),
+    0px 8px 32px 0px rgba(0, 0, 0, 0.25),
+    0px 16px 48px 0px rgba(0, 0, 0, 0.2);
+
+  --tt-shadow-canvas:
+    0px 8px 32px 0px rgba(0, 0, 0, 0.35),
+    0px 16px 64px 0px rgba(0, 0, 0, 0.3),
+    0px 32px 96px 0px rgba(0, 0, 0, 0.25);
+
+  --tt-shadow-toolbar:
+    0px 4px 24px 0px rgba(0, 0, 0, 0.3),
+    0px 8px 40px 0px rgba(0, 0, 0, 0.2);
+
+  --tt-shadow-dropdown:
+    0px 4px 16px 0px rgba(0, 0, 0, 0.35),
+    0px 12px 40px 0px rgba(0, 0, 0, 0.3),
+    0px 24px 64px 0px rgba(0, 0, 0, 0.2);
 }
 
 /* Text colors */

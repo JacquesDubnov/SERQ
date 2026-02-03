@@ -1,457 +1,468 @@
+/**
+ * SERQ App - Phase 3: Style System Integration
+ */
+
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { useHotkeys } from 'react-hotkeys-hook';
-import { EditorCore, EditorToolbar, EditorWrapper, SelectionContextMenu, type EditorCoreRef } from './components/Editor';
-import { Canvas, type CanvasWidth } from './components/Layout';
-import { StylePanel, type StylePanelType } from './components/StylePanel';
-import { CommandPalette } from './components/CommandPalette';
-import { OutlinePanel } from './components/DocumentOutline';
-import { VersionHistoryPanel } from './components/VersionHistory';
-import { CommentPanel, CommentTooltip } from './components/Comments';
-import { StatusBar } from './components/StatusBar';
-import { ExportMenu } from './components/ExportMenu';
-import { useEditorStore, useStyleStore } from './stores';
-import { useKeyboardShortcuts, useAutoSave, useSystemTheme, useFocusMode } from './hooks';
-import { useTauriFileDrop } from './hooks/useTauriFileDrop';
-import { getStyleDefaults } from './lib/preferencesStore';
-import type { Editor, JSONContent } from '@tiptap/core';
+import { EditorCore, EditorToolbar, EditorWrapper, type EditorCoreRef } from './components/Editor';
+import { Canvas } from './components/Layout';
+import { StylePanel } from './components/StylePanel';
+// TODO: Re-enable Format Painter in final polish phase
+// import { FormatPainterButton } from './components/FormatPainter';
+import { useEditorStore } from './stores/editorStore';
+import { useStyleStore } from './stores/styleStore';
+import { useKeyboardShortcuts, useAutoSave, useSystemTheme } from './hooks';
+import { PaginationModeSelector } from './components/tiptap-ui-custom/pagination-mode-selector';
+import type { Editor } from '@tiptap/core';
+
+import './index.css';
 
 /**
- * Format a Date object as a relative time string
+ * Format a date as relative time (e.g., "just now", "2m ago", "1h ago")
  */
 function formatRelativeTime(date: Date): string {
-  const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000)
-  if (seconds < 60) return 'just now'
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
-  return date.toLocaleDateString()
+  const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  return date.toLocaleDateString();
 }
 
-// Panel button component
-function PanelButton({
-  label,
-  isActive,
-  onClick,
-  colors,
-}: {
-  label: string;
-  isActive: boolean;
-  onClick: () => void;
-  colors: { textPrimary: string; textSecondary: string; bgSurface: string };
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="px-2 py-1 text-xs rounded transition-colors"
-      style={{
-        backgroundColor: isActive ? colors.bgSurface : 'transparent',
-        color: isActive ? colors.textPrimary : colors.textSecondary,
-      }}
-    >
-      {label}
-    </button>
-  );
-}
+// Clean SVG icons (NO EMOJIS EVER)
+const SunIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="5" />
+    <line x1="12" y1="1" x2="12" y2="3" />
+    <line x1="12" y1="21" x2="12" y2="23" />
+    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+    <line x1="1" y1="12" x2="3" y2="12" />
+    <line x1="21" y1="12" x2="23" y2="12" />
+    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+  </svg>
+);
+
+const MoonIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+  </svg>
+);
+
+const StylesIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+  </svg>
+);
+
 
 function App() {
   const editorRef = useRef<EditorCoreRef>(null);
   const [editor, setEditor] = useState<Editor | null>(null);
-  const [activePanel, setActivePanel] = useState<StylePanelType | null>(null);
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
-  const [outlinePanelOpen, setOutlinePanelOpen] = useState(false);
-  const [isVersionHistoryOpen, setVersionHistoryOpen] = useState(false);
-  const [typewriterEnabled, setTypewriterEnabled] = useState(false);
+  const [isStylePanelOpen, setIsStylePanelOpen] = useState(false);
 
-  // Zustand store for document state
-  const document = useEditorStore((state) => state.document);
-  const canvasWidth = useEditorStore((state) => state.canvasWidth);
-  const setCanvasWidth = useEditorStore((state) => state.setCanvasWidth);
-  const markDirty = useEditorStore((state) => state.markDirty);
-  const showSaveGlow = useEditorStore((state) => state.showSaveGlow);
-  const pagination = useEditorStore((state) => state.pagination);
+  // Preserve content across pagination mode changes
+  const contentRef = useRef<string>('<p></p>');
+  const [editorKey, setEditorKey] = useState(0);
 
-  // Focus mode state
-  const { isFocusMode } = useFocusMode();
+  // System theme detection with Tauri integration
+  const { effectiveTheme, toggleTheme: toggleSystemTheme } = useSystemTheme();
 
-  // System theme detection - this responds to styleStore.themeMode
-  const { effectiveTheme } = useSystemTheme();
+  // Sync style store with system theme
+  const { setEffectiveTheme, applyAllPresets } = useStyleStore();
 
-  // Theme toggle - affects EVERYTHING (interface + canvas)
-  const handleToggleTheme = useCallback(() => {
-    const styleStore = useStyleStore.getState();
-    const currentMode = styleStore.themeMode;
+  useEffect(() => {
+    setEffectiveTheme(effectiveTheme);
+  }, [effectiveTheme, setEffectiveTheme]);
 
-    let newMode: 'light' | 'dark' | 'system';
-    if (currentMode === 'system') {
-      newMode = effectiveTheme === 'dark' ? 'light' : 'dark';
-    } else {
-      newMode = currentMode === 'dark' ? 'light' : 'dark';
+  // Apply all presets on initial mount
+  useEffect(() => {
+    applyAllPresets();
+  }, [applyAllPresets]);
+
+  // Computed dark mode flag
+  const isDark = effectiveTheme === 'dark';
+
+  // Zustand store - must be declared before any effects that reference its values
+  const {
+    document: docMeta,
+    canvasWidth,
+    zoom,
+    pagination,
+    markDirty,
+    setCanvasWidth,
+    setZoom,
+    togglePagination,
+    setPageSize,
+  } = useEditorStore();
+
+  // Force editor recreation when theme changes in pagination mode (for gap color)
+  const prevThemeRef = useRef(isDark);
+  useEffect(() => {
+    if (prevThemeRef.current !== isDark && pagination.enabled) {
+      // Theme changed while in pagination mode - need to recreate editor for new gap color
+      if (editorRef.current) {
+        contentRef.current = editorRef.current.getHTML();
+      }
+      setEditorKey((k) => k + 1);
     }
+    prevThemeRef.current = isDark;
+  }, [isDark, pagination.enabled]);
 
-    styleStore.setThemeMode(newMode);
-  }, [effectiveTheme]);
-
-  // Initialize keyboard shortcuts
-  useKeyboardShortcuts(editorRef);
-  useAutoSave(editorRef, true);
-  // Note: Font shortcuts handled by FontKeyboardShortcuts extension, not useFontShortcuts hook
-
-  // Handle Tauri file drops for images
-  useTauriFileDrop(editor);
-
-  // Keyboard shortcut for style panel (Cmd+Shift+Y toggles themes panel)
-  useHotkeys(
-    'mod+shift+y',
-    (e) => {
-      e.preventDefault();
-      setActivePanel((prev) => (prev === 'themes' ? null : 'themes'));
-    },
-    { enableOnContentEditable: true }
-  );
-
-  // Get the store action for storing selection
-  const setStoredSelection = useEditorStore((state) => state.setStoredSelection);
-
-  // Keyboard shortcut for command palette (Cmd+P)
-  useHotkeys(
-    'mod+p',
-    (e) => {
-      e.preventDefault();
-      // Store current selection before opening palette (for commands like Add Comment)
-      if (editor && !commandPaletteOpen) {
-        const { from, to } = editor.state.selection;
-        setStoredSelection({ from, to });
-        console.log('[App] Stored selection before opening palette:', { from, to });
-      }
-      setCommandPaletteOpen((prev) => !prev);
-    },
-    { enableOnContentEditable: true, enableOnFormTags: true }
-  );
-
-  // Keyboard shortcut for document outline (Cmd+Shift+O)
-  useHotkeys(
-    'mod+shift+o',
-    (e) => {
-      e.preventDefault();
-      setOutlinePanelOpen((prev) => !prev);
-    },
-    { enableOnContentEditable: true }
-  );
-
-
-  // Toggle panel helper
-  const togglePanel = useCallback((panel: StylePanelType) => {
-    setActivePanel((prev) => (prev === panel ? null : panel));
-  }, []);
-
-  // Get editor instance after mount
+  // Add .dark class to document for TipTap components
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const editorInstance = editorRef.current?.getEditor();
-      if (editorInstance) {
-        setEditor(editorInstance);
-      }
-    }, 0);
-    return () => clearTimeout(timer);
-  }, []);
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDark]);
 
-  // Initialize styles on app mount
+  // Track viewport width for zoom constraints
+  const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
+  const mainContentRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
-    const initStyles = async () => {
-      try {
-        const defaults = await getStyleDefaults();
-        const styleStore = useStyleStore.getState();
-
-        styleStore.setTypography(defaults.defaultTypography);
-        styleStore.setColor(defaults.defaultColor);
-        styleStore.setCanvas(defaults.defaultCanvas);
-        styleStore.setLayout(defaults.defaultLayout);
-
-        if (defaults.themeMode) {
-          styleStore.setThemeMode(defaults.themeMode);
-        }
-
-        useEditorStore.getState().markSaved();
-      } catch (error) {
-        console.debug('[App] Could not load style defaults, using built-in defaults', error);
-        const styleStore = useStyleStore.getState();
-        styleStore.applyAllPresets();
-
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        window.document.documentElement.dataset.theme = prefersDark ? 'dark' : 'light';
+    const handleResize = () => {
+      if (mainContentRef.current) {
+        setViewportWidth(mainContentRef.current.clientWidth);
+      } else {
+        setViewportWidth(window.innerWidth);
       }
     };
 
-    initStyles();
-  }, []);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [isStylePanelOpen]);
 
-  // Update window title based on document state
+  // Calculate max zoom that won't cause horizontal scroll
+  const canvasWidthPx: Record<typeof canvasWidth, number> = {
+    narrow: 600,
+    normal: 720,
+    wide: 900,
+    full: viewportWidth - 40, // Account for padding
+  };
+  const currentCanvasWidth = canvasWidthPx[canvasWidth];
+
+  // Register keyboard shortcuts for file operations
+  useKeyboardShortcuts(editorRef);
+
+  // Enable auto-save (30-second debounce, only for saved documents)
+  useAutoSave(editorRef);
+
+  // Get editor instance after mount (poll until ready, re-run when editorKey changes)
   useEffect(() => {
-    const dirtyIndicator = document.isDirty ? '• ' : '';
-    const displayName = document.path ? document.name : `${document.name} - UNSAVED`;
-    window.document.title = `${dirtyIndicator}${displayName} - SERQ`;
-  }, [document.name, document.isDirty, document.path]);
+    let cancelled = false;
 
-  const handleUpdate = useCallback((content: JSONContent) => {
+    const checkForEditor = () => {
+      if (cancelled) return;
+
+      const editorInstance = editorRef.current?.getEditor();
+      if (editorInstance && editorInstance.isEditable) {
+        setEditor(editorInstance);
+      } else {
+        // Poll every 50ms until editor is ready
+        setTimeout(checkForEditor, 50);
+      }
+    };
+
+    // Start checking after a brief delay
+    setTimeout(checkForEditor, 50);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [editorKey]);
+
+  // Update window title to reflect document state
+  useEffect(() => {
+    const dirtyIndicator = docMeta.isDirty ? '• ' : '';
+    window.document.title = `${dirtyIndicator}${docMeta.name} - SERQ`;
+  }, [docMeta.name, docMeta.isDirty]);
+
+  const handleUpdate = useCallback(() => {
     markDirty();
-    console.debug('Editor content updated:', content);
   }, [markDirty]);
 
-  // Toggle typewriter mode
-  const handleToggleTypewriter = useCallback(() => {
-    if (editor) {
-      editor.commands.toggleTypewriterMode();
-      setTypewriterEnabled((prev) => !prev);
+  const handleToggleStylePanel = useCallback(() => {
+    setIsStylePanelOpen((prev) => !prev);
+  }, []);
+
+  // Handle pagination toggle - preserve content across editor recreation
+  const handleTogglePagination = useCallback(() => {
+    // Save current content before toggling
+    if (editorRef.current) {
+      contentRef.current = editorRef.current.getHTML();
     }
-  }, [editor]);
+    togglePagination();
+    // Force editor recreation with new extensions
+    setEditorKey((k) => k + 1);
+  }, [togglePagination]);
 
-  // Interface colors based on light/dark mode (affects EVERYTHING)
-  const interfaceBg = effectiveTheme === 'dark' ? '#1a1a1a' : '#ffffff';
-  const interfaceBgSurface = effectiveTheme === 'dark' ? '#262626' : '#f5f5f5';
-  const interfaceBorder = effectiveTheme === 'dark' ? '#3f3f46' : '#e5e7eb';
-  const interfaceTextPrimary = effectiveTheme === 'dark' ? '#f5f5f5' : '#1a1a1a';
-  const interfaceTextSecondary = effectiveTheme === 'dark' ? '#a1a1aa' : '#6b7280';
-  const interfaceTextMuted = effectiveTheme === 'dark' ? '#71717a' : '#9ca3af';
+  // Handle page size change - preserve content
+  const handlePageSizeChange = useCallback((size: Parameters<typeof setPageSize>[0]) => {
+    if (editorRef.current) {
+      contentRef.current = editorRef.current.getHTML();
+    }
+    setPageSize(size);
+    setEditorKey((k) => k + 1);
+  }, [setPageSize]);
 
-  const interfaceColors = {
-    bg: interfaceBg,
-    bgSurface: interfaceBgSurface,
-    border: interfaceBorder,
-    textPrimary: interfaceTextPrimary,
-    textSecondary: interfaceTextSecondary,
-    textMuted: interfaceTextMuted,
-  };
+  // Theme colors
+  const bg = isDark ? '#1a1a1a' : '#ffffff';
+  const bgSurface = isDark ? '#262626' : '#f5f5f5';
+  const border = isDark ? '#3f3f46' : '#e5e7eb';
+  const textPrimary = isDark ? '#f5f5f5' : '#1a1a1a';
+  const textSecondary = isDark ? '#a1a1aa' : '#6b7280';
+  const textDirty = isDark ? '#fb923c' : '#f97316';
+
+  // Note: Main content positioning now handled in fixed position style
 
   return (
-    <div
-      className="min-h-screen flex flex-col"
-      style={{
-        backgroundColor: interfaceBgSurface,
-        minWidth: '400px',  // 320px canvas + 40px margins on each side
-        minHeight: '700px',
-      }}
-    >
-      {/* Fixed Header + Toolbar - SOLID BACKGROUND, content scrolls under */}
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: bgSurface, overflow: 'hidden' }}>
+      {/* Header with document title */}
       <header
-        className="fixed top-0 left-0 right-0 z-30"
         style={{
-          backgroundColor: interfaceBg,
-          borderBottom: `1px solid ${interfaceBorder}`,
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: isStylePanelOpen ? '320px' : 0,
+          zIndex: 30,
+          backgroundColor: bg,
+          borderBottom: `1px solid ${border}`,
+          padding: '12px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          transition: 'right 200ms ease-out',
         }}
       >
-        {/* Top bar with proper padding */}
-        <div className="py-3 flex items-center justify-between" style={{ paddingLeft: '20px', paddingRight: '20px' }}>
-          <div className="flex items-center gap-4">
-            <span className="text-lg font-semibold" style={{ color: interfaceTextPrimary }}>SERQ</span>
-            <div className="h-4 w-px" style={{ backgroundColor: interfaceBorder }} />
-            {/* Outline toggle button */}
-            <button
-              onClick={() => setOutlinePanelOpen((prev) => !prev)}
-              title="Document Outline (Cmd+Shift+O)"
-              className="p-1.5 rounded transition-colors"
-              style={{
-                backgroundColor: outlinePanelOpen ? interfaceBgSurface : 'transparent',
-                color: outlinePanelOpen ? interfaceTextPrimary : interfaceTextSecondary,
-              }}
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-              </svg>
-            </button>
-            <div className="h-4 w-px" style={{ backgroundColor: interfaceBorder }} />
-            <div className="flex items-center gap-2">
-              {document.isDirty && (
-                <span className="text-orange-500 text-lg" title="Unsaved changes">•</span>
-              )}
-              <span className="text-sm" style={{ color: interfaceTextSecondary }}>
-                {document.path ? document.name : `${document.name} - UNSAVED`}
-              </span>
-              {document.lastSaved && !document.isDirty && (
-                <span className="text-xs" style={{ color: interfaceTextMuted }}>
-                  Saved {formatRelativeTime(document.lastSaved)}
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Theme toggle - show moon in light mode (to switch to dark), sun in dark mode (to switch to light) */}
-            <button
-              onClick={handleToggleTheme}
-              title={`Switch to ${effectiveTheme === 'light' ? 'dark' : 'light'} mode`}
-              className="p-2 rounded transition-colors"
-              style={{ color: interfaceTextSecondary }}
-            >
-              {effectiveTheme === 'light' ? (
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                </svg>
-              ) : (
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
-              )}
-            </button>
-
-            <div className="h-4 w-px" style={{ backgroundColor: interfaceBorder }} />
-
-            {/* Style panel buttons */}
-            <PanelButton label="Themes" isActive={activePanel === 'themes'} onClick={() => togglePanel('themes')} colors={interfaceColors} />
-            <PanelButton label="Colors" isActive={activePanel === 'colors'} onClick={() => togglePanel('colors')} colors={interfaceColors} />
-            <PanelButton label="Typography" isActive={activePanel === 'typography'} onClick={() => togglePanel('typography')} colors={interfaceColors} />
-            <PanelButton label="Canvas" isActive={activePanel === 'canvas'} onClick={() => togglePanel('canvas')} colors={interfaceColors} />
-            <PanelButton label="Layout" isActive={activePanel === 'layout'} onClick={() => togglePanel('layout')} colors={interfaceColors} />
-
-            <div className="h-4 w-px" style={{ backgroundColor: interfaceBorder }} />
-
-            {/* Canvas width selector */}
-            <label htmlFor="canvas-width" className="text-sm" style={{ color: interfaceTextSecondary }}>
-              Width:
-            </label>
-            <select
-              id="canvas-width"
-              value={canvasWidth}
-              onChange={(e) => setCanvasWidth(e.target.value as CanvasWidth)}
-              className="text-sm rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              style={{
-                backgroundColor: interfaceBg,
-                border: `1px solid ${interfaceBorder}`,
-                color: interfaceTextPrimary,
-              }}
-            >
-              <option value="narrow">Narrow</option>
-              <option value="normal">Normal</option>
-              <option value="wide">Wide</option>
-              <option value="full">Full</option>
-            </select>
-
-            <div className="h-4 w-px" style={{ backgroundColor: interfaceBorder }} />
-
-            {/* Export Menu */}
-            <ExportMenu editor={editor} interfaceColors={interfaceColors} />
-          </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <span style={{ fontSize: '18px', fontWeight: 600, color: textPrimary }}>SERQ</span>
         </div>
 
-        {/* Toolbar with padding */}
-        {editor && (
-          <EditorToolbar
-            editor={editor}
-            interfaceColors={interfaceColors}
+        {/* Document title - centered */}
+        <div style={{ position: 'absolute', left: '50%', transform: 'translateX(-50%)' }}>
+          <span style={{ fontSize: '14px', color: textSecondary }}>
+            {docMeta.isDirty && <span style={{ color: textDirty, marginRight: '4px' }}>•</span>}
+            {docMeta.name}
+          </span>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Format painter button - TODO: Fix and re-enable in final polish phase */}
+          {/* {editor && <FormatPainterButton editor={editor} isDark={isDark} />} */}
+
+          {/* Pagination mode selector */}
+          <PaginationModeSelector
+            paginationEnabled={pagination.enabled}
+            pageSize={pagination.pageSize}
+            onTogglePagination={handleTogglePagination}
+            onPageSizeChange={handlePageSizeChange}
           />
-        )}
+
+          {/* Canvas width selector (disabled in pagination mode) */}
+          <select
+            value={canvasWidth}
+            onChange={(e) => setCanvasWidth(e.target.value as typeof canvasWidth)}
+            disabled={pagination.enabled}
+            style={{
+              fontSize: '12px',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              border: `1px solid ${border}`,
+              backgroundColor: bg,
+              color: pagination.enabled ? (isDark ? '#52525b' : '#d1d5db') : textSecondary,
+              cursor: pagination.enabled ? 'not-allowed' : 'pointer',
+              opacity: pagination.enabled ? 0.5 : 1,
+            }}
+          >
+            <option value="narrow">Narrow</option>
+            <option value="normal">Normal</option>
+            <option value="wide">Wide</option>
+            <option value="full">Full</option>
+          </select>
+
+          {/* Styles panel toggle */}
+          <button
+            onClick={handleToggleStylePanel}
+            title="Style presets"
+            style={{
+              padding: '8px',
+              borderRadius: '6px',
+              border: isStylePanelOpen ? `2px solid ${isDark ? '#a78bfa' : '#8b5cf6'}` : 'none',
+              backgroundColor: isStylePanelOpen ? (isDark ? '#3f3f46' : '#e5e7eb') : 'transparent',
+              color: textSecondary,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <StylesIcon />
+          </button>
+
+          {/* Theme toggle */}
+          <button
+            onClick={toggleSystemTheme}
+            title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+            style={{
+              padding: '8px',
+              borderRadius: '6px',
+              border: 'none',
+              backgroundColor: 'transparent',
+              color: textSecondary,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {isDark ? <SunIcon /> : <MoonIcon />}
+          </button>
+        </div>
       </header>
 
-      {/* Main content - pushed down by header height, padded at bottom for status bar */}
-      {/* marginTop: header bar (~52px) + toolbar (~48px) + 40px gap = 140px */}
-      <main
-        className="flex-1 overflow-auto"
-        style={{ marginTop: '140px', paddingBottom: '36px' }} // Clear header + toolbar + gap + status bar
-      >
-        <Canvas
-          width={canvasWidth}
-          viewportColor={interfaceBgSurface}
-          paginationEnabled={pagination.enabled}
-          pageSize={pagination.pageSize}
+      {/* Toolbar - fixed below header */}
+      {editor && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '53px',
+            left: 0,
+            right: isStylePanelOpen ? '320px' : 0,
+            zIndex: 20,
+            transition: 'right 200ms ease-out',
+            backgroundColor: bg, // Solid background so content clips behind
+          }}
         >
-          <EditorWrapper editor={editor}>
-            <EditorCore
-              ref={editorRef}
-              placeholder="Start writing..."
-              onUpdate={handleUpdate}
-            />
-          </EditorWrapper>
-        </Canvas>
-      </main>
-
-      {/* Style Panel - full viewport height, overlays content */}
-      <StylePanel
-        panelType={activePanel}
-        onClose={() => setActivePanel(null)}
-        interfaceColors={interfaceColors}
-      />
-
-      {/* Command Palette */}
-      <CommandPalette
-        editor={editor}
-        isOpen={commandPaletteOpen}
-        onOpenChange={setCommandPaletteOpen}
-        onShowOutline={() => setOutlinePanelOpen(true)}
-        onShowVersionHistory={() => setVersionHistoryOpen(true)}
-      />
-
-      {/* Document Outline Panel */}
-      <OutlinePanel
-        isOpen={outlinePanelOpen}
-        onClose={() => setOutlinePanelOpen(false)}
-        editor={editor}
-        interfaceColors={interfaceColors}
-      />
-
-      {/* Version History Panel */}
-      <VersionHistoryPanel
-        isOpen={isVersionHistoryOpen}
-        onClose={() => setVersionHistoryOpen(false)}
-        editor={editor}
-        interfaceColors={interfaceColors}
-      />
-
-      {/* Comment Panel */}
-      <CommentPanel
-        editor={editor}
-        interfaceColors={interfaceColors}
-      />
-
-      {/* Comment Tooltip (hover over highlighted comments) */}
-      <CommentTooltip
-        editor={editor}
-        interfaceColors={interfaceColors}
-      />
-
-      {/* Selection Context Menu (right-click on selected text) */}
-      <SelectionContextMenu
-        editor={editor}
-        interfaceColors={interfaceColors}
-      />
-
-      {/* Status Bar (hidden in focus mode) - fixed at bottom */}
-      {!isFocusMode && (
-        <div className="fixed bottom-0 left-0 right-0 z-20">
-          <StatusBar
-            editor={editor}
-            interfaceColors={interfaceColors}
-            typewriterEnabled={typewriterEnabled}
-            onToggleTypewriter={handleToggleTypewriter}
-          />
+          <EditorToolbar editor={editor} />
         </div>
       )}
 
-      {/* Save Glow Effect - blue neon border glow on save */}
-      {showSaveGlow && (
-        <div
-          className="save-glow-overlay"
-          style={{
-            position: 'fixed',
-            inset: 0,
-            pointerEvents: 'none',
-            zIndex: 9999,
-            boxShadow: 'inset 0 0 30px 8px rgba(59, 130, 246, 0.6), inset 0 0 60px 15px rgba(59, 130, 246, 0.3)',
-            animation: 'saveGlow 0.6s ease-out forwards',
-          }}
-        />
-      )}
+      {/* Main content area - ONLY scrollable region */}
+      <main
+        ref={mainContentRef}
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: isStylePanelOpen ? '320px' : 0,
+          bottom: '40px', // Leave room for footer
+          paddingTop: editor ? '210px' : '110px', // Push content below header/toolbar + 75px gap
+          paddingLeft: '20px',
+          paddingRight: '20px',
+          paddingBottom: '40px',
+          display: 'flex',
+          justifyContent: 'center',
+          transition: 'right 200ms ease-out',
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          zIndex: 1, // Below toolbar (20) and header (30) - content clips under them
+        }}
+      >
+        {pagination.enabled ? (
+          /* Paginated mode - TipTap Pages extension handles layout */
+          <div style={{ width: '100%', maxWidth: '100%' }}>
+            <EditorWrapper editor={editor} zoom={zoom}>
+              <EditorCore
+                key={`editor-${editorKey}`}
+                ref={editorRef}
+                initialContent={contentRef.current}
+                placeholder="Start writing..."
+                onUpdate={handleUpdate}
+                paginationEnabled={pagination.enabled}
+                pageSize={pagination.pageSize}
+                isDark={isDark}
+              />
+            </EditorWrapper>
+          </div>
+        ) : (
+          /* Continuous mode - use Canvas wrapper */
+          <div
+            style={{
+              width: canvasWidth === 'full' ? '100%' : `${currentCanvasWidth * (zoom / 100)}px`,
+              maxWidth: '100%',
+            }}
+          >
+            <div
+              style={{
+                width: canvasWidth === 'full' ? '100%' : `${currentCanvasWidth}px`,
+                transform: `scale(${zoom / 100})`,
+                transformOrigin: 'top left',
+              }}
+            >
+              <Canvas width={canvasWidth}>
+                <EditorWrapper editor={editor} zoom={zoom}>
+                  <EditorCore
+                    key={`editor-${editorKey}`}
+                    ref={editorRef}
+                    initialContent={contentRef.current}
+                    placeholder="Start writing..."
+                    onUpdate={handleUpdate}
+                    paginationEnabled={false}
+                    pageSize={pagination.pageSize}
+                    isDark={isDark}
+                  />
+                </EditorWrapper>
+              </Canvas>
+            </div>
+          </div>
+        )}
+      </main>
 
-      {/* Save glow keyframes - injected once */}
-      <style>{`
-        @keyframes saveGlow {
-          0% {
-            opacity: 0;
-          }
-          30% {
-            opacity: 1;
-          }
-          100% {
-            opacity: 0;
-          }
-        }
-      `}</style>
+      {/* Footer */}
+      <footer
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: isStylePanelOpen ? '320px' : 0,
+          zIndex: 20, // Above main content (z-index: 1)
+          backgroundColor: bg,
+          borderTop: `1px solid ${border}`,
+          padding: '8px 20px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: '12px',
+          color: textSecondary,
+          transition: 'right 200ms ease-out',
+        }}
+      >
+        <span>{editor?.storage.characterCount?.characters?.() ?? 0} characters</span>
+
+        {/* Zoom slider - double-click to reset to 100% */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ fontSize: '11px', color: textSecondary }}>{zoom}%</span>
+          <input
+            type="range"
+            className="zoom-slider"
+            min={20}
+            max={200}
+            value={Math.min(zoom, 200)}
+            onChange={(e) => setZoom(Number(e.target.value))}
+            onDoubleClick={() => setZoom(100)}
+            title={`Zoom: ${zoom}% (double-click to reset)`}
+          />
+          <span style={{ fontSize: '11px', color: textSecondary }}>200%</span>
+        </div>
+
+        <span>
+          {docMeta.isDirty
+            ? 'Unsaved changes'
+            : docMeta.lastSaved
+              ? `Saved ${formatRelativeTime(docMeta.lastSaved)}`
+              : 'No changes'}
+        </span>
+      </footer>
+
+      {/* Style Panel - slides in from right */}
+      <StylePanel
+        isOpen={isStylePanelOpen}
+        onClose={() => setIsStylePanelOpen(false)}
+        isDark={isDark}
+      />
     </div>
   );
 }

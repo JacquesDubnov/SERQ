@@ -1,1 +1,1 @@
-export { FormatPainter } from './FormatPainter'
+export { FormatPainterButton } from './FormatPainterButton';

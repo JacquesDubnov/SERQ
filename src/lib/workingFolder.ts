@@ -1,65 +1,60 @@
-import { homeDir } from '@tauri-apps/api/path'
-import { getPreferencesStore } from './preferencesStore'
+/**
+ * Working Folder - Persistent folder preference for file dialogs
+ *
+ * Uses tauri-plugin-store for persistence.
+ * Open/Save dialogs will default to this folder.
+ */
+
+import { load } from '@tauri-apps/plugin-store';
+import { homeDir } from '@tauri-apps/api/path';
+
+const STORE_FILE = 'preferences.json';
+
+let storeInstance: Awaited<ReturnType<typeof load>> | null = null;
+
+async function getStore() {
+  if (!storeInstance) {
+    // Note: tauri-plugin-store v2 requires defaults property
+    storeInstance = await load(STORE_FILE, { defaults: {}, autoSave: false });
+  }
+  return storeInstance;
+}
 
 /**
- * Get the configured working folder for file dialogs
- *
+ * Get the configured working folder for file dialogs.
  * Returns the stored preference, or falls back to user's home directory.
- * Used as defaultPath in open/save dialogs so they open to the user's
- * preferred location.
- *
- * @returns Path to the working folder
  */
 export async function getWorkingFolder(): Promise<string> {
-  try {
-    const store = await getPreferencesStore()
-    const folder = await store.get<string>('workingFolder')
+  const store = await getStore();
+  const folder = await store.get<string>('workingFolder');
 
-    if (folder) {
-      return folder
-    }
-  } catch (error) {
-    console.error('[WorkingFolder] Failed to get:', error)
+  if (folder) {
+    return folder;
   }
 
   // Default to home directory if not configured
-  return await homeDir()
+  return await homeDir();
 }
 
 /**
- * Set the working folder preference
- *
+ * Set the working folder preference.
  * This will be used as defaultPath in open/save dialogs.
- * Typically called when user explicitly chooses a folder or
- * automatically after opening/saving a file.
- *
- * @param path - Directory path to set as working folder
  */
 export async function setWorkingFolder(path: string): Promise<void> {
-  try {
-    const store = await getPreferencesStore()
-    await store.set('workingFolder', path)
-    await store.save()
-  } catch (error) {
-    console.error('[WorkingFolder] Failed to set:', error)
-    // Non-critical, don't re-throw
-  }
+  const store = await getStore();
+  await store.set('workingFolder', path);
+  await store.save();
 }
 
 /**
- * Update working folder based on a file path
- *
+ * Update working folder based on a file path.
  * Extracts the directory from the file path and stores it.
- * Called automatically when opening or saving files so the
- * next dialog opens to the same location.
- *
- * @param filePath - Full file path (directory will be extracted)
  */
 export async function updateWorkingFolderFromFile(filePath: string): Promise<void> {
   // Extract directory from file path
-  const lastSlash = filePath.lastIndexOf('/')
+  const lastSlash = filePath.lastIndexOf('/');
   if (lastSlash > 0) {
-    const directory = filePath.substring(0, lastSlash)
-    await setWorkingFolder(directory)
+    const directory = filePath.substring(0, lastSlash);
+    await setWorkingFolder(directory);
   }
 }

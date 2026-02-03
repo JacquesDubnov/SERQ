@@ -1,5 +1,6 @@
 :root {
   --tt-toolbar-height: 2.75rem;
+  --tt-toolbar-row-height: 2.5rem;
   --tt-safe-area-bottom: env(safe-area-inset-bottom, 0px);
   --tt-toolbar-bg-color: var(--white);
   --tt-toolbar-border-color: var(--tt-gray-light-a-100);
@@ -8,6 +9,27 @@
 .dark {
   --tt-toolbar-bg-color: var(--black);
   --tt-toolbar-border-color: var(--tt-gray-dark-a-50);
+}
+
+/* Multi-row toolbar container */
+.tiptap-toolbar-container {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  width: 100%;
+  background: var(--tt-toolbar-bg-color);
+  border-bottom: 1px solid var(--tt-toolbar-border-color);
+  box-shadow: var(--tt-shadow-toolbar);
+  display: flex;
+  flex-direction: column;
+
+  &[data-rows="1"] {
+    min-height: var(--tt-toolbar-height);
+  }
+
+  &[data-rows="2"] {
+    min-height: calc(var(--tt-toolbar-row-height) * 2);
+  }
 }
 
 .tiptap-toolbar {
@@ -38,7 +60,8 @@
     min-height: var(--tt-toolbar-height);
     background: var(--tt-toolbar-bg-color);
     border-bottom: 1px solid var(--tt-toolbar-border-color);
-    padding: 0 0.5rem;
+    box-shadow: var(--tt-shadow-toolbar);
+    padding: 0 0.75rem;
     overflow-x: auto;
     overscroll-behavior-x: contain;
     -webkit-overflow-scrolling: touch;
@@ -62,6 +85,27 @@
       .tiptap-toolbar-group {
         flex: 0 0 auto;
       }
+    }
+  }
+
+  /* Row variant - for use inside toolbar container (no sticky/border) */
+  &[data-variant="row"] {
+    width: 100%;
+    min-height: var(--tt-toolbar-row-height);
+    padding: 0 0.75rem;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+
+    &::-webkit-scrollbar {
+      display: none;
+    }
+
+    /* Subtle divider between rows */
+    &:not(:last-child) {
+      border-bottom: 1px solid color-mix(in srgb, var(--tt-toolbar-border-color) 30%, transparent);
     }
   }
 

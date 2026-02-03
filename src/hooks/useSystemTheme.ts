@@ -1,115 +1,108 @@
 /**
- * System Theme Detection Hook
- * Phase 3: Style System Foundation
+ * useSystemTheme - System theme detection with override support
  *
- * Wraps Tauri's window theme API for detecting macOS light/dark mode.
- * Uses styleStore.themeMode as the source of truth for user override.
- * Falls back to CSS media query when Tauri API is unavailable (browser dev).
+ * Detects macOS light/dark mode via Tauri window API.
+ * Falls back to matchMedia if Tauri is unavailable.
  */
 
-import { useState, useEffect } from 'react'
-import { useStyleStore } from '../stores/styleStore'
+import { useState, useEffect, useCallback } from 'react';
 
-type EffectiveTheme = 'light' | 'dark'
+type ThemeMode = 'light' | 'dark' | 'system';
+type EffectiveTheme = 'light' | 'dark';
 
-export interface UseSystemThemeReturn {
-  /** The currently applied theme (resolved from system or override) */
-  effectiveTheme: EffectiveTheme
-  /** What macOS system settings report */
-  systemTheme: EffectiveTheme
-  /** Whether the Tauri API is available */
-  isTauriAvailable: boolean
+interface UseSystemThemeReturn {
+  effectiveTheme: EffectiveTheme;
+  systemTheme: EffectiveTheme;
+  userOverride: ThemeMode;
+  setUserOverride: (mode: ThemeMode) => void;
+  toggleTheme: () => void;
 }
 
 /**
- * Detect and respond to system theme changes with override support.
- *
- * Uses Tauri's window API when available, falls back to CSS media queries.
- * Syncs with styleStore.themeMode for user preference.
+ * Detect system theme using matchMedia (browser fallback)
  */
+function detectSystemTheme(): EffectiveTheme {
+  if (typeof window === 'undefined') return 'light';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
 export function useSystemTheme(): UseSystemThemeReturn {
-  const [systemTheme, setSystemTheme] = useState<EffectiveTheme>('light')
-  const [isTauriAvailable, setIsTauriAvailable] = useState(false)
+  const [systemTheme, setSystemTheme] = useState<EffectiveTheme>(detectSystemTheme);
+  const [userOverride, setUserOverride] = useState<ThemeMode>('system');
 
-  // Get themeMode from styleStore (this makes the hook reactive to store changes)
-  const themeMode = useStyleStore((state) => state.themeMode)
-
-  // Calculate effective theme from system and store's themeMode
+  // Calculate effective theme
   const effectiveTheme: EffectiveTheme =
-    themeMode === 'system' ? systemTheme : themeMode
+    userOverride === 'system' ? systemTheme : userOverride;
 
-  // Update document theme attribute when effective theme changes
+  // Update data-theme attribute on document
   useEffect(() => {
-    document.documentElement.dataset.theme = effectiveTheme
-  }, [effectiveTheme])
+    document.documentElement.dataset.theme = effectiveTheme;
+  }, [effectiveTheme]);
 
-  // Initialize theme detection
+  // Listen for system theme changes
   useEffect(() => {
-    let cleanup: (() => void) | null = null
-    let mounted = true
-
-    async function initTauriTheme() {
+    // Try Tauri API first
+    const tryTauriTheme = async () => {
       try {
-        // Dynamically import Tauri API (only works in Tauri environment)
-        const { getCurrentWindow } = await import('@tauri-apps/api/window')
-        const appWindow = getCurrentWindow()
-
-        if (!mounted) return
-
-        setIsTauriAvailable(true)
+        const { getCurrentWindow } = await import('@tauri-apps/api/window');
+        const window = getCurrentWindow();
 
         // Get initial theme
-        const initialTheme = await appWindow.theme()
-        if (mounted && initialTheme) {
-          setSystemTheme(initialTheme)
+        const theme = await window.theme();
+        if (theme) {
+          setSystemTheme(theme as EffectiveTheme);
         }
 
         // Subscribe to theme changes
-        const unlisten = await appWindow.onThemeChanged(({ payload }) => {
-          if (mounted) {
-            setSystemTheme(payload)
-          }
-        })
+        const unlisten = await window.onThemeChanged(({ payload }) => {
+          setSystemTheme(payload as EffectiveTheme);
+        });
 
-        cleanup = unlisten
+        return unlisten;
       } catch {
-        // Tauri API not available, use CSS media query fallback
-        if (!mounted) return
-
-        console.debug(
-          '[useSystemTheme] Tauri API not available, using media query fallback'
-        )
-        setIsTauriAvailable(false)
-
-        // Check initial system preference via CSS media query
-        const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)')
-        setSystemTheme(darkModeQuery.matches ? 'dark' : 'light')
-
-        // Listen for changes
-        const handleChange = (e: MediaQueryListEvent) => {
-          if (mounted) {
-            setSystemTheme(e.matches ? 'dark' : 'light')
-          }
-        }
-
-        darkModeQuery.addEventListener('change', handleChange)
-        cleanup = () => darkModeQuery.removeEventListener('change', handleChange)
+        // Tauri not available, use matchMedia fallback
+        console.log('[useSystemTheme] Tauri not available, using matchMedia fallback');
+        return null;
       }
-    }
+    };
 
-    initTauriTheme()
+    let tauriUnlisten: (() => void) | null = null;
+
+    tryTauriTheme().then((unlisten) => {
+      tauriUnlisten = unlisten;
+    });
+
+    // Also listen to matchMedia as fallback
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      setSystemTheme(e.matches ? 'dark' : 'light');
+    };
+
+    mediaQuery.addEventListener('change', handleChange);
 
     return () => {
-      mounted = false
-      if (cleanup) {
-        cleanup()
+      mediaQuery.removeEventListener('change', handleChange);
+      if (tauriUnlisten) {
+        tauriUnlisten();
       }
-    }
-  }, [])
+    };
+  }, []);
+
+  // Toggle between light and dark (ignoring system)
+  const toggleTheme = useCallback(() => {
+    setUserOverride((current) => {
+      if (current === 'system') {
+        return systemTheme === 'dark' ? 'light' : 'dark';
+      }
+      return current === 'dark' ? 'light' : 'dark';
+    });
+  }, [systemTheme]);
 
   return {
     effectiveTheme,
     systemTheme,
-    isTauriAvailable,
-  }
+    userOverride,
+    setUserOverride,
+    toggleTheme,
+  };
 }

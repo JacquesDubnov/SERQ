@@ -1,111 +1,81 @@
-import { useRef, useEffect } from 'react'
-import type { RefObject } from 'react'
-import { useDebouncedCallback } from 'use-debounce'
-import { writeTextFile } from '@tauri-apps/plugin-fs'
-import { useEditorStore } from '../stores/editorStore'
-import { serializeSerqDocument } from '../lib/serqFormat'
-import type { EditorCoreRef } from '../components/Editor/EditorCore'
-
 /**
- * Auto-save interval in milliseconds (30 seconds)
- * Matches typical auto-save behavior in document editors
- */
-const AUTO_SAVE_INTERVAL = 30000
-
-/**
- * Maximum wait time before forcing a save (60 seconds)
- * Ensures save happens even during continuous typing
- */
-const MAX_WAIT = AUTO_SAVE_INTERVAL * 2
-
-export interface AutoSaveResult {
-  /** Timestamp of last successful auto-save, null if never saved */
-  lastSave: Date | null
-  /** Force flush any pending auto-save immediately */
-  flushAutoSave: () => void
-}
-
-/**
- * Hook providing automatic document saving with debounce
+ * useAutoSave - Auto-save with 30-second debounce
  *
- * Behavior:
- * - Only auto-saves documents that have a file path (existing files)
- * - Only saves when document has unsaved changes (isDirty)
- * - Debounces saves by 30 seconds to avoid constant disk writes
- * - Forces save after 60 seconds of continuous typing (maxWait)
- * - Flushes pending saves on component unmount (app close)
- *
- * @param editorRef - Reference to the EditorCore component for content access
- * @param enabled - Whether auto-save is enabled (default: true)
- * @returns Object containing lastSave timestamp and flushAutoSave function
+ * Only triggers for documents that have a file path AND are dirty.
+ * New unsaved documents must use Save As first.
  */
+
+import { useEffect, useRef } from 'react';
+import { useDebouncedCallback } from 'use-debounce';
+import { writeTextFile } from '@tauri-apps/plugin-fs';
+import { useEditorStore } from '../stores/editorStore';
+import { useStyleStore } from '../stores/styleStore';
+import { serializeSerqDocument } from '../lib/serqFormat';
+import type { EditorCoreRef } from '../components/Editor/EditorCore';
+
+const AUTO_SAVE_INTERVAL = 30000; // 30 seconds
+
 export function useAutoSave(
-  editorRef: RefObject<EditorCoreRef | null>,
+  editorRef: React.RefObject<EditorCoreRef | null>,
   enabled: boolean = true
-): AutoSaveResult {
-  const document = useEditorStore((state) => state.document)
-  const markSaved = useEditorStore((state) => state.markSaved)
-  const lastSaveRef = useRef<Date | null>(null)
+) {
+  const { document: docMeta, markSaved } = useEditorStore();
+  const lastSaveRef = useRef<Date | null>(null);
 
-  // Use ref to always get current document state in debounced callback
-  // This prevents stale closure issues where the callback captures old values
-  const documentRef = useRef(document)
-  useEffect(() => {
-    documentRef.current = document
-  }, [document])
+  // Use a ref to always have current document state in the debounced callback
+  const documentRef = useRef(docMeta);
+  documentRef.current = docMeta;
 
   const performAutoSave = useDebouncedCallback(
     async () => {
-      // Get CURRENT document state from ref (not stale closure)
-      const currentDoc = documentRef.current
+      const doc = documentRef.current;
 
       // Guard conditions - don't auto-save if:
       // 1. No file path (new document, use Save As instead)
       // 2. Document isn't dirty (nothing to save)
       // 3. Editor ref isn't available
-      if (!currentDoc.path || !currentDoc.isDirty || !editorRef.current) {
-        return
-      }
+      if (!doc.path || !doc.isDirty) return;
+      if (!editorRef.current) return;
 
       try {
-        console.log('[AutoSave] Saving:', currentDoc.path)
-        const html = editorRef.current.getHTML()
-        const content = serializeSerqDocument(html, {
-          name: currentDoc.name,
-          path: currentDoc.path,
-        })
-        await writeTextFile(currentDoc.path, content)
+        const html = editorRef.current.getHTML();
+        const styleMetadata = useStyleStore.getState().getStyleMetadata();
+        const content = serializeSerqDocument(
+          html,
+          { name: doc.name, path: doc.path },
+          undefined,
+          styleMetadata
+        );
+        await writeTextFile(doc.path, content);
 
-        markSaved()
-        lastSaveRef.current = new Date()
-        console.log('[AutoSave] Saved at', lastSaveRef.current.toISOString())
+        markSaved();
+        lastSaveRef.current = new Date();
+        console.log('[AutoSave] Document saved at', lastSaveRef.current.toISOString());
       } catch (error) {
-        console.error('[AutoSave] Failed:', error)
+        console.error('[AutoSave] Failed:', error);
         // Don't mark as saved on error - user will see dirty indicator
       }
     },
     AUTO_SAVE_INTERVAL,
-    { maxWait: MAX_WAIT }
-  )
+    { maxWait: AUTO_SAVE_INTERVAL * 2 } // Force save after 60s even if still typing
+  );
 
   // Trigger auto-save when document becomes dirty
   useEffect(() => {
-    console.log('[AutoSave] Effect triggered - enabled:', enabled, 'isDirty:', document.isDirty, 'path:', document.path)
-    if (enabled && document.isDirty && document.path) {
-      console.log('[AutoSave] Scheduling save in 30 seconds for:', document.path)
-      performAutoSave()
+    if (enabled && docMeta.isDirty && docMeta.path) {
+      performAutoSave();
     }
-  }, [document.isDirty, document.path, enabled, performAutoSave])
+  }, [docMeta.isDirty, docMeta.path, enabled, performAutoSave]);
 
   // Flush pending auto-save on unmount (app close)
   useEffect(() => {
     return () => {
-      performAutoSave.flush()
-    }
-  }, [performAutoSave])
+      performAutoSave.flush();
+    };
+  }, [performAutoSave]);
 
   return {
     lastSave: lastSaveRef.current,
     flushAutoSave: performAutoSave.flush,
-  }
+  };
 }

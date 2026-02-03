@@ -1,83 +1,54 @@
-import { ReactNode, useEffect } from 'react'
-import type { PageSize } from '../../stores/editorStore'
+/**
+ * Canvas - Responsive writing surface
+ *
+ * Uses CSS custom properties for theming so presets actually work.
+ * Continuous flow, no pagination.
+ */
 
-export type CanvasWidth = 'narrow' | 'normal' | 'wide' | 'full'
+import { ReactNode } from 'react';
+
+export type CanvasWidth = 'narrow' | 'normal' | 'wide' | 'full';
 
 interface CanvasProps {
-  children: ReactNode
-  width?: CanvasWidth
-  className?: string
-  viewportColor: string  // Interface color for viewport background
-  paginationEnabled?: boolean
-  pageSize?: PageSize
+  children: ReactNode;
+  width?: CanvasWidth;
 }
 
-const widthClasses: Record<CanvasWidth, string> = {
-  narrow: 'max-w-xl',    // 576px
-  normal: 'max-w-3xl',   // 768px
-  wide: 'max-w-5xl',     // 1024px
-  full: 'max-w-none',
-}
+// Width values in pixels
+const widthValues: Record<CanvasWidth, string> = {
+  narrow: '600px',
+  normal: '720px',
+  wide: '900px',
+  full: '100%',
+};
 
-export function Canvas({
-  children,
-  width = 'normal',
-  className = '',
-  viewportColor,
-  paginationEnabled = false,
-  pageSize = 'a4',
-}: CanvasProps) {
-  // Update body data-page-size attribute for print CSS @page rules
-  useEffect(() => {
-    if (paginationEnabled) {
-      document.body.setAttribute('data-page-size', pageSize)
-    } else {
-      document.body.removeAttribute('data-page-size')
-    }
-    return () => {
-      document.body.removeAttribute('data-page-size')
-    }
-  }, [paginationEnabled, pageSize])
+export function Canvas({ children, width = 'normal' }: CanvasProps) {
+  const maxWidth = widthValues[width];
 
   return (
-    // Viewport background - uses INTERFACE color (not document preset)
-    // Flexbox ensures canvas is always centered
     <div
-      className={`canvas-viewport min-h-screen flex justify-center ${className}`}
-      style={{
-        backgroundColor: viewportColor,
-        padding: '40px', // 40px margin on all sides
-      }}
+      className="canvas-container"
       data-canvas-width={width}
+      style={{
+        width: '100%',
+        maxWidth,
+        margin: '0 auto',
+        // Use CSS variables so presets actually affect the canvas
+        backgroundColor: 'var(--canvas-bg-color, var(--color-bg-canvas, #ffffff))',
+        backgroundImage: 'var(--canvas-bg-image, none)',
+        backgroundSize: 'var(--canvas-bg-size, auto)',
+        backgroundPosition: 'var(--canvas-bg-position, center)',
+        backgroundRepeat: 'var(--canvas-bg-repeat, no-repeat)',
+        borderRadius: width === 'full' ? '0' : 'var(--canvas-border-radius, 12px)',
+        boxShadow: width === 'full' ? 'none' : 'var(--canvas-shadow, var(--tt-shadow-canvas))',
+        // Account for two-row toolbar (5rem = 80px) + page margins
+        minHeight: 'calc(100vh - 220px)',
+        padding: '74px',
+        // Text color from theme
+        color: 'var(--color-text-primary, #1a1a1a)',
+      }}
     >
-      {/* Page container - the "paper" uses DOCUMENT CSS variables */}
-      {/* Min-width 320px = smallest mobile screen (iPhone SE) */}
-      <div
-        className={`canvas-page ${paginationEnabled ? '' : widthClasses[width]}`}
-        style={{ width: '100%', minWidth: '320px' }}
-        data-pagination={paginationEnabled ? 'true' : undefined}
-        data-page-size={paginationEnabled ? pageSize : undefined}
-      >
-        <div
-          className="canvas-content px-12 py-10"
-          style={{
-            backgroundColor: 'var(--canvas-bg-color, #ffffff)',
-            backgroundImage: 'var(--canvas-bg-image, none)',
-            backgroundSize: 'var(--canvas-bg-size, auto)',
-            backgroundPosition: 'var(--canvas-bg-position, center)',
-            backgroundRepeat: 'var(--canvas-bg-repeat, no-repeat)',
-            borderRadius: paginationEnabled ? '0' : '10px',
-            boxShadow: paginationEnabled
-              ? 'none'
-              : '0 4px 40px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.04)',
-            minHeight: 'calc(100vh - 200px)', // Account for header + 40px top/bottom margins
-          }}
-          data-pagination={paginationEnabled ? 'true' : undefined}
-          data-page-size={paginationEnabled ? pageSize : undefined}
-        >
-          {children}
-        </div>
-      </div>
+      {children}
     </div>
-  )
+  );
 }

@@ -1,259 +1,226 @@
 /**
- * Pagination CSS - Page size support for print-ready documents
+ * TipTap Pages Extension Styles
  *
- * Provides:
- * - Visual page boundaries in editor
- * - @page rules for different page sizes
- * - Print break handling to avoid cutting headings/tables
+ * Styles for the TipTap Pro Pages extension.
+ * Handles page appearance, gaps, dark mode, and print output.
+ *
+ * Key elements:
+ * - [data-tiptap-pagination] - Main pagination container
+ * - .tiptap-pagination-gap - Gap between pages (where pageBreakBackground applies)
+ * - .tiptap-page-header / .tiptap-page-footer - Header/footer areas
+ * - .tiptap-page-break - Page break indicators
  */
 
-/* =============================================================================
-   CSS Variables - Page Dimensions
-   ============================================================================= */
+/* ============================================
+   Gap Between Pages - Full-width visual break
+   ============================================ */
 
-:root {
-  /* A4: 210mm x 297mm */
-  --page-width-a4: 210mm;
-  --page-height-a4: 297mm;
+/*
+ * The gap element is contained within the pagination container (same width as pages).
+ * To create a full-viewport-width gap, we use pseudo-elements that extend beyond.
+ */
 
-  /* US Letter: 8.5in x 11in = 215.9mm x 279.4mm */
-  --page-width-letter: 8.5in;
-  --page-height-letter: 11in;
-
-  /* US Legal: 8.5in x 14in = 215.9mm x 355.6mm */
-  --page-width-legal: 8.5in;
-  --page-height-legal: 14in;
-
-  /* Default margins for print */
-  --page-margin: 1in;
-
-  /* Visual page boundary color */
-  --page-boundary-color: rgba(0, 0, 0, 0.1);
-}
-
-:root[data-theme="dark"] {
-  --page-boundary-color: rgba(255, 255, 255, 0.15);
-}
-
-/* =============================================================================
-   Visual Page Boundaries in Editor
-   ============================================================================= */
-
-/* Pagination mode container styling */
-.canvas-content[data-pagination="true"] {
-  /* Visual page width indicator */
+.tiptap-pagination-gap {
   position: relative;
+  background: #f5f5f5 !important;
+  background-color: #f5f5f5 !important;
 }
 
-/* Page boundary visual indicators using repeating gradient */
-.canvas-content[data-pagination="true"][data-page-size="a4"] {
-  /* A4 paper simulation - show page breaks */
-  background-image:
-    linear-gradient(to bottom,
-      var(--canvas-bg-color, #ffffff) calc(var(--page-height-a4) - 4px),
-      var(--page-boundary-color) calc(var(--page-height-a4) - 4px),
-      var(--page-boundary-color) var(--page-height-a4)
-    );
-  background-size: 100% var(--page-height-a4);
-  background-repeat: repeat-y;
+/* Extend gap to full viewport width using pseudo-elements */
+.tiptap-pagination-gap::before,
+.tiptap-pagination-gap::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 100vw;
+  background: inherit;
+  pointer-events: none;
 }
 
-.canvas-content[data-pagination="true"][data-page-size="letter"] {
-  background-image:
-    linear-gradient(to bottom,
-      var(--canvas-bg-color, #ffffff) calc(var(--page-height-letter) - 4px),
-      var(--page-boundary-color) calc(var(--page-height-letter) - 4px),
-      var(--page-boundary-color) var(--page-height-letter)
-    );
-  background-size: 100% var(--page-height-letter);
-  background-repeat: repeat-y;
+.tiptap-pagination-gap::before {
+  right: 100%;
 }
 
-.canvas-content[data-pagination="true"][data-page-size="legal"] {
-  background-image:
-    linear-gradient(to bottom,
-      var(--canvas-bg-color, #ffffff) calc(var(--page-height-legal) - 4px),
-      var(--page-boundary-color) calc(var(--page-height-legal) - 4px),
-      var(--page-boundary-color) var(--page-height-legal)
-    );
-  background-size: 100% var(--page-height-legal);
-  background-repeat: repeat-y;
+.tiptap-pagination-gap::after {
+  left: 100%;
 }
 
-/* Page width constraint when pagination is enabled */
-.canvas-page[data-pagination="true"][data-page-size="a4"] {
-  max-width: var(--page-width-a4) !important;
+/* Dark mode gap */
+.dark .tiptap-pagination-gap,
+.theme-dark .tiptap-pagination-gap,
+[data-theme="dark"] .tiptap-pagination-gap {
+  background: #262626 !important;
+  background-color: #262626 !important;
+  border-color: #262626 !important;
 }
 
-.canvas-page[data-pagination="true"][data-page-size="letter"] {
-  max-width: var(--page-width-letter) !important;
+/* Allow overflow for pseudo-elements but clip at main content level */
+[data-tiptap-pagination] {
+  overflow: visible;
 }
 
-.canvas-page[data-pagination="true"][data-page-size="legal"] {
-  max-width: var(--page-width-legal) !important;
+/* ============================================
+   Page Elements - White/dark "paper" on top
+   ============================================ */
+
+/*
+ * TipTap Pages sets background-color: #fff directly on .ProseMirror via
+ * a dynamically generated unique class. We need to override this for dark mode.
+ * The page "paper" elements have class .page (created via JavaScript).
+ */
+
+/* Override TipTap's hardcoded white background and border on ProseMirror */
+.theme-dark .ProseMirror,
+[data-theme="dark"] .ProseMirror {
+  background-color: #1f1f1f !important;
+  border-color: #1f1f1f !important;
 }
 
-/* =============================================================================
-   Print Media Styles
-   ============================================================================= */
+/* Target page elements by .page class (TipTap's actual class name) */
+[data-tiptap-pagination] .page {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+}
+
+.theme-dark [data-tiptap-pagination] .page,
+[data-theme="dark"] [data-tiptap-pagination] .page {
+  background: #1f1f1f !important;
+  background-color: #1f1f1f !important;
+}
+
+/* Fallback: target direct children divs that aren't gaps/headers/footers */
+[data-tiptap-pagination] > div:not(.tiptap-pagination-gap):not(.tiptap-page-header):not(.tiptap-page-footer):not(.page) {
+  background: #ffffff !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Dark mode for fallback selector */
+.theme-dark [data-tiptap-pagination] > div:not(.tiptap-pagination-gap):not(.tiptap-page-header):not(.tiptap-page-footer):not(.page),
+[data-theme="dark"] [data-tiptap-pagination] > div:not(.tiptap-pagination-gap):not(.tiptap-page-header):not(.tiptap-page-footer):not(.page) {
+  background: #1f1f1f !important;
+  background-color: #1f1f1f !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================
+   Page Header and Footer
+   ============================================ */
+
+/*
+ * TipTap uses hsl(var(--background)) for header/footer backgrounds.
+ * We need to set this CSS variable to match our page color.
+ */
+
+/* Light mode - white page */
+:root {
+  --background: 0 0% 100%;
+}
+
+/* Dark mode - dark page */
+.theme-dark,
+[data-theme="dark"] {
+  --background: 0 0% 12%;
+}
+
+.tiptap-page-header,
+.tiptap-page-footer {
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.theme-dark .tiptap-page-header,
+.theme-dark .tiptap-page-footer,
+[data-theme="dark"] .tiptap-page-header,
+[data-theme="dark"] .tiptap-page-footer {
+  color: #9ca3af;
+}
+
+/* ============================================
+   Virtual Cursor - Custom caret rendering
+   ============================================ */
+
+/*
+ * prosemirror-virtual-cursor hides native caret and renders a decoration.
+ * This prevents cursor stretching across page gaps.
+ * Override the default red color to match theme text color.
+ */
+
+.ProseMirror-focused {
+  --prosemirror-virtual-cursor-color: currentColor;
+}
+
+.dark .ProseMirror-focused,
+.theme-dark .ProseMirror-focused,
+[data-theme="dark"] .ProseMirror-focused {
+  --prosemirror-virtual-cursor-color: #e5e5e5;
+}
+
+/* Light mode explicit override */
+.theme-light .ProseMirror-focused,
+[data-theme="light"] .ProseMirror-focused {
+  --prosemirror-virtual-cursor-color: #171717;
+}
+
+/* Gap should not capture clicks */
+.tiptap-pagination-gap {
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ============================================
+   Content Break Rules - Prevent awkward breaks
+   ============================================ */
+
+[data-tiptap-pagination] h1,
+[data-tiptap-pagination] h2,
+[data-tiptap-pagination] h3,
+[data-tiptap-pagination] h4,
+[data-tiptap-pagination] h5,
+[data-tiptap-pagination] h6 {
+  break-after: avoid;
+  page-break-after: avoid;
+}
+
+[data-tiptap-pagination] img,
+[data-tiptap-pagination] table,
+[data-tiptap-pagination] pre,
+[data-tiptap-pagination] blockquote,
+[data-tiptap-pagination] figure {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+[data-tiptap-pagination] p {
+  orphans: 3;
+  widows: 3;
+}
+
+/* ============================================
+   Print Styles
+   ============================================ */
 
 @media print {
-  /* Remove screen-only elements */
-  .toolbar,
-  .style-panel,
-  .outline-panel,
-  .status-bar,
-  .command-palette,
-  .version-history-panel,
-  .comment-panel {
+  [data-tiptap-pagination] > div {
+    box-shadow: none !important;
+    border: none !important;
+    page-break-after: always;
+  }
+
+  [data-tiptap-pagination] > div:last-child {
+    page-break-after: auto;
+  }
+
+  .tiptap-pagination-gap {
     display: none !important;
   }
-
-  /* Full width canvas for print */
-  .canvas-viewport {
-    padding: 0 !important;
-    background: white !important;
-  }
-
-  .canvas-page {
-    max-width: none !important;
-    width: 100% !important;
-  }
-
-  .canvas-content {
-    box-shadow: none !important;
-    border-radius: 0 !important;
-    padding: 0 !important;
-    background: white !important;
-    background-image: none !important;
-  }
-
-  /* Ensure content uses full page width */
-  .ProseMirror {
-    padding: 0 !important;
-  }
 }
 
-/* =============================================================================
-   @page Rules - Page Size Definitions
-   ============================================================================= */
-
-/* Default page settings */
 @page {
-  margin: var(--page-margin);
+  margin: 0.75in;
 }
 
-/* A4 page size */
-body[data-page-size="a4"] {
-  /* Hint for print dialog */
-}
-
-@page a4 {
-  size: A4;
-  margin: 1in;
-}
-
-/* Letter page size */
-@page letter {
-  size: letter;
-  margin: 1in;
-}
-
-/* Legal page size */
-@page legal {
-  size: legal;
-  margin: 1in;
-}
-
-/* Apply named page based on body attribute */
-@media print {
-  body[data-page-size="a4"] {
-    page: a4;
-  }
-
-  body[data-page-size="letter"] {
-    page: letter;
-  }
-
-  body[data-page-size="legal"] {
-    page: legal;
-  }
-}
-
-/* =============================================================================
-   Page Break Control - Avoid Cutting Content
-   ============================================================================= */
-
-@media print {
-  /* Headings should not be orphaned at bottom of page */
-  h1, h2, h3, h4, h5, h6,
-  .ProseMirror h1, .ProseMirror h2, .ProseMirror h3,
-  .ProseMirror h4, .ProseMirror h5, .ProseMirror h6 {
-    break-after: avoid;
-    page-break-after: avoid; /* Legacy support */
-  }
-
-  /* Tables should stay together when possible */
-  table, .tableWrapper {
-    break-inside: avoid;
-    page-break-inside: avoid; /* Legacy support */
-  }
-
-  /* Callouts should stay together */
-  .callout, [data-type="callout"] {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  /* Blockquotes should stay together */
-  blockquote {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  /* Code blocks should stay together (up to reasonable size) */
-  pre, .code-block {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  /* Images should not break */
-  img, figure {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  /* Columns should break between, not within */
-  .column-section {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  /* Lists: avoid breaking between list items when possible */
-  li {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-
-  /* Don't leave orphan lines */
-  p {
-    orphans: 3;
-    widows: 3;
-  }
-}
-
-/* =============================================================================
-   Page Number Placeholder (for future enhancement)
-   ============================================================================= */
-
-@media print {
-  /* Page number styling placeholder
-   * Note: Actual page numbers require @page margin boxes
-   * which have limited browser support. This is for future use.
-   */
-  @page {
-    @bottom-center {
-      content: counter(page);
-    }
-  }
+@page :first {
+  margin-top: 1in;
 }

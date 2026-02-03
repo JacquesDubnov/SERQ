@@ -50,6 +50,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       showTooltip = true,
       shortcutKeys,
       "aria-label": ariaLabel,
+      onMouseDown,
       ...props
     },
     ref
@@ -59,12 +60,19 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       [shortcutKeys]
     )
 
+    // Prevent focus stealing from editor - toolbar buttons shouldn't take focus
+    const handleMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.preventDefault()
+      onMouseDown?.(e)
+    }
+
     if (!tooltip || !showTooltip) {
       return (
         <button
           className={cn("tiptap-button", className)}
           ref={ref}
           aria-label={ariaLabel}
+          onMouseDown={handleMouseDown}
           {...props}
         >
           {children}
@@ -78,6 +86,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           className={cn("tiptap-button", className)}
           ref={ref}
           aria-label={ariaLabel}
+          onMouseDown={handleMouseDown}
           {...props}
         >
           {children}

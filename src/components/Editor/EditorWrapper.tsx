@@ -1,246 +1,123 @@
-import { ReactNode, useEffect, useState, useCallback, useRef } from 'react'
-import { Editor } from '@tiptap/core'
-import { Selection } from '@tiptap/pm/state'
-import { CellSelection } from '@tiptap/pm/tables'
-import { TableContextMenu } from './TableContextMenu'
-import { useAutoSnapshot } from '../../hooks'
-import { useEditorStore } from '../../stores/editorStore'
+/**
+ * EditorWrapper - TRUE Click-Anywhere Cursor Placement
+ *
+ * PARADIGM SHIFT: Click anywhere on the canvas, cursor appears THERE.
+ * No more hitting Enter 20 times to start writing in the middle of the page.
+ */
 
-interface SelectionInfo {
-  cellCount: number
-  rowCount: number
-  colCount: number
-}
-
-interface CellRect {
-  top: number
-  left: number
-  width: number
-  height: number
-}
+import { useRef, useCallback, ReactNode } from 'react';
+import type { Editor } from '@tiptap/core';
 
 interface EditorWrapperProps {
-  editor: Editor | null
-  children: ReactNode
-  className?: string
+  editor: Editor | null;
+  children: ReactNode;
+  minHeight?: number;
+  zoom?: number; // Zoom percentage (100 = 100%)
 }
 
-/**
- * EditorWrapper provides click-anywhere functionality and table context menu.
- */
-export function EditorWrapper({ editor, children, className = '' }: EditorWrapperProps) {
-  // Auto-snapshot for version history
-  const documentPath = useEditorStore((s) => s.document.path);
-  useAutoSnapshot(editor, documentPath, { enabled: !!documentPath });
+const PARAGRAPH_HEIGHT = 42; // Approximate height per paragraph (line-height + margin)
 
-  // Capture selection state on mousedown BEFORE ProseMirror can change it
-  const capturedSelectionRef = useRef<{
-    selection: Selection | null
-    selectionInfo: SelectionInfo
-    cellRects: CellRect[]
-  }>({ selection: null, selectionInfo: { cellCount: 1, rowCount: 1, colCount: 1 }, cellRects: [] })
+export function EditorWrapper({ editor, children, minHeight = 800, zoom = 100 }: EditorWrapperProps) {
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
-  // Table context menu state - includes cell rects for overlays
-  const [tableMenuState, setTableMenuState] = useState<{
-    x: number
-    y: number
-    selectionInfo: SelectionInfo
-    savedSelection: Selection
-    cellRects: CellRect[]
-  } | null>(null)
+  const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (!editor || !wrapperRef.current) return;
 
-  // Capture selection state AND cell rectangles on mousedown
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    // Only for right-click
-    if (e.button !== 2) return
+    // Check if click was on the wrapper itself (not on editor content)
+    const target = e.target as HTMLElement;
+    const isClickOnWrapper = target === wrapperRef.current;
+    const isClickOnBackground = target.classList.contains('click-anywhere-bg');
 
-    const target = e.target as HTMLElement
-    if (!target.closest('td, th')) return
+    if (!isClickOnWrapper && !isClickOnBackground) {
+      return; // Click was on editor content, let TipTap handle it
+    }
 
-    // CRITICAL: Capture everything NOW, before ProseMirror can change anything
-    if (editor) {
-      const { selection } = editor.state
-      let selectionInfo: SelectionInfo = { cellCount: 1, rowCount: 1, colCount: 1 }
-      const cellRects: CellRect[] = []
+    e.preventDefault();
+    e.stopPropagation();
 
-      if (selection instanceof CellSelection) {
-        let cellCount = 0
-        selection.forEachCell((_node, pos) => {
-          cellCount++
-          // Get DOM element and capture its rectangle
-          try {
-            const domNode = editor.view.nodeDOM(pos)
-            if (domNode instanceof HTMLElement) {
-              const rect = domNode.getBoundingClientRect()
-              cellRects.push({
-                top: rect.top,
-                left: rect.left,
-                width: rect.width,
-                height: rect.height,
-              })
-            }
-          } catch {
-            // Ignore errors
-          }
-        })
+    // Calculate click position (adjusted for zoom)
+    const wrapperRect = wrapperRef.current.getBoundingClientRect();
+    const clickY = e.clientY - wrapperRect.top;
+    // Adjust for zoom: screen coordinates / zoom factor = content coordinates
+    const zoomFactor = zoom / 100;
+    const adjustedClickY = clickY / zoomFactor;
 
-        const { $anchorCell, $headCell } = selection
-        const anchorRow = $anchorCell.index(-1)
-        const headRow = $headCell.index(-1)
-        const anchorCol = $anchorCell.index(0)
-        const headCol = $headCell.index(0)
+    // Calculate target line from Y position (in content coordinates)
+    const targetLine = Math.max(0, Math.floor(adjustedClickY / PARAGRAPH_HEIGHT));
 
-        const rowCount = Math.abs(headRow - anchorRow) + 1
-        const colCount = Math.abs(headCol - anchorCol) + 1
+    // Get current paragraph count
+    const currentCount = editor.state.doc.childCount;
 
-        selectionInfo = { cellCount, rowCount, colCount }
+    console.log('[ClickAnywhere] Y:', clickY, 'Adjusted Y:', adjustedClickY, 'Target:', targetLine, 'Current:', currentCount);
+
+    // If we need more paragraphs, add them
+    if (targetLine >= currentCount) {
+      const toAdd = targetLine - currentCount + 1;
+      console.log('[ClickAnywhere] Adding', toAdd, 'paragraphs');
+
+      // Move to end first
+      editor.commands.focus('end');
+
+      // Add paragraphs by pressing Enter repeatedly (this actually works)
+      for (let i = 0; i < toAdd; i++) {
+        editor.commands.splitBlock();
       }
+    }
 
-      // If no cells in selection, capture the clicked cell
-      if (cellRects.length === 0) {
-        const clickedCell = target.closest('td, th') as HTMLElement
-        if (clickedCell) {
-          const rect = clickedCell.getBoundingClientRect()
-          cellRects.push({
-            top: rect.top,
-            left: rect.left,
-            width: rect.width,
-            height: rect.height,
-          })
+    // Now position cursor at target line
+    // Need to recalculate after adding paragraphs
+    setTimeout(() => {
+      const doc = editor.state.doc;
+      const newCount = doc.childCount;
+      const actualTarget = Math.min(targetLine, newCount - 1);
+
+      console.log('[ClickAnywhere] After add - Count:', newCount, 'Going to line:', actualTarget);
+
+      // Calculate position: each block node is wrapped, so we need to find the right offset
+      let pos = 1; // Start inside doc
+      let lineIndex = 0;
+
+      doc.forEach((_node, offset) => {
+        if (lineIndex === actualTarget) {
+          pos = offset + 1; // +1 to be inside the node, not before it
         }
-      }
+        lineIndex++;
+      });
 
-      capturedSelectionRef.current = { selection, selectionInfo, cellRects }
-    }
-  }, [editor])
+      console.log('[ClickAnywhere] Setting position:', pos);
 
-  // Handle right-click for table context menu or canvas context menu
-  const handleContextMenu = useCallback((e: React.MouseEvent) => {
-    const target = e.target as HTMLElement
-    const tableCell = target.closest('td, th')
-
-    // Table cell context menu
-    if (tableCell && editor) {
-      e.preventDefault()
-      e.stopPropagation()
-
-      // Use the data captured in mousedown
-      const { selection, selectionInfo, cellRects } = capturedSelectionRef.current
-      const savedSelection = selection || editor.state.selection
-
-      // Set menu state with cell rects for overlays
-      setTableMenuState({ x: e.clientX, y: e.clientY, selectionInfo, savedSelection, cellRects })
-    }
-  }, [editor])
-
-  // Close table context menu and clean up overlays
-  const closeTableMenu = useCallback(() => {
-    // Reset captured state
-    capturedSelectionRef.current = { selection: null, selectionInfo: { cellCount: 1, rowCount: 1, colCount: 1 }, cellRects: [] }
-
-    // Setting to null clears both menu and overlays (they're in the same state)
-    setTableMenuState(null)
-  }, [])
-
-  // Click-anywhere to extend document
-  useEffect(() => {
-    if (!editor) return
-
-    const handleDocumentClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement
-
-      if (
-        target.closest('header') ||
-        target.closest('button') ||
-        target.closest('select') ||
-        target.closest('[role="toolbar"]') ||
-        target.tagName === 'BUTTON' ||
-        target.tagName === 'SELECT' ||
-        target.tagName === 'INPUT'
-      ) {
-        return
-      }
-
-      const proseMirror = document.querySelector('.ProseMirror') as HTMLElement
-      if (!proseMirror) return
-
-      const contentElements = proseMirror.querySelectorAll('p, h1, h2, h3, h4, h5, h6, ul, ol, blockquote, pre, hr, table')
-
-      let contentBottom = 0
-      if (contentElements.length > 0) {
-        const lastElement = contentElements[contentElements.length - 1]
-        const rect = lastElement.getBoundingClientRect()
-        contentBottom = rect.bottom
-      } else {
-        contentBottom = proseMirror.getBoundingClientRect().top + 50
-      }
-
-      const clickY = e.clientY
-
-      if (clickY > contentBottom + 10) {
-        e.preventDefault()
-        e.stopPropagation()
-
-        const computedStyle = window.getComputedStyle(proseMirror)
-        const lineHeight = parseFloat(computedStyle.lineHeight) || 24
-        const distanceBelowContent = clickY - contentBottom
-        const paragraphsNeeded = Math.max(1, Math.floor(distanceBelowContent / lineHeight))
-
-        editor.view.focus()
-
-        setTimeout(() => {
-          const paragraphs = Array(paragraphsNeeded).fill({ type: 'paragraph' })
-          const endPos = editor.state.doc.content.size
-          editor
-            .chain()
-            .focus('end')
-            .insertContentAt(endPos, paragraphs)
-            .focus('end')
-            .run()
-        }, 0)
-      }
-    }
-
-    document.addEventListener('click', handleDocumentClick, true)
-    return () => document.removeEventListener('click', handleDocumentClick, true)
-  }, [editor])
+      editor.commands.setTextSelection(pos);
+      editor.commands.focus();
+    }, 20);
+  }, [editor, zoom]);
 
   return (
     <div
-      className={`click-anywhere-wrapper ${className}`}
-      onMouseDown={handleMouseDown}
-      onContextMenu={handleContextMenu}
+      ref={wrapperRef}
+      onClick={handleCanvasClick}
+      style={{
+        minHeight: `${minHeight}px`,
+        cursor: 'text',
+        position: 'relative',
+      }}
     >
-      {children}
+      {/* Editor content */}
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        {children}
+      </div>
 
-      {/* Cell selection overlays - tied to tableMenuState so they disappear with menu */}
-      {tableMenuState?.cellRects.map((rect, index) => (
-        <div
-          key={index}
-          style={{
-            position: 'fixed',
-            top: rect.top,
-            left: rect.left,
-            width: rect.width,
-            height: rect.height,
-            backgroundColor: 'rgba(37, 99, 235, 0.15)',
-            border: '2px solid #2563eb',
-            pointerEvents: 'none',
-            zIndex: 999,
-            boxSizing: 'border-box',
-          }}
-        />
-      ))}
-
-      {tableMenuState && editor && (
-        <TableContextMenu
-          editor={editor}
-          position={{ x: tableMenuState.x, y: tableMenuState.y }}
-          selectionInfo={tableMenuState.selectionInfo}
-          savedSelection={tableMenuState.savedSelection}
-          onClose={closeTableMenu}
-        />
-      )}
+      {/* Background layer for click detection */}
+      <div
+        className="click-anywhere-bg"
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 0,
+        }}
+      />
     </div>
-  )
+  );
 }

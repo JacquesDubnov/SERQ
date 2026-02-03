@@ -11,11 +11,11 @@
 }
 
 .tiptap-card {
-  --padding: 0.375rem;
+  --padding: 0.75rem;
   --border-width: 1px;
 
   border-radius: calc(var(--padding) + var(--tt-radius-lg));
-  box-shadow: var(--tt-shadow-elevated-md);
+  box-shadow: var(--tt-shadow-dropdown);
   background-color: var(--tiptap-card-bg-color);
   border: 1px solid var(--tiptap-card-border-color);
   display: flex;
@@ -30,7 +30,7 @@
 }
 
 .tiptap-card-header {
-  padding: 0.375rem;
+  padding: 0.75rem 1rem;
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -40,7 +40,7 @@
 }
 
 .tiptap-card-body {
-  padding: 0.375rem;
+  padding: 0.75rem 1rem;
   flex: 1 1 auto;
   overflow-y: auto;
 }
@@ -64,14 +64,19 @@
 }
 
 .tiptap-card-group-label {
-  padding-top: 0.75rem;
+  padding-top: 1rem;
   padding-left: 0.5rem;
   padding-right: 0.5rem;
-  padding-bottom: 0.25rem;
+  padding-bottom: 0.5rem;
   line-height: normal;
-  font-size: 0.75rem;
-  font-weight: 600;
-  line-height: normal;
-  text-transform: capitalize;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   color: var(--tiptap-card-group-label-color);
+}
+
+/* Indented items under group labels (hierarchy) */
+.tiptap-card-item-group .tiptap-button-group {
+  padding-left: 0.75rem;
 }

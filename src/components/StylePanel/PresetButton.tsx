@@ -1,42 +1,48 @@
 /**
- * Preset Button Component
- * Individual clickable preset in the style panel
+ * PresetButton - Individual preset selection button
  */
 
 interface PresetButtonProps {
-  name: string
-  isActive: boolean
-  isCustom?: boolean
-  onClick: () => void
+  name: string;
+  isActive: boolean;
+  onClick: () => void;
+  isDark: boolean;
 }
 
-export function PresetButton({
-  name,
-  isActive,
-  isCustom = false,
-  onClick,
-}: PresetButtonProps) {
+export function PresetButton({ name, isActive, onClick, isDark }: PresetButtonProps) {
+  const bg = isDark ? '#27272a' : '#f5f5f5';
+  const bgActive = isDark ? '#3f3f46' : '#e5e7eb';
+  const bgHover = isDark ? '#3f3f46' : '#e5e7eb';
+  const border = isDark ? '#3f3f46' : '#e5e7eb';
+  const borderActive = isDark ? '#a78bfa' : '#8b5cf6';
+  const textPrimary = isDark ? '#f5f5f5' : '#1a1a1a';
+
   return (
     <button
       onClick={onClick}
-      className={`
-        relative px-3 py-2 text-sm rounded-md border transition-all text-left w-full
-        ${
-          isActive
-            ? 'bg-blue-50 border-blue-300 text-blue-900 shadow-sm'
-            : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300'
+      style={{
+        padding: '10px 12px',
+        fontSize: '13px',
+        border: `1px solid ${isActive ? borderActive : border}`,
+        borderRadius: '6px',
+        backgroundColor: isActive ? bgActive : bg,
+        color: textPrimary,
+        cursor: 'pointer',
+        textAlign: 'left',
+        transition: 'all 100ms ease',
+      }}
+      onMouseEnter={(e) => {
+        if (!isActive) {
+          e.currentTarget.style.backgroundColor = bgHover;
         }
-      `}
+      }}
+      onMouseLeave={(e) => {
+        if (!isActive) {
+          e.currentTarget.style.backgroundColor = bg;
+        }
+      }}
     >
-      <span className="block truncate">{name}</span>
-      {isCustom && (
-        <span
-          className="absolute top-1 right-1 w-2 h-2 rounded-full bg-purple-400"
-          title="Custom preset"
-        />
-      )}
+      {name}
     </button>
-  )
+  );
 }
-
-export default PresetButton

@@ -1,196 +1,370 @@
-@import './float.css';
-@import './columns.css';
-@import './line-numbers.css';
+/**
+ * TipTap Editor Styles
+ *
+ * Uses CSS variables from themes.css and presets system.
+ * Variables prefixed with --color- come from color presets.
+ */
 
-/* Editor wrapper - natural height, don't expand to fill parent */
-.editor-wrapper {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: clip;
-}
-
-/* Editor content area */
+/* Editor container */
 .editor-content {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: clip;
-  max-width: 100%;
+  min-height: 100%;
+  width: 100%;
 }
 
-/* ProseMirror editor styling - uses CSS variables from style presets */
 .editor-content .tiptap {
   outline: none;
-  font-family: var(--font-body);
-  font-size: var(--font-size-base);
-  line-height: var(--line-height-body);
-  letter-spacing: var(--letter-spacing-body);
-  /* !important ensures color presets override any inherited/base styles */
-  color: var(--color-text-primary) !important;
-
-  /* Layout variables */
-  max-width: var(--layout-page-max-width, 720px);
-  padding: var(--layout-page-padding, 1.5rem);
-  padding-bottom: 50vh; /* Large bottom padding for click-anywhere */
-  margin-top: var(--layout-margin-top, 2rem);
-  margin-bottom: var(--layout-margin-bottom, 2rem);
-  margin-left: var(--layout-margin-left, auto);
-  margin-right: var(--layout-margin-right, auto);
-  /* Fill viewport height - ensures empty canvas shows cursor at top */
-  min-height: calc(100vh - 4rem);
-
-  /* Contain table overflow during column resize */
-  overflow-x: hidden;
-
-  /* CRITICAL: Prevent word breaking and hyphenation globally */
-  word-break: normal;
-  overflow-wrap: normal;
-  hyphens: none;
-  -webkit-hyphens: none;
-  -ms-hyphens: none;
 }
 
-/* When editor is empty or has minimal content, ensure it's visible at top of viewport */
-.editor-content .tiptap:empty,
-.editor-content .tiptap:has(> p.is-editor-empty:only-child) {
-  /* Reset any bottom padding that might cause visual issues */
-  padding-bottom: calc(100vh - 8rem);
+/* Placeholder styling */
+.editor-content .tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: var(--color-text-muted, #9ca3af);
+  pointer-events: none;
+  height: 0;
 }
 
-/* Prose typography */
-.editor-content .tiptap > * + * {
-  margin-top: 0.75em;
+/* Prose defaults - uses preset variables */
+.editor-content .tiptap {
+  font-family: var(--font-body, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  font-size: var(--font-size-base, 16px);
+  line-height: var(--layout-line-spacing, var(--line-height-body, 1.6));
+  letter-spacing: var(--letter-spacing-body, 0);
+  color: var(--color-text-primary, #1a1a1a);
+  text-align: var(--layout-text-align, left);
 }
 
-/* Headings */
+/* Headings
+ *
+ * Spacing uses CSS custom properties for future per-heading overrides:
+ * - --h1-spacing-before, --h1-spacing-after (etc.) can override global spacing
+ * - When not set, falls back to global --paragraph-spacing-before/after
+ *
+ * FUTURE: Per-heading custom spacing via heading context menu will set
+ * these variables on individual heading elements via inline styles.
+ */
+.editor-content .tiptap h1,
+.editor-content .tiptap h2,
+.editor-content .tiptap h3,
+.editor-content .tiptap h4,
+.editor-content .tiptap h5,
+.editor-content .tiptap h6 {
+  font-family: var(--font-heading, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  color: var(--color-text-primary, #1a1a1a);
+  line-height: var(--line-height-heading, 1.2);
+}
+
+/* ===== HEADING STYLES =====
+ * Consolidated heading styles with custom override support.
+ * --hN-* variables are set dynamically when custom styles are applied via context menu.
+ * Falls back to document defaults (--font-size-h1, etc.) then hardcoded defaults.
+ */
 .editor-content .tiptap h1 {
-  font-family: var(--font-heading);
-  font-size: var(--font-size-h1);
-  font-weight: 700;
-  line-height: var(--line-height-heading);
-  letter-spacing: var(--letter-spacing-heading);
-  color: var(--color-text-primary) !important;
-  margin-top: 1.5rem;
-  margin-bottom: 0.5rem;
+  font-size: var(--h1-font-size, var(--font-size-h1, 2.25rem));
+  font-family: var(--h1-font-family, var(--font-heading));
+  font-weight: var(--h1-font-weight, 700);
+  font-style: var(--h1-font-style, normal);
+  text-decoration: var(--h1-text-decoration, none);
+  letter-spacing: var(--h1-letter-spacing, inherit);
+  line-height: var(--h1-line-height, var(--line-height-heading, 1.2));
+  color: var(--h1-color, var(--color-text-primary));
+  background-color: var(--h1-background-color, transparent);
+  caret-color: var(--h1-color, var(--color-text-primary, #1a1a1a));
+  margin-top: var(--h1-spacing-before, var(--paragraph-spacing-before, 0));
+  margin-bottom: var(--h1-spacing-after, var(--paragraph-spacing-after, 12px));
+  position: relative;
 }
 
 .editor-content .tiptap h2 {
-  font-family: var(--font-heading);
-  font-size: var(--font-size-h2);
-  font-weight: 600;
-  line-height: var(--line-height-heading);
-  letter-spacing: var(--letter-spacing-heading);
-  color: var(--color-text-primary) !important;
-  margin-top: 1.25rem;
-  margin-bottom: 0.5rem;
+  font-size: var(--h2-font-size, var(--font-size-h2, 1.75rem));
+  font-family: var(--h2-font-family, var(--font-heading));
+  font-weight: var(--h2-font-weight, 600);
+  font-style: var(--h2-font-style, normal);
+  text-decoration: var(--h2-text-decoration, none);
+  letter-spacing: var(--h2-letter-spacing, inherit);
+  line-height: var(--h2-line-height, var(--line-height-heading, 1.2));
+  color: var(--h2-color, var(--color-text-primary));
+  background-color: var(--h2-background-color, transparent);
+  caret-color: var(--h2-color, var(--color-text-primary, #1a1a1a));
+  margin-top: var(--h2-spacing-before, var(--paragraph-spacing-before, 0));
+  margin-bottom: var(--h2-spacing-after, var(--paragraph-spacing-after, 12px));
+  position: relative;
 }
 
 .editor-content .tiptap h3 {
-  font-family: var(--font-heading);
-  font-size: var(--font-size-h3);
-  font-weight: 600;
-  line-height: var(--line-height-heading);
-  letter-spacing: var(--letter-spacing-heading);
-  color: var(--color-text-primary) !important;
-  margin-top: 1rem;
-  margin-bottom: 0.5rem;
+  font-size: var(--h3-font-size, var(--font-size-h3, 1.375rem));
+  font-family: var(--h3-font-family, var(--font-heading));
+  font-weight: var(--h3-font-weight, 600);
+  font-style: var(--h3-font-style, normal);
+  text-decoration: var(--h3-text-decoration, none);
+  letter-spacing: var(--h3-letter-spacing, inherit);
+  line-height: var(--h3-line-height, var(--line-height-heading, 1.2));
+  color: var(--h3-color, var(--color-text-primary));
+  background-color: var(--h3-background-color, transparent);
+  caret-color: var(--h3-color, var(--color-text-primary, #1a1a1a));
+  margin-top: var(--h3-spacing-before, var(--paragraph-spacing-before, 0));
+  margin-bottom: var(--h3-spacing-after, var(--paragraph-spacing-after, 12px));
+  position: relative;
 }
 
-/* Paragraphs */
+.editor-content .tiptap h4 {
+  font-size: var(--h4-font-size, var(--font-size-h4, 1.125rem));
+  font-family: var(--h4-font-family, var(--font-heading));
+  font-weight: var(--h4-font-weight, 600);
+  font-style: var(--h4-font-style, normal);
+  text-decoration: var(--h4-text-decoration, none);
+  letter-spacing: var(--h4-letter-spacing, inherit);
+  line-height: var(--h4-line-height, var(--line-height-heading, 1.2));
+  color: var(--h4-color, var(--color-text-primary));
+  background-color: var(--h4-background-color, transparent);
+  caret-color: var(--h4-color, var(--color-text-primary, #1a1a1a));
+  margin-top: var(--h4-spacing-before, var(--paragraph-spacing-before, 0));
+  margin-bottom: var(--h4-spacing-after, var(--paragraph-spacing-after, 12px));
+  position: relative;
+}
+
+.editor-content .tiptap h5,
+.editor-content .tiptap h6 {
+  font-size: var(--h5-font-size, 1rem);
+  font-family: var(--h5-font-family, var(--font-heading));
+  font-weight: var(--h5-font-weight, 600);
+  font-style: var(--h5-font-style, normal);
+  text-decoration: var(--h5-text-decoration, none);
+  letter-spacing: var(--h5-letter-spacing, inherit);
+  line-height: var(--h5-line-height, var(--line-height-heading, 1.2));
+  color: var(--h5-color, var(--color-text-primary));
+  background-color: var(--h5-background-color, transparent);
+  caret-color: var(--h5-color, var(--color-text-primary, #1a1a1a));
+  margin-top: var(--h5-spacing-before, var(--paragraph-spacing-before, 0));
+  margin-bottom: var(--h5-spacing-after, var(--paragraph-spacing-after, 12px));
+  position: relative;
+}
+
+/* ===== HEADING DIVIDERS =====
+ * Dividing lines above/below headings via ::before and ::after pseudo-elements.
+ * Controlled by CSS variables set from styleStore.headingCustomStyles[hN].divider
+ *
+ * Variables per heading (e.g., --h1-divider-*):
+ *   --hN-divider-enabled: 0 or 1
+ *   --hN-divider-position: below | above | both
+ *   --hN-divider-distance: distance from text (e.g., 0.5em)
+ *   --hN-divider-color: color value (default: currentColor)
+ *   --hN-divider-thickness: line thickness (e.g., 1px)
+ *   --hN-divider-double: 0 or 1 for double line
+ *   --hN-divider-style: solid | dashed | dotted | wavy | zigzag | gradient
+ */
+
+/* Base divider styles - only show when enabled */
+.editor-content .tiptap h1::before,
+.editor-content .tiptap h1::after,
+.editor-content .tiptap h2::before,
+.editor-content .tiptap h2::after,
+.editor-content .tiptap h3::before,
+.editor-content .tiptap h3::after,
+.editor-content .tiptap h4::before,
+.editor-content .tiptap h4::after,
+.editor-content .tiptap h5::before,
+.editor-content .tiptap h5::after,
+.editor-content .tiptap h6::before,
+.editor-content .tiptap h6::after {
+  content: '';
+  display: none;
+  width: 100%;
+  height: 0;
+  border: none;
+}
+
+/* H1 Divider - Below */
+.editor-content .tiptap h1::after {
+  display: var(--h1-divider-show-after, none);
+  margin-top: var(--h1-divider-distance, 0.5em);
+  border-bottom-width: var(--h1-divider-thickness, 1px);
+  border-bottom-style: var(--h1-divider-style, solid);
+  border-bottom-color: var(--h1-divider-color, currentColor);
+}
+
+/* H1 Divider - Above */
+.editor-content .tiptap h1::before {
+  display: var(--h1-divider-show-before, none);
+  margin-bottom: var(--h1-divider-distance, 0.5em);
+  border-bottom-width: var(--h1-divider-thickness, 1px);
+  border-bottom-style: var(--h1-divider-style, solid);
+  border-bottom-color: var(--h1-divider-color, currentColor);
+}
+
+/* H2 Divider - Below */
+.editor-content .tiptap h2::after {
+  display: var(--h2-divider-show-after, none);
+  margin-top: var(--h2-divider-distance, 0.5em);
+  border-bottom-width: var(--h2-divider-thickness, 1px);
+  border-bottom-style: var(--h2-divider-style, solid);
+  border-bottom-color: var(--h2-divider-color, currentColor);
+}
+
+/* H2 Divider - Above */
+.editor-content .tiptap h2::before {
+  display: var(--h2-divider-show-before, none);
+  margin-bottom: var(--h2-divider-distance, 0.5em);
+  border-bottom-width: var(--h2-divider-thickness, 1px);
+  border-bottom-style: var(--h2-divider-style, solid);
+  border-bottom-color: var(--h2-divider-color, currentColor);
+}
+
+/* H3 Divider - Below */
+.editor-content .tiptap h3::after {
+  display: var(--h3-divider-show-after, none);
+  margin-top: var(--h3-divider-distance, 0.5em);
+  border-bottom-width: var(--h3-divider-thickness, 1px);
+  border-bottom-style: var(--h3-divider-style, solid);
+  border-bottom-color: var(--h3-divider-color, currentColor);
+}
+
+/* H3 Divider - Above */
+.editor-content .tiptap h3::before {
+  display: var(--h3-divider-show-before, none);
+  margin-bottom: var(--h3-divider-distance, 0.5em);
+  border-bottom-width: var(--h3-divider-thickness, 1px);
+  border-bottom-style: var(--h3-divider-style, solid);
+  border-bottom-color: var(--h3-divider-color, currentColor);
+}
+
+/* H4 Divider */
+.editor-content .tiptap h4::after {
+  display: var(--h4-divider-show-after, none);
+  margin-top: var(--h4-divider-distance, 0.5em);
+  border-bottom-width: var(--h4-divider-thickness, 1px);
+  border-bottom-style: var(--h4-divider-style, solid);
+  border-bottom-color: var(--h4-divider-color, currentColor);
+}
+
+.editor-content .tiptap h4::before {
+  display: var(--h4-divider-show-before, none);
+  margin-bottom: var(--h4-divider-distance, 0.5em);
+  border-bottom-width: var(--h4-divider-thickness, 1px);
+  border-bottom-style: var(--h4-divider-style, solid);
+  border-bottom-color: var(--h4-divider-color, currentColor);
+}
+
+/* H5 Divider */
+.editor-content .tiptap h5::after {
+  display: var(--h5-divider-show-after, none);
+  margin-top: var(--h5-divider-distance, 0.5em);
+  border-bottom-width: var(--h5-divider-thickness, 1px);
+  border-bottom-style: var(--h5-divider-style, solid);
+  border-bottom-color: var(--h5-divider-color, currentColor);
+}
+
+.editor-content .tiptap h5::before {
+  display: var(--h5-divider-show-before, none);
+  margin-bottom: var(--h5-divider-distance, 0.5em);
+  border-bottom-width: var(--h5-divider-thickness, 1px);
+  border-bottom-style: var(--h5-divider-style, solid);
+  border-bottom-color: var(--h5-divider-color, currentColor);
+}
+
+/* H6 Divider */
+.editor-content .tiptap h6::after {
+  display: var(--h6-divider-show-after, none);
+  margin-top: var(--h6-divider-distance, 0.5em);
+  border-bottom-width: var(--h6-divider-thickness, 1px);
+  border-bottom-style: var(--h6-divider-style, solid);
+  border-bottom-color: var(--h6-divider-color, currentColor);
+}
+
+.editor-content .tiptap h6::before {
+  display: var(--h6-divider-show-before, none);
+  margin-bottom: var(--h6-divider-distance, 0.5em);
+  border-bottom-width: var(--h6-divider-thickness, 1px);
+  border-bottom-style: var(--h6-divider-style, solid);
+  border-bottom-color: var(--h6-divider-color, currentColor);
+}
+
+/* Double line variant - uses border-style: double */
+/* Note: For double lines, thickness should be at least 3px */
+
+/* Wavy divider style - uses background pattern */
+.editor-content .tiptap h1[data-divider-wavy]::after,
+.editor-content .tiptap h1[data-divider-wavy]::before,
+.editor-content .tiptap h2[data-divider-wavy]::after,
+.editor-content .tiptap h2[data-divider-wavy]::before,
+.editor-content .tiptap h3[data-divider-wavy]::after,
+.editor-content .tiptap h3[data-divider-wavy]::before {
+  border: none;
+  height: var(--divider-thickness, 2px);
+  background: repeating-linear-gradient(
+    90deg,
+    var(--divider-color, currentColor) 0,
+    var(--divider-color, currentColor) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='4'%3E%3Cpath d='M0 2 Q5 0 10 2 T20 2' stroke='black' fill='none' stroke-width='2'/%3E%3C/svg%3E");
+  mask-repeat: repeat-x;
+  mask-size: 20px 4px;
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='4'%3E%3Cpath d='M0 2 Q5 0 10 2 T20 2' stroke='black' fill='none' stroke-width='2'/%3E%3C/svg%3E");
+  -webkit-mask-repeat: repeat-x;
+  -webkit-mask-size: 20px 4px;
+}
+
+/* Gradient divider style */
+.editor-content .tiptap h1[data-divider-gradient]::after,
+.editor-content .tiptap h1[data-divider-gradient]::before,
+.editor-content .tiptap h2[data-divider-gradient]::after,
+.editor-content .tiptap h2[data-divider-gradient]::before,
+.editor-content .tiptap h3[data-divider-gradient]::after,
+.editor-content .tiptap h3[data-divider-gradient]::before {
+  border: none;
+  height: var(--divider-thickness, 1px);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--divider-color, currentColor) 20%,
+    var(--divider-color, currentColor) 80%,
+    transparent
+  );
+}
+
+/* Paragraphs - global spacing from style store */
 .editor-content .tiptap p {
-  font-size: var(--font-size-base);
-  line-height: var(--line-height-body);
-  color: var(--color-text-primary) !important;
-  text-align: var(--layout-text-align, left);
-  margin-bottom: var(--layout-paragraph-spacing, 1rem);
+  margin-top: var(--paragraph-spacing-before, 0);
+  margin-bottom: var(--paragraph-spacing-after, 12px);
   text-indent: var(--layout-paragraph-indent, 0);
-  /* Prevent word breaking */
-  word-break: normal;
-  overflow-wrap: normal;
-  hyphens: none;
 }
 
-/* Inline styles */
-.editor-content .tiptap strong {
-  font-weight: 600;
+/* First/last child margin handling for paragraphs and headings */
+.editor-content .tiptap p:first-child,
+.editor-content .tiptap h1:first-child,
+.editor-content .tiptap h2:first-child,
+.editor-content .tiptap h3:first-child,
+.editor-content .tiptap h4:first-child,
+.editor-content .tiptap h5:first-child,
+.editor-content .tiptap h6:first-child {
+  margin-top: 0;
 }
 
-.editor-content .tiptap em {
-  font-style: italic;
-}
-
-.editor-content .tiptap u {
-  text-decoration: underline;
-}
-
-.editor-content .tiptap s {
-  text-decoration: line-through;
-}
-
-.editor-content .tiptap sub {
-  font-size: 0.75em;
-  vertical-align: sub;
-}
-
-.editor-content .tiptap sup {
-  font-size: 0.75em;
-  vertical-align: super;
-}
-
-/* Inline code - NOT inside pre blocks */
-.editor-content .tiptap code:not(pre code) {
-  font-family: var(--font-mono);
-  background-color: #f5f5f5;
-  color: #d63384;
-  border-radius: 0.25rem;
-  padding: 0.125rem 0.375rem;
-  font-size: 0.875em;
-  border: 1px solid #e0e0e0;
-}
-
-:root[data-theme="dark"] .editor-content .tiptap code:not(pre code) {
-  background-color: #2d2d2d;
-  border-color: #404040;
-  color: #f8b4b4;
-}
-
-/* Code block - light gray background */
-.editor-content .tiptap pre {
-  background-color: #f5f5f5 !important;
-  color: #1f2937 !important;
-  font-family: var(--font-mono);
-  padding: 1rem;
-  border-radius: 0.5rem;
-  overflow-x: auto;
-  border: 1px solid #e5e7eb;
-  margin: 1rem 0;
-}
-
-/* Code inside pre - reset ALL styles */
-.editor-content .tiptap pre code {
-  all: unset;
-  font-family: var(--font-mono);
-  font-size: 0.875rem;
-  color: #1f2937 !important;
-  line-height: 1.6;
-  display: block;
-  background: transparent !important;
-}
-
-/* Dark mode code block */
-:root[data-theme="dark"] .editor-content .tiptap pre {
-  background-color: #1f2937 !important;
-  color: #e5e7eb !important;
-  border-color: #374151;
-}
-
-:root[data-theme="dark"] .editor-content .tiptap pre code {
-  color: #e5e7eb !important;
+.editor-content .tiptap p:last-child,
+.editor-content .tiptap h1:last-child,
+.editor-content .tiptap h2:last-child,
+.editor-content .tiptap h3:last-child,
+.editor-content .tiptap h4:last-child,
+.editor-content .tiptap h5:last-child,
+.editor-content .tiptap h6:last-child {
+  margin-bottom: 0;
 }
 
 /* Lists */
 .editor-content .tiptap ul,
 .editor-content .tiptap ol {
-  padding-left: 1.5rem;
+  padding-left: var(--layout-list-indent, 1.5rem);
+  margin-bottom: 1em;
+}
+
+.editor-content .tiptap li {
+  margin-bottom: 0.25em;
+}
+
+.editor-content .tiptap li p {
+  margin-bottom: 0.25em;
 }
 
 .editor-content .tiptap ul {
@@ -201,136 +375,177 @@
   list-style-type: decimal;
 }
 
-.editor-content .tiptap li {
-  margin-top: 0.25em;
-  color: var(--color-text-primary);
+/* Nested lists */
+.editor-content .tiptap ul ul,
+.editor-content .tiptap ol ul {
+  list-style-type: circle;
 }
 
-.editor-content .tiptap li p {
-  margin: 0;
+.editor-content .tiptap ul ul ul,
+.editor-content .tiptap ol ul ul {
+  list-style-type: square;
 }
 
 /* Blockquote */
 .editor-content .tiptap blockquote {
   border-left: 3px solid var(--color-blockquote-border, #d1d5db);
-  padding-left: 1rem;
-  margin-left: 0;
-  color: var(--color-blockquote-text, #4b5563);
+  padding-left: var(--layout-blockquote-indent, 1rem);
+  margin: 1rem 0;
+  color: var(--color-blockquote-text, #6b7280);
   font-style: italic;
+}
+
+/* Inline code */
+.editor-content .tiptap code {
+  background-color: var(--color-code-bg, #f3f4f6);
+  color: var(--color-code-text, #1a1a1a);
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, monospace);
+  font-size: 0.875em;
+}
+
+/* Code block */
+.editor-content .tiptap pre {
+  background-color: var(--color-code-bg, #1f2937);
+  color: var(--color-code-text, #f9fafb);
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin: 1rem 0;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Monaco, monospace);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.editor-content .tiptap pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+  font-size: inherit;
+}
+
+/* Links */
+.editor-content .tiptap a,
+.editor-content .tiptap .editor-link {
+  color: var(--color-link, #2563eb);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.editor-content .tiptap a:hover,
+.editor-content .tiptap .editor-link:hover {
+  opacity: 0.8;
 }
 
 /* Horizontal rule */
 .editor-content .tiptap hr {
   border: none;
   border-top: 1px solid var(--color-border, #e5e7eb);
-  margin: 1.5rem 0;
-}
-
-/* Links */
-.editor-content .tiptap a {
-  color: var(--color-link, #2563eb);
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-.editor-content .tiptap a:hover {
-  color: var(--color-accent-hover, #1d4ed8);
+  margin: 2rem 0;
 }
 
 /* Highlight */
 .editor-content .tiptap mark {
   background-color: var(--color-highlight, #fef08a);
   padding: 0.125rem 0;
+  border-radius: 0.125rem;
+}
+
+/* Subscript/Superscript */
+.editor-content .tiptap sub {
+  font-size: 0.75em;
+  vertical-align: sub;
+}
+
+.editor-content .tiptap sup {
+  font-size: 0.75em;
+  vertical-align: super;
 }
 
 /* Text alignment */
-.editor-content .tiptap .is-text-left {
+.editor-content .tiptap [style*="text-align: left"] {
   text-align: left;
 }
 
-.editor-content .tiptap .is-text-center {
+.editor-content .tiptap [style*="text-align: center"] {
   text-align: center;
 }
 
-.editor-content .tiptap .is-text-right {
+.editor-content .tiptap [style*="text-align: right"] {
   text-align: right;
 }
 
-.editor-content .tiptap .is-text-justify {
+.editor-content .tiptap [style*="text-align: justify"] {
   text-align: justify;
 }
 
-/* Placeholder */
-.editor-content .tiptap p.is-editor-empty:first-child::before {
-  content: attr(data-placeholder);
-  float: left;
-  color: var(--color-text-muted, #9ca3af);
+/* Gapcursor styling */
+.ProseMirror-gapcursor {
+  display: none;
   pointer-events: none;
-  height: 0;
+  position: absolute;
 }
 
-/* Selection */
+.ProseMirror-gapcursor:after {
+  content: '';
+  display: block;
+  position: absolute;
+  top: -2px;
+  width: 20px;
+  border-top: 1px solid var(--color-text-primary, #1a1a1a);
+  animation: ProseMirror-cursor-blink 1.1s steps(2, start) infinite;
+}
+
+@keyframes ProseMirror-cursor-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+.ProseMirror-focused .ProseMirror-gapcursor {
+  display: block;
+}
+
+/* Selection styling */
 .editor-content .tiptap ::selection {
-  background-color: var(--color-accent, #2563eb);
-  opacity: 0.3;
+  background-color: var(--color-selection, rgba(59, 130, 246, 0.3));
 }
 
-/* ========================================
-   Canvas Layout System
-   ======================================== */
+/* Multi-selection highlight (Cmd+drag for non-consecutive selections) */
+.editor-content .tiptap .multi-selection-highlight {
+  background-color: var(--color-selection, rgba(59, 130, 246, 0.3));
+  border-radius: 2px;
+}
 
-/* Canvas width CSS custom properties for theme system (Phase 3) */
+/* Canvas & Wrapper Styles */
 :root {
-  --canvas-width-narrow: 576px;
-  --canvas-width-normal: 768px;
-  --canvas-width-wide: 1024px;
+  --canvas-width-narrow: 600px;
+  --canvas-width-normal: 720px;
+  --canvas-width-wide: 900px;
   --canvas-width-full: 100%;
 }
 
-/* Canvas container with CSS variable background */
 .canvas-container {
-  overflow-y: auto;
-  overflow-x: hidden;
-  background-color: var(--canvas-bg-color, #ffffff);
-  background-image: var(--canvas-bg-image, none);
-  background-size: var(--canvas-bg-size, auto);
-  background-position: var(--canvas-bg-position, center);
-  background-repeat: var(--canvas-bg-repeat, no-repeat);
+  /* NO scroll here - only the main viewport scrolls */
+  overflow: visible;
+  transition: max-width 0.2s ease;
 }
 
-.canvas-content {
-  padding-left: max(1rem, env(safe-area-inset-left, 1rem));
-  padding-right: max(1rem, env(safe-area-inset-right, 1rem));
+.editor-wrapper {
+  min-height: 100%;
+  cursor: text;
 }
 
-/* Click-anywhere wrapper - enables clicking empty space to place cursor */
-.click-anywhere-wrapper {
-  min-height: calc(100vh - 4rem);
-}
-
-/* Editor content should NOT expand - stays natural height */
-.click-anywhere-wrapper .tiptap {
+.editor-wrapper .tiptap {
   cursor: auto;
-  min-height: auto !important; /* Override any min-height that would make it expand */
 }
 
-/* ========================================
-   Format Painter Cursor
-   ======================================== */
-
-body.format-painter-active,
-body.format-painter-active * {
-  cursor: copy !important;
-}
-
-/* ========================================
-   Responsive Breakpoints
-   ======================================== */
-
+/* Responsive adjustments */
 @media (max-width: 640px) {
-  .canvas-content {
-    padding-left: 1rem;
-    padding-right: 1rem;
+  .canvas-container {
+    padding: 20px !important;
+    border-radius: 0 !important;
   }
 
   .editor-content .tiptap h1 {
@@ -338,17 +553,68 @@ body.format-painter-active * {
   }
 
   .editor-content .tiptap h2 {
-    font-size: 1.375rem;
+    font-size: 1.5rem;
+  }
+
+  .editor-content .tiptap h3 {
+    font-size: 1.25rem;
   }
 }
 
-/* ========================================
-   Print Styles
-   ======================================== */
+/* Zoom slider - thin track with small circle handle */
+.zoom-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100px;
+  height: 2px;
+  background: var(--color-border, #3f3f46);
+  border-radius: 1px;
+  outline: none;
+  cursor: pointer;
+}
 
+.zoom-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  background: var(--color-text-secondary, #a1a1aa);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.zoom-slider::-webkit-slider-thumb:hover {
+  background: var(--color-text-primary, #f5f5f5);
+}
+
+.zoom-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: var(--color-text-secondary, #a1a1aa);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.zoom-slider::-moz-range-thumb:hover {
+  background: var(--color-text-primary, #f5f5f5);
+}
+
+.zoom-slider::-moz-range-track {
+  height: 2px;
+  background: var(--color-border, #3f3f46);
+  border-radius: 1px;
+}
+
+/* Print styles */
 @media print {
   .canvas-container {
     overflow: visible;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    max-width: 100% !important;
   }
 
   .editor-content .tiptap {
@@ -365,50 +631,4 @@ body.format-painter-active * {
     orphans: 3;
     widows: 3;
   }
-}
-
-/* ========================================
-   Drop Cursor (insertion indicator when dragging)
-   ======================================== */
-
-.editor-content .tiptap .ProseMirror-dropcursor {
-  border-color: var(--color-accent, #2563eb) !important;
-  border-width: 3px !important;
-  animation: drop-cursor-glow 1.2s ease-in-out infinite;
-  box-shadow:
-    0 0 8px 2px var(--color-accent, #2563eb),
-    0 0 16px 4px rgba(37, 99, 235, 0.4) !important;
-}
-
-@keyframes drop-cursor-glow {
-  0%, 100% {
-    opacity: 1;
-    box-shadow:
-      0 0 8px 2px var(--color-accent, #2563eb),
-      0 0 16px 4px rgba(37, 99, 235, 0.4);
-  }
-  50% {
-    opacity: 0.7;
-    box-shadow:
-      0 0 12px 4px var(--color-accent, #2563eb),
-      0 0 24px 8px rgba(37, 99, 235, 0.5);
-  }
-}
-
-/* Dark mode drop cursor glow */
-:root[data-theme="dark"] .editor-content .tiptap .ProseMirror-dropcursor {
-  box-shadow:
-    0 0 10px 3px var(--color-accent, #60a5fa),
-    0 0 20px 6px rgba(96, 165, 250, 0.5) !important;
-}
-
-/* Multi-Selection - Additional selections when Cmd-clicking */
-.editor-content .tiptap .multi-selection {
-  background-color: rgba(96, 165, 250, 0.3);
-  border-radius: 2px;
-}
-
-/* Dark mode multi-selection */
-[data-theme="dark"] .editor-content .tiptap .multi-selection {
-  background-color: rgba(96, 165, 250, 0.4);
 }

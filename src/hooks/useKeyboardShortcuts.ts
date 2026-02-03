@@ -1,82 +1,62 @@
-import type { RefObject } from 'react'
-import { useHotkeys } from 'react-hotkeys-hook'
-import { useFileOperations } from './useFileOperations'
-import { useEditorStore } from '../stores/editorStore'
-import type { EditorCoreRef } from '../components/Editor/EditorCore'
-
 /**
- * Common options for all keyboard shortcuts
- * - enableOnContentEditable: Allow shortcuts when cursor is in TipTap editor
- * - enableOnFormTags: Allow shortcuts in any input context
+ * useKeyboardShortcuts - Global keyboard shortcuts for SERQ
+ *
+ * Binds Cmd+S, Cmd+Shift+S, Cmd+O, Cmd+N to file operations.
+ * Uses react-hotkeys-hook for cross-platform support.
  */
+
+import { useHotkeys } from 'react-hotkeys-hook';
+import { useFileOperations } from './useFileOperations';
+import type { EditorCoreRef } from '../components/Editor/EditorCore';
+
 const HOTKEY_OPTIONS = {
-  enableOnContentEditable: true,
-  enableOnFormTags: true,
-} as const
+  enableOnContentEditable: true, // Work when cursor is in TipTap
+  enableOnFormTags: true, // Work in any input context
+  preventDefault: true, // Block browser default behavior
+};
 
-/**
- * Hook that registers global keyboard shortcuts for file operations
- *
- * Shortcuts:
- * - Cmd+S / Ctrl+S: Save document
- * - Cmd+Shift+S / Ctrl+Shift+S: Save As
- * - Cmd+O / Ctrl+O: Open file
- * - Cmd+N / Ctrl+N: New document
- * - Cmd+/ / Ctrl+/: Toggle Markdown source view
- *
- * All shortcuts work even when cursor is focused in the TipTap editor.
- */
-export function useKeyboardShortcuts(editorRef: RefObject<EditorCoreRef | null>) {
-  const { openFile, saveFile, saveFileAs, newFile } = useFileOperations(editorRef)
-  const toggleViewMode = useEditorStore((s) => s.toggleViewMode)
+export function useKeyboardShortcuts(
+  editorRef: React.RefObject<EditorCoreRef | null>
+): void {
+  const { openFile, saveFile, saveFileAs, newFile } = useFileOperations(editorRef);
 
-  // Save: Cmd+S (macOS) / Ctrl+S (Windows/Linux)
+  // Cmd+S / Ctrl+S - Save
   useHotkeys(
     'meta+s, ctrl+s',
     (e) => {
-      e.preventDefault()
-      saveFile()
+      e.preventDefault();
+      saveFile().catch(console.error);
     },
     HOTKEY_OPTIONS
-  )
+  );
 
-  // Save As: Cmd+Shift+S (macOS) / Ctrl+Shift+S (Windows/Linux)
+  // Cmd+Shift+S / Ctrl+Shift+S - Save As
   useHotkeys(
     'meta+shift+s, ctrl+shift+s',
     (e) => {
-      e.preventDefault()
-      saveFileAs()
+      e.preventDefault();
+      saveFileAs().catch(console.error);
     },
     HOTKEY_OPTIONS
-  )
+  );
 
-  // Open: Cmd+O (macOS) / Ctrl+O (Windows/Linux)
+  // Cmd+O / Ctrl+O - Open
   useHotkeys(
     'meta+o, ctrl+o',
     (e) => {
-      e.preventDefault()
-      openFile()
+      e.preventDefault();
+      openFile().catch(console.error);
     },
     HOTKEY_OPTIONS
-  )
+  );
 
-  // New: Cmd+N (macOS) / Ctrl+N (Windows/Linux)
+  // Cmd+N / Ctrl+N - New
   useHotkeys(
     'meta+n, ctrl+n',
     (e) => {
-      e.preventDefault()
-      newFile()
+      e.preventDefault();
+      newFile();
     },
     HOTKEY_OPTIONS
-  )
-
-  // Toggle Markdown source view: Cmd+/ (macOS) / Ctrl+/ (Windows/Linux)
-  useHotkeys(
-    'meta+/, ctrl+/',
-    (e) => {
-      e.preventDefault()
-      toggleViewMode()
-    },
-    HOTKEY_OPTIONS
-  )
+  );
 }

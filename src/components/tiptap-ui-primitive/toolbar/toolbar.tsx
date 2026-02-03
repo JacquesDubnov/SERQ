@@ -1,3 +1,5 @@
+"use client"
+
 import { forwardRef, useCallback, useEffect, useRef, useState } from "react"
 import { Separator } from "@/components/tiptap-ui-primitive/separator"
 import "@/components/tiptap-ui-primitive/toolbar/toolbar.scss"
@@ -8,7 +10,11 @@ import { useComposedRef } from "@/hooks/use-composed-ref"
 type BaseProps = React.HTMLAttributes<HTMLDivElement>
 
 interface ToolbarProps extends BaseProps {
-  variant?: "floating" | "fixed"
+  variant?: "floating" | "fixed" | "row"
+}
+
+interface ToolbarContainerProps extends BaseProps {
+  rows?: 1 | 2
 }
 
 const useToolbarNavigation = (
@@ -119,3 +125,17 @@ export const ToolbarSeparator = forwardRef<HTMLDivElement, BaseProps>(
   )
 )
 ToolbarSeparator.displayName = "ToolbarSeparator"
+
+export const ToolbarContainer = forwardRef<HTMLDivElement, ToolbarContainerProps>(
+  ({ children, className, rows = 1, ...props }, ref) => (
+    <div
+      ref={ref}
+      data-rows={rows}
+      className={cn("tiptap-toolbar-container", className)}
+      {...props}
+    >
+      {children}
+    </div>
+  )
+)
+ToolbarContainer.displayName = "ToolbarContainer"
