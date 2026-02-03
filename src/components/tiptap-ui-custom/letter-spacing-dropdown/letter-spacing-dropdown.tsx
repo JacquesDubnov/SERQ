@@ -14,6 +14,9 @@ import { ChevronDownIcon } from '@/components/tiptap-icons/chevron-down-icon';
 // Utils - letter-spacing can be block OR inline depending on selection
 import { getTextStyleAtCursor, getBlockAttrsAtCursor } from '@/lib/editor-utils';
 
+// Store - subscribe to headingCustomStyles changes
+import { useStyleStore } from '@/stores/styleStore';
+
 // TipTap UI Primitives
 import { Button, ButtonGroup } from '@/components/tiptap-ui-primitive/button';
 import {
@@ -69,6 +72,9 @@ export const LetterSpacingDropdown = forwardRef<HTMLButtonElement, LetterSpacing
     const [isEditing, setIsEditing] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
 
+    // Subscribe to styleStore - re-render when heading styles change
+    const headingCustomStyles = useStyleStore((state) => state.headingCustomStyles);
+
     // Parse letter spacing value to number (handles px or unitless)
     const parseSpacing = (value: string | undefined): number => {
       if (!value || value === 'normal' || value === '0') return 0;
@@ -77,7 +83,7 @@ export const LetterSpacingDropdown = forwardRef<HTMLButtonElement, LetterSpacing
       return isNaN(num) ? 0 : num;
     };
 
-    // Update current spacing when editor selection changes
+    // Update current spacing when editor selection changes OR heading styles change
     // Letter-spacing can be inline (when text selected) or block (when no selection)
     useEffect(() => {
       const updateSpacing = () => {
@@ -116,7 +122,7 @@ export const LetterSpacingDropdown = forwardRef<HTMLButtonElement, LetterSpacing
         editor.off('selectionUpdate', updateSpacing);
         editor.off('transaction', updateSpacing);
       };
-    }, [editor, isEditing]);
+    }, [editor, isEditing, headingCustomStyles]); // Re-run when headingCustomStyles changes
 
     const applySpacing = useCallback(
       (spacing: number) => {

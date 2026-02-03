@@ -61,6 +61,15 @@ export function getStyleContext(editor: Editor): StyleContext {
     ? (node.attrs.level as HeadingLevel)
     : undefined;
 
+  console.log('[getStyleContext]', {
+    nodeName: node.type.name,
+    blockType,
+    headingLevel,
+    scope,
+    from,
+    to,
+  });
+
   return {
     editor,
     scope,

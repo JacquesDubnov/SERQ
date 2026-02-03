@@ -1,5 +1,6 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-// mod commands;  // TODO: Fix keyring API before re-enabling
+mod commands;
+// Note: AI commands disabled until keyring API is fixed
 
 use tauri_plugin_sql::{Builder as SqlBuilder, Migration, MigrationKind};
 
@@ -38,6 +39,9 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
+            // Debug bridge - always active in dev
+            commands::debug_bridge_log,
+            commands::debug_bridge_clear,
             // TODO: Re-enable after fixing keyring API
             // commands::set_api_key,
             // commands::get_api_key,

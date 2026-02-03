@@ -14,6 +14,7 @@ import {
   clearStyle,
   toggleStyle,
   isHeadingContext,
+  STYLE_PROPERTY_META,
   type StyleProperty,
   type StyleValue,
   type StyleContext,
@@ -182,7 +183,14 @@ export function useUnifiedToggle(
   const canToggle = useMemo(() => {
     if (!editor || !editor.isEditable) return false;
     if (result.context?.blockType === 'codeBlock') return false;
-    return editor.can().toggleMark(property);
+    // Use the TipTap mark name, not the StyleProperty name
+    const meta = STYLE_PROPERTY_META[property];
+    const markName = meta?.markName || property;
+    try {
+      return editor.can().toggleMark(markName);
+    } catch {
+      return false;
+    }
   }, [editor, result.context, property]);
 
   return {

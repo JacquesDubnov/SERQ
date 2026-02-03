@@ -14,6 +14,9 @@ import { ChevronDownIcon } from '@/components/tiptap-icons/chevron-down-icon';
 // Utils
 import { getTextStyleAtCursor } from '@/lib/editor-utils';
 
+// Store - subscribe to headingCustomStyles changes
+import { useStyleStore } from '@/stores/styleStore';
+
 // TipTap UI Primitives
 import { Button, ButtonGroup } from '@/components/tiptap-ui-primitive/button';
 import {
@@ -77,7 +80,10 @@ export const FontSizeDropdown = forwardRef<HTMLButtonElement, FontSizeDropdownPr
     const [isEditing, setIsEditing] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
 
-    // Update current size when editor selection changes
+    // Subscribe to styleStore - re-render when heading styles change
+    const headingCustomStyles = useStyleStore((state) => state.headingCustomStyles);
+
+    // Update current size when editor selection changes OR heading styles change
     useEffect(() => {
       const updateSize = () => {
         const attrs = getTextStyleAtCursor(editor);
@@ -108,7 +114,7 @@ export const FontSizeDropdown = forwardRef<HTMLButtonElement, FontSizeDropdownPr
         editor.off('selectionUpdate', updateSize);
         editor.off('transaction', updateSize);
       };
-    }, [editor, isEditing]);
+    }, [editor, isEditing, headingCustomStyles]); // Re-run when headingCustomStyles changes
 
     const applySize = useCallback(
       (size: number) => {

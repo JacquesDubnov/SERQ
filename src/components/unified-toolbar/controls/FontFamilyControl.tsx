@@ -1,23 +1,17 @@
 /**
- * FontFamilyDropdown - Dynamic Font Selection
+ * FontFamilyControl - Unified font family dropdown
  *
- * Fonts are loaded from styleStore - fully configurable by user.
- * No hardcoded font lists. Everything is dynamic.
+ * Uses useUnifiedFontFamily hook for context-aware styling.
+ * Shows blue dot when displaying heading-level style.
+ *
+ * IMPORTANT: Font options come from styleStore (dynamic, user-configurable).
+ * Never hardcode font lists here.
  */
 
-import { forwardRef, useCallback, useState, useEffect } from 'react';
+import { forwardRef, useCallback, useState } from 'react';
 import type { Editor } from '@tiptap/core';
 
-// TipTap Icons
 import { ChevronDownIcon } from '@/components/tiptap-icons/chevron-down-icon';
-
-// Utils
-import { getTextStyleAtCursor } from '@/lib/editor-utils';
-
-// Store - dynamic font configuration + heading style reactivity
-import { useStyleStore } from '@/stores/styleStore';
-
-// TipTap UI Primitives
 import { Button, ButtonGroup } from '@/components/tiptap-ui-primitive/button';
 import {
   DropdownMenu,
@@ -28,57 +22,37 @@ import {
 import { Card, CardBody, CardGroupLabel, CardItemGroup } from '@/components/tiptap-ui-primitive/card';
 import { Separator } from '@/components/tiptap-ui-primitive/separator';
 
-interface FontFamilyDropdownProps {
+import { useUnifiedFontFamily } from '@/hooks/style-hooks';
+import { useStyleStore } from '@/stores/styleStore';
+
+interface FontFamilyControlProps {
   editor: Editor;
 }
 
-export const FontFamilyDropdown = forwardRef<HTMLButtonElement, FontFamilyDropdownProps>(
+export const FontFamilyControl = forwardRef<HTMLButtonElement, FontFamilyControlProps>(
   ({ editor }, ref) => {
     const [isOpen, setIsOpen] = useState(false);
-    const [currentFont, setCurrentFont] = useState('Font');
-    const [currentValue, setCurrentValue] = useState<string | null>(null);
 
-    // Subscribe to styleStore - dynamic font configuration + heading style reactivity
-    const headingCustomStyles = useStyleStore((state) => state.headingCustomStyles);
+    // Get dynamic font categories from store
     const fontCategories = useStyleStore((state) => state.fontCategories);
-    const availableFonts = useStyleStore((state) => state.availableFonts);
 
-    // Update current font when editor selection changes OR heading styles change
-    useEffect(() => {
-      const updateFont = () => {
-        const attrs = getTextStyleAtCursor(editor);
-        const fontFamily = (attrs.fontFamily as string) || null;
+    const {
+      value,
+      displayName,
+      isHeadingLevel,
+      setFontFamily,
+      clearFontFamily,
+    } = useUnifiedFontFamily(editor);
 
-        // Find match in dynamic font list from store
-        const match = availableFonts.find((f) => f.value === fontFamily);
-        console.log('[FontFamilyDropdown] fontFamily:', fontFamily, '| match:', match?.label || 'none');
-
-        setCurrentValue(fontFamily);
-        setCurrentFont(match?.label || 'Font');
-      };
-
-      updateFont();
-      editor.on('selectionUpdate', updateFont);
-      editor.on('transaction', updateFont);
-
-      return () => {
-        editor.off('selectionUpdate', updateFont);
-        editor.off('transaction', updateFont);
-      };
-    }, [editor, headingCustomStyles, availableFonts]); // Re-run when fonts or headingCustomStyles changes
-
-    const handleFontSelect = useCallback(
-      (fontValue: string) => {
-        editor.chain().focus().setFontFamily(fontValue).run();
-        setIsOpen(false);
-      },
-      [editor]
-    );
+    const handleFontSelect = useCallback((fontValue: string) => {
+      setFontFamily(fontValue);
+      setIsOpen(false);
+    }, [setFontFamily]);
 
     const handleUnset = useCallback(() => {
-      editor.chain().focus().unsetFontFamily().run();
+      clearFontFamily();
       setIsOpen(false);
-    }, [editor]);
+    }, [clearFontFamily]);
 
     return (
       <DropdownMenu modal open={isOpen} onOpenChange={setIsOpen}>
@@ -91,18 +65,53 @@ export const FontFamilyDropdown = forwardRef<HTMLButtonElement, FontFamilyDropdo
             aria-label="Select font family"
             tooltip="Font Family"
             ref={ref}
-            style={{ minWidth: '100px' }}
+            style={{ minWidth: '100px', position: 'relative' }}
           >
             <span className="tiptap-button-text" style={{ fontSize: '12px' }}>
-              {currentFont}
+              {displayName}
             </span>
+            {isHeadingLevel && (
+              <span
+                className="heading-level-indicator"
+                style={{
+                  position: 'absolute',
+                  top: '4px',
+                  right: '4px',
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  backgroundColor: 'var(--color-accent, #3b82f6)',
+                }}
+                title="Applies to all headings of this level"
+              />
+            )}
             <ChevronDownIcon className="tiptap-button-dropdown-small" />
           </Button>
         </DropdownMenuTrigger>
 
-        <DropdownMenuContent align="start" style={{ width: '200px', padding: 0, background: 'transparent', border: 'none', boxShadow: 'none', borderRadius: '12px', overflow: 'hidden' }}>
+        <DropdownMenuContent
+          align="start"
+          style={{
+            width: '200px',
+            padding: 0,
+            background: 'transparent',
+            border: 'none',
+            boxShadow: 'none',
+            borderRadius: '12px',
+            overflow: 'hidden',
+          }}
+        >
           <Card style={{ overflow: 'hidden', width: '100%', borderRadius: '12px' }}>
-            <CardBody style={{ maxHeight: '400px', overflowY: 'auto', overflowX: 'hidden', paddingTop: '12px', paddingBottom: '12px', paddingRight: '4px' }}>
+            <CardBody
+              style={{
+                maxHeight: '400px',
+                overflowY: 'auto',
+                overflowX: 'hidden',
+                paddingTop: '12px',
+                paddingBottom: '12px',
+                paddingRight: '4px',
+              }}
+            >
               {/* Default/Reset option */}
               <CardItemGroup>
                 <DropdownMenuItem asChild>
@@ -130,9 +139,14 @@ export const FontFamilyDropdown = forwardRef<HTMLButtonElement, FontFamilyDropdo
                           <Button
                             type="button"
                             data-style="ghost"
-                            data-active-state={currentValue === font.value ? 'on' : 'off'}
+                            data-active-state={value === font.value ? 'on' : 'off'}
                             onClick={() => handleFontSelect(font.value)}
-                            style={{ width: '100%', justifyContent: 'flex-start', fontFamily: font.value, padding: '8px 12px' }}
+                            style={{
+                              width: '100%',
+                              justifyContent: 'flex-start',
+                              fontFamily: font.value,
+                              padding: '8px 12px',
+                            }}
                           >
                             <span className="tiptap-button-text">{font.label}</span>
                           </Button>
@@ -155,9 +169,14 @@ export const FontFamilyDropdown = forwardRef<HTMLButtonElement, FontFamilyDropdo
                           <Button
                             type="button"
                             data-style="ghost"
-                            data-active-state={currentValue === font.value ? 'on' : 'off'}
+                            data-active-state={value === font.value ? 'on' : 'off'}
                             onClick={() => handleFontSelect(font.value)}
-                            style={{ width: '100%', justifyContent: 'flex-start', fontFamily: font.value, padding: '8px 12px' }}
+                            style={{
+                              width: '100%',
+                              justifyContent: 'flex-start',
+                              fontFamily: font.value,
+                              padding: '8px 12px',
+                            }}
                           >
                             <span className="tiptap-button-text">{font.label}</span>
                           </Button>
@@ -180,9 +199,14 @@ export const FontFamilyDropdown = forwardRef<HTMLButtonElement, FontFamilyDropdo
                           <Button
                             type="button"
                             data-style="ghost"
-                            data-active-state={currentValue === font.value ? 'on' : 'off'}
+                            data-active-state={value === font.value ? 'on' : 'off'}
                             onClick={() => handleFontSelect(font.value)}
-                            style={{ width: '100%', justifyContent: 'flex-start', fontFamily: font.value, padding: '8px 12px' }}
+                            style={{
+                              width: '100%',
+                              justifyContent: 'flex-start',
+                              fontFamily: font.value,
+                              padding: '8px 12px',
+                            }}
                           >
                             <span className="tiptap-button-text">{font.label}</span>
                           </Button>
@@ -204,9 +228,14 @@ export const FontFamilyDropdown = forwardRef<HTMLButtonElement, FontFamilyDropdo
                         <Button
                           type="button"
                           data-style="ghost"
-                          data-active-state={currentValue === font.value ? 'on' : 'off'}
+                          data-active-state={value === font.value ? 'on' : 'off'}
                           onClick={() => handleFontSelect(font.value)}
-                          style={{ width: '100%', justifyContent: 'flex-start', fontFamily: font.value, padding: '8px 12px' }}
+                          style={{
+                            width: '100%',
+                            justifyContent: 'flex-start',
+                            fontFamily: font.value,
+                            padding: '8px 12px',
+                          }}
                         >
                           <span className="tiptap-button-text">{font.label}</span>
                         </Button>
@@ -223,6 +252,4 @@ export const FontFamilyDropdown = forwardRef<HTMLButtonElement, FontFamilyDropdo
   }
 );
 
-FontFamilyDropdown.displayName = 'FontFamilyDropdown';
-
-export default FontFamilyDropdown;
+FontFamilyControl.displayName = 'FontFamilyControl';

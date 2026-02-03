@@ -21,6 +21,31 @@ import { useEditorStore } from './editorStore';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
+// ===== CONFIGURABLE OPTIONS (User can add/remove/reorder these) =====
+
+export interface FontOption {
+  value: string;    // CSS value, e.g., '"Source Sans 3", sans-serif'
+  label: string;    // Display label, e.g., 'Source Sans 3'
+}
+
+export interface FontWeightOption {
+  value: number;    // CSS font-weight value (100-900)
+  label: string;    // Display label, e.g., 'Bold'
+}
+
+export interface ColorOption {
+  value: string;    // Hex, HSL, or CSS variable
+  label: string;    // Display label
+}
+
+// Categorized fonts for dropdowns with groupings
+export interface FontCategories {
+  sansSerif: FontOption[];
+  serif: FontOption[];
+  display: FontOption[];
+  monospace: FontOption[];
+}
+
 export interface StoredFormat {
   marks: Array<{ type: string; attrs: Record<string, unknown> }>;
   textAlign: string | null;
@@ -153,6 +178,15 @@ interface StyleState {
   // Custom saved styles
   customStyles: CustomStyle[];
 
+  // ===== CONFIGURABLE OPTIONS (Dynamic - user can modify) =====
+  // Fonts organized by category for grouped dropdowns
+  fontCategories: FontCategories;
+  // Flat list of all fonts (computed from categories)
+  availableFonts: FontOption[];
+  availableFontWeights: FontWeightOption[];
+  availableTextColors: ColorOption[];
+  availableHighlightColors: ColorOption[];
+
   // Actions
   setTypography: (presetId: string) => void;
   setColor: (presetId: string) => void;
@@ -192,6 +226,17 @@ interface StyleState {
   resetToDefaults: () => void;
   loadFromMetadata: (metadata: Partial<StyleMetadata>) => void;
   getStyleMetadata: () => StyleMetadata;
+
+  // Configurable options actions
+  addFont: (font: FontOption) => void;
+  removeFont: (value: string) => void;
+  reorderFonts: (fonts: FontOption[]) => void;
+  addFontWeight: (weight: FontWeightOption) => void;
+  removeFontWeight: (value: number) => void;
+  addTextColor: (color: ColorOption) => void;
+  removeTextColor: (value: string) => void;
+  addHighlightColor: (color: ColorOption) => void;
+  removeHighlightColor: (value: string) => void;
 }
 
 // ===== HELPERS =====
@@ -346,6 +391,89 @@ function clearHeadingDividerCSS(level: HeadingLevel) {
   root.style.removeProperty(`${prefix}-divider-show-after`);
 }
 
+// ===== DEFAULT CONFIGURABLE OPTIONS =====
+// These are the default values - users can modify via settings
+
+const DEFAULT_FONT_CATEGORIES: FontCategories = {
+  sansSerif: [
+    { value: 'Inter, sans-serif', label: 'Inter' },
+    { value: 'Roboto, sans-serif', label: 'Roboto' },
+    { value: '"Open Sans", sans-serif', label: 'Open Sans' },
+    { value: 'Lato, sans-serif', label: 'Lato' },
+    { value: 'Montserrat, sans-serif', label: 'Montserrat' },
+    { value: 'Poppins, sans-serif', label: 'Poppins' },
+    { value: '"Source Sans 3", sans-serif', label: 'Source Sans 3' },
+    { value: 'Nunito, sans-serif', label: 'Nunito' },
+    { value: 'Raleway, sans-serif', label: 'Raleway' },
+    { value: '"Work Sans", sans-serif', label: 'Work Sans' },
+  ],
+  serif: [
+    { value: '"Playfair Display", serif', label: 'Playfair Display' },
+    { value: 'Merriweather, serif', label: 'Merriweather' },
+    { value: 'Lora, serif', label: 'Lora' },
+    { value: '"PT Serif", serif', label: 'PT Serif' },
+    { value: '"Libre Baskerville", serif', label: 'Libre Baskerville' },
+    { value: '"Crimson Text", serif', label: 'Crimson Text' },
+    { value: 'Bitter, serif', label: 'Bitter' },
+    { value: '"Source Serif 4", serif', label: 'Source Serif 4' },
+    { value: '"Noto Serif", serif', label: 'Noto Serif' },
+    { value: '"EB Garamond", serif', label: 'EB Garamond' },
+  ],
+  display: [
+    { value: 'Oswald, sans-serif', label: 'Oswald' },
+    { value: '"Bebas Neue", sans-serif', label: 'Bebas Neue' },
+    { value: 'Anton, sans-serif', label: 'Anton' },
+    { value: '"Abril Fatface", serif', label: 'Abril Fatface' },
+    { value: 'Righteous, sans-serif', label: 'Righteous' },
+  ],
+  monospace: [
+    { value: '"Fira Code", monospace', label: 'Fira Code' },
+    { value: '"JetBrains Mono", monospace', label: 'JetBrains Mono' },
+    { value: '"Source Code Pro", monospace', label: 'Source Code Pro' },
+    { value: '"IBM Plex Mono", monospace', label: 'IBM Plex Mono' },
+    { value: '"Roboto Mono", monospace', label: 'Roboto Mono' },
+  ],
+};
+
+const DEFAULT_FONT_WEIGHTS: FontWeightOption[] = [
+  { value: 100, label: 'Thin' },
+  { value: 200, label: 'Extralight' },
+  { value: 300, label: 'Light' },
+  { value: 400, label: 'Regular' },
+  { value: 500, label: 'Medium' },
+  { value: 600, label: 'Semibold' },
+  { value: 700, label: 'Bold' },
+  { value: 800, label: 'Extrabold' },
+  { value: 900, label: 'Black' },
+];
+
+const DEFAULT_TEXT_COLORS: ColorOption[] = [
+  { value: 'var(--tt-color-text-red)', label: 'Red' },
+  { value: 'var(--tt-color-text-orange)', label: 'Orange' },
+  { value: 'var(--tt-color-text-yellow)', label: 'Yellow' },
+  { value: 'var(--tt-color-text-green)', label: 'Green' },
+  { value: 'var(--tt-color-text-blue)', label: 'Blue' },
+  { value: 'var(--tt-color-text-purple)', label: 'Purple' },
+  { value: 'var(--tt-color-text-pink)', label: 'Pink' },
+  { value: 'var(--tt-color-text-gray)', label: 'Gray' },
+];
+
+const DEFAULT_HIGHLIGHT_COLORS: ColorOption[] = [
+  { value: 'var(--tt-color-highlight-red)', label: 'Red' },
+  { value: 'var(--tt-color-highlight-orange)', label: 'Orange' },
+  { value: 'var(--tt-color-highlight-yellow)', label: 'Yellow' },
+  { value: 'var(--tt-color-highlight-green)', label: 'Green' },
+  { value: 'var(--tt-color-highlight-blue)', label: 'Blue' },
+  { value: 'var(--tt-color-highlight-purple)', label: 'Purple' },
+  { value: 'var(--tt-color-highlight-pink)', label: 'Pink' },
+  { value: 'var(--tt-color-highlight-gray)', label: 'Gray' },
+];
+
+// Helper to flatten font categories
+function flattenFontCategories(cats: FontCategories): FontOption[] {
+  return [...cats.sansSerif, ...cats.serif, ...cats.display, ...cats.monospace];
+}
+
 // ===== STORE =====
 
 export const useStyleStore = create<StyleState>((set, get) => ({
@@ -395,6 +523,13 @@ export const useStyleStore = create<StyleState>((set, get) => ({
   },
 
   customStyles: [],
+
+  // ===== CONFIGURABLE OPTIONS - Default values (user can modify) =====
+  fontCategories: DEFAULT_FONT_CATEGORIES,
+  availableFonts: flattenFontCategories(DEFAULT_FONT_CATEGORIES),
+  availableFontWeights: DEFAULT_FONT_WEIGHTS,
+  availableTextColors: DEFAULT_TEXT_COLORS,
+  availableHighlightColors: DEFAULT_HIGHLIGHT_COLORS,
 
   // ===== PRESET SETTERS =====
 
@@ -564,15 +699,22 @@ export const useStyleStore = create<StyleState>((set, get) => ({
   assignStyleToHeading: (level, style) => {
     const key = `h${level}` as keyof StyleState['headingCustomStyles'];
 
+    console.log('[styleStore.assignStyleToHeading] level:', level, 'key:', key);
+    console.log('[styleStore.assignStyleToHeading] style being saved:', JSON.stringify(style, null, 2));
+
     // Apply CSS variables for this heading level
     applyHeadingCustomStyleCSS(level, style);
 
-    set((state) => ({
-      headingCustomStyles: {
-        ...state.headingCustomStyles,
-        [key]: style,
-      },
-    }));
+    set((state) => {
+      const newState = {
+        headingCustomStyles: {
+          ...state.headingCustomStyles,
+          [key]: style,
+        },
+      };
+      console.log('[styleStore.assignStyleToHeading] new headingCustomStyles:', JSON.stringify(newState.headingCustomStyles, null, 2));
+      return newState;
+    });
     markDocumentDirty();
   },
 
@@ -663,7 +805,9 @@ export const useStyleStore = create<StyleState>((set, get) => ({
 
   getHeadingCustomStyle: (level) => {
     const key = `h${level}` as keyof StyleState['headingCustomStyles'];
-    return get().headingCustomStyles[key];
+    const style = get().headingCustomStyles[key];
+    console.log('[styleStore.getHeadingCustomStyle] level:', level, 'key:', key, 'style:', style);
+    return style;
   },
 
   // ===== FORMAT PAINTER =====
@@ -1045,5 +1189,59 @@ export const useStyleStore = create<StyleState>((set, get) => ({
       headingSpacing,
       headingCustomStyles,
     };
+  },
+
+  // ===== CONFIGURABLE OPTIONS ACTIONS =====
+
+  addFont: (font) => {
+    set((state) => ({
+      availableFonts: [...state.availableFonts, font],
+    }));
+  },
+
+  removeFont: (value) => {
+    set((state) => ({
+      availableFonts: state.availableFonts.filter((f) => f.value !== value),
+    }));
+  },
+
+  reorderFonts: (fonts) => {
+    set({ availableFonts: fonts });
+  },
+
+  addFontWeight: (weight) => {
+    set((state) => ({
+      availableFontWeights: [...state.availableFontWeights, weight].sort((a, b) => a.value - b.value),
+    }));
+  },
+
+  removeFontWeight: (value) => {
+    set((state) => ({
+      availableFontWeights: state.availableFontWeights.filter((w) => w.value !== value),
+    }));
+  },
+
+  addTextColor: (color) => {
+    set((state) => ({
+      availableTextColors: [...state.availableTextColors, color],
+    }));
+  },
+
+  removeTextColor: (value) => {
+    set((state) => ({
+      availableTextColors: state.availableTextColors.filter((c) => c.value !== value),
+    }));
+  },
+
+  addHighlightColor: (color) => {
+    set((state) => ({
+      availableHighlightColors: [...state.availableHighlightColors, color],
+    }));
+  },
+
+  removeHighlightColor: (value) => {
+    set((state) => ({
+      availableHighlightColors: state.availableHighlightColors.filter((c) => c.value !== value),
+    }));
   },
 }));

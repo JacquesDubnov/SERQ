@@ -1,117 +1,50 @@
 # SERQ Session Handover
 
 **Last Updated:** 2026-02-03
-**Branch:** `feature/unified-style-system`
+**Branch:** main
 
 ---
 
 ## Project Overview
 
-SERQ is a Tauri-based desktop text editor using TipTap (ProseMirror). Currently building a **Unified Style System** to replace the dual-system architecture (TipTap marks + CSS variables) with a single, coherent styling architecture.
+SERQ is a Tauri-based desktop text editor using TipTap (ProseMirror). We've built a **Unified Style System** that makes the toolbar heading-aware - when cursor is in a heading with assigned custom styles, the toolbar shows those styles instead of TipTap's default mark values.
 
 ---
 
-## Current Work: Unified Style System
+## Current State: Heading-Aware Toolbar COMPLETE
 
-### Why We're Doing This
+### What's Working
 
-The previous toolbar didn't reflect heading-level styles because:
-- Toolbar reads from TipTap marks (editor.state)
-- Heading styles live in styleStore (CSS variables)
-- Two separate systems duct-taped together
+1. **UnifiedToolbar** - Single toolbar (exact replica of original EditorToolbar)
+   - Two rows: History, Fonts, Marks, Colors, Links, Clear / Headings, Lists, Alignment, Spacing
+   - All original components with input fields, +/- buttons, dropdowns
 
-The user wants a **modular, unified system** that can be exposed through:
-1. **Toolbar** (Word-style)
-2. **Context menus** (Notion-style)
-3. **Keyboard shortcuts** (power user)
-4. Any combination of the above
+2. **Heading Context Menu** - Right-click H1-H6 buttons to:
+   - Assign current style to heading type
+   - Customize style (inline typography panel)
+   - Reset to default
+   - Add dividing line with settings
 
-### What's Been Built (Foundation Complete)
+3. **Heading-Aware Toolbar Components**
+   - Font dropdowns read from styleStore for headings (via editor-utils.ts)
+   - Mark buttons (Bold/Italic/Underline/Strike) read from styleStore for headings
+   - Color popover reads from styleStore for headings, resolves CSS variables
 
-**1. Style Operations Layer** (`src/lib/style-operations/`)
-- `types.ts` - Core types: StyleContext, StyleProperty, StyleValue, StyleSource
-- `context.ts` - Detect current context (is cursor in heading? what level?)
-- `read.ts` - Read styles from marks, nodeAttrs, OR styleStore (auto-routes)
-- `write.ts` - Write styles to correct destination based on context
+### Architecture
 
-**2. Unified Hooks Layer** (`src/hooks/style-hooks/`)
-- `useUnifiedStyle` - Base hook for all style operations
-- `useUnifiedFontFamily` - Font family with display name resolution
-- `useUnifiedFontSize` - Font size in pixels
-- `useUnifiedFontWeight` - Font weight 100-900 with labels
-- `useUnifiedColor` / `useUnifiedHighlight` / `useUnifiedBackgroundColor`
-- `useUnifiedMark` - Bold, italic, underline, strikethrough, code
-- `useUnifiedLineHeight` / `useUnifiedLetterSpacing` / `useUnifiedSpacing`
-- `useUnifiedTextAlign` - Alignment buttons
+**See `.planning/UNIFIED-STYLE-SYSTEM-ARCHITECTURE.md`** for complete documentation.
 
-**Key Features:**
-- All hooks return `isHeadingLevel: boolean` for UI indicator
-- All hooks return `source: 'mark' | 'cssVar' | 'default'`
-- Single entry point: `readStyle()` and `writeStyle()` route automatically
-- Context-aware: headings → styleStore, paragraphs → marks
-
-### What's Next (Not Started)
-
-**3. Unified Toolbar Components** (`src/components/unified-toolbar/`)
-Build toolbar controls that USE the unified hooks:
-- FontFamilyControl
-- FontSizeControl
-- FontWeightControl
-- MarkToggle (bold/italic/etc.)
-- ColorControl
-- TextAlignControl
-- etc.
-
-**4. Integration**
-- Add toggle to switch between old/new toolbar for testing
-- Test all scenarios (paragraph, heading, mixed selection)
-- Replace EditorToolbar with UnifiedToolbar
-- Archive old components
-
----
-
-## Architecture Overview
+Key concept: **editor-utils.ts is THE BRIDGE** between toolbar and styles.
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    UNIFIED STYLE SYSTEM                     │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │              CONTROL SURFACES (UI)                   │   │
-│  │  ┌─────────┐ ┌──────────┐ ┌──────────┐ ┌─────────┐ │   │
-│  │  │ Toolbar │ │ Context  │ │ Keyboard │ │  Slash  │ │   │
-│  │  │         │ │  Menu    │ │ Shortcuts│ │Commands │ │   │
-│  │  └────┬────┘ └────┬─────┘ └────┬─────┘ └────┬────┘ │   │
-│  └───────┼───────────┼────────────┼────────────┼──────┘   │
-│          │           │            │            │           │
-│          ▼           ▼            ▼            ▼           │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │           UNIFIED STYLE HOOKS                        │   │
-│  │  useUnifiedFontFamily, useUnifiedFontSize, etc.     │   │
-│  │                                                      │   │
-│  │  READ:  isHeading? → styleStore : editor.state      │   │
-│  │  WRITE: isHeading? → styleStore : editor.chain()    │   │
-│  └──────────────────────┬──────────────────────────────┘   │
-│                         │                                   │
-│                         ▼                                   │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │              STYLE OPERATIONS LAYER                  │   │
-│  │                                                      │   │
-│  │  StyleContext: { scope, blockType, level, editor }  │   │
-│  │                                                      │   │
-│  │  readStyle(ctx, property) → StyleValue              │   │
-│  │  writeStyle(ctx, property, value)                   │   │
-│  └──────────────────────┬──────────────────────────────┘   │
-│                         │                                   │
-│          ┌──────────────┼──────────────┐                   │
-│          ▼              ▼              ▼                   │
-│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐       │
-│  │  styleStore  │ │ TipTap Editor│ │   CSS Vars   │       │
-│  │ (Zustand)    │ │ (marks/attrs)│ │ (document)   │       │
-│  └──────────────┘ └──────────────┘ └──────────────┘       │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
+Toolbar Component
+       ↓
+editor-utils.ts (getTextStyleAtCursor, etc.)
+       ↓
+Is heading with custom style?
+       ↓
+YES → Read from styleStore.headingCustomStyles
+NO  → Read from TipTap marks/defaults
 ```
 
 ---
@@ -120,51 +53,128 @@ Build toolbar controls that USE the unified hooks:
 
 | File | Purpose |
 |------|---------|
-| `.planning/UNIFIED-STYLE-SYSTEM-PLAN.md` | Full architectural plan |
-| `src/lib/style-operations/` | Core read/write operations |
-| `src/hooks/style-hooks/` | React hooks for UI components |
-| `src/stores/styleStore.ts` | Zustand store for heading styles |
-| `src/components/Editor/EditorToolbar.tsx` | Current toolbar (to be replaced) |
+| `src/lib/editor-utils.ts` | **THE BRIDGE** - All toolbar style queries go through here |
+| `src/stores/styleStore.ts` | Zustand store for heading custom styles |
+| `src/components/unified-toolbar/UnifiedToolbar.tsx` | The single toolbar |
+| `src/components/tiptap-ui-custom/heading-aware-mark-button/` | Bold/Italic/Underline/Strike |
+| `src/components/tiptap-ui-custom/heading-aware-color-popover/` | Color picker |
+| `src/components/tiptap-ui-custom/heading-context-menu/` | Right-click menu for H1-H6 |
+| `.planning/UNIFIED-STYLE-SYSTEM-ARCHITECTURE.md` | Full architecture docs |
+
+---
+
+## What's Next
+
+### Immediate
+1. **Test** - Run `npm run tauri dev` and verify heading styles work
+2. **Clean up** - Remove debug console.log statements once verified
+
+### Pending Tasks
+- **Task #8** - Blue dot indicator for "default" values in dropdowns
+
+---
+
+## Commands
+
+```bash
+# Start Tauri app (ALWAYS use this, not npm run dev)
+npm run tauri dev
+
+# Type check / build
+npm run build
+```
+
+---
+
+## Technical Notes
+
+### Heading-Level Styling
+When cursor is in a heading with assigned custom style:
+- Style values come from `styleStore.headingCustomStyles.h1` (or h2, etc.)
+- CSS variables applied to document for rendering
+- Inline marks are cleared when style is assigned (CSS takes precedence)
+
+### CSS Variables
+Colors may be stored as CSS variables like `var(--tt-color-text-blue)`. Use `resolveCssVariable()` from editor-utils.ts to convert to hex for display in color pickers.
+
+### What NOT To Do
+1. Don't modify standard TipTap components - create heading-aware wrappers
+2. Don't check styleStore directly in toolbar components - use editor-utils
+3. Don't store resolved hex colors - store CSS variables, resolve at display time
+4. Don't assume inline marks exist for headings with custom styles
+
+---
+
+## Recent Session Work (2026-02-03)
+
+### Session 2: Dynamic Configuration Refactoring
+
+**Major architectural change:** Removed ALL hardcoded lists from components. Everything is now dynamic.
+
+#### What Changed
+
+1. **styleStore.ts** - Added dynamic configuration system:
+   - `FontOption`, `FontWeightOption`, `ColorOption` types
+   - `FontCategories` interface for categorized fonts
+   - `fontCategories`, `availableFonts`, `availableFontWeights`, `availableTextColors`, `availableHighlightColors`
+   - Actions: `addFont`, `removeFont`, `reorderFonts`, etc.
+   - Default values defined as constants outside store
+
+2. **Toolbar Components** - Now read from store:
+   - `font-family-dropdown.tsx` - Uses `fontCategories` and `availableFonts` from store
+   - `font-weight-dropdown.tsx` - Uses `availableFontWeights` from store
+   - `FontFamilyControl.tsx`, `FontWeightControl.tsx` - Same
+   - `TextColorControl.tsx`, `HighlightControl.tsx` - Use dynamic color lists
+
+3. **Hooks** - Updated to use store:
+   - `useUnifiedFontFamily.ts` - Gets `availableFonts` from store for label lookup
+   - `useUnifiedFontWeight.ts` - Gets `availableFontWeights` from store for label lookup
+
+4. **Index Files** - Removed hardcoded exports:
+   - `hooks/style-hooks/index.ts` - Removed `FONT_WEIGHTS`, `GOOGLE_FONTS` exports
+   - `unified-toolbar/controls/index.ts` - Removed `TEXT_COLORS`, `HIGHLIGHT_COLORS` exports
+   - `tiptap-ui-custom/index.tsx` - Removed `GOOGLE_FONTS`, `FONT_WEIGHTS` exports
+
+5. **HeadingStyleSettings.tsx** - Already updated to use dynamic store
+
+#### Why This Matters
+
+Users can now:
+- Add/remove/reorder fonts
+- Create custom color palettes
+- Modify font weight options
+- All without touching component code
+
+#### Files Modified
+
+- `src/stores/styleStore.ts`
+- `src/components/tiptap-ui-custom/font-family-dropdown/font-family-dropdown.tsx`
+- `src/components/tiptap-ui-custom/font-weight-dropdown/font-weight-dropdown.tsx`
+- `src/components/unified-toolbar/controls/FontFamilyControl.tsx`
+- `src/components/unified-toolbar/controls/FontWeightControl.tsx`
+- `src/components/unified-toolbar/controls/TextColorControl.tsx`
+- `src/components/unified-toolbar/controls/HighlightControl.tsx`
+- `src/hooks/style-hooks/useUnifiedFontFamily.ts`
+- `src/hooks/style-hooks/useUnifiedFontWeight.ts`
+- Various index.ts files
+
+### Session 1: Heading-Aware Toolbar
+
+Fixed toolbar to accurately reflect heading custom styles:
+
+1. **Created HeadingAwareMarkButton** - Bold/Italic/Underline/Strike read from styleStore
+2. **Created HeadingAwareColorPopover** - Color picker reads from styleStore
+3. **Added resolveCssVariable()** - Converts CSS variables to hex for display
+4. **Updated HeadingStyleSettings** - Context menu color pickers resolve CSS variables
 
 ---
 
 ## Build Status
 
 ```bash
-npm run build    # Compiles successfully
-npm run tauri dev   # For testing
+npm run build    # ✓ Compiles successfully (2026-02-03)
 ```
 
-Branch: `feature/unified-style-system` (ahead of main)
-
 ---
 
-## Technical Notes
-
-- **Heading-level styling**: When cursor is in a heading, style changes affect ALL headings of that level (document-wide)
-- **Inline styling**: When cursor is in paragraph, style changes affect only the selection
-- **Context detection**: `getStyleContext(editor)` determines where we are
-- **Auto-routing**: `writeStyle(ctx, 'fontFamily', value)` automatically routes to styleStore or marks
-
----
-
-## What NOT to Change
-
-- Keep existing styleStore structure intact
-- Keep CSS variable system for heading styles
-- Keep TipTap UI primitives (Button, Dropdown, etc.)
-- Don't modify existing toolbar until UnifiedToolbar is ready
-
----
-
-## Testing Checklist (For Next Session)
-
-When building the UnifiedToolbar:
-
-1. Place cursor in paragraph, change font → Only that text changes
-2. Place cursor in H1, change font → ALL H1s change
-3. Toolbar shows correct font for paragraph (from marks)
-4. Toolbar shows correct font for H1 (from styleStore)
-5. Blue dot indicator shows when viewing heading-level style
-6. Undo works for both paragraph and heading changes
-7. Save/load preserves all styles
+*For detailed architecture, see `.planning/UNIFIED-STYLE-SYSTEM-ARCHITECTURE.md`*

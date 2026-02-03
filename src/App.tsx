@@ -3,7 +3,8 @@
  */
 
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { EditorCore, EditorToolbar, EditorWrapper, type EditorCoreRef } from './components/Editor';
+import { EditorCore, EditorWrapper, type EditorCoreRef } from './components/Editor';
+import { UnifiedToolbar } from './components/unified-toolbar';
 import { Canvas } from './components/Layout';
 import { StylePanel } from './components/StylePanel';
 // TODO: Re-enable Format Painter in final polish phase
@@ -336,7 +337,7 @@ function App() {
             backgroundColor: bg, // Solid background so content clips behind
           }}
         >
-          <EditorToolbar editor={editor} />
+          <UnifiedToolbar editor={editor} />
         </div>
       )}
 

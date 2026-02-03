@@ -1,8 +1,8 @@
 /**
- * FontWeightDropdown - Font Weight Selection
+ * FontWeightDropdown - Dynamic Font Weight Selection
  *
- * Standard font weights from Thin to Black.
- * Dynamically shows current selection's weight.
+ * Weights are loaded from styleStore - fully configurable by user.
+ * No hardcoded weight lists. Everything is dynamic.
  */
 
 import { forwardRef, useCallback, useState, useEffect } from 'react';
@@ -14,6 +14,9 @@ import { ChevronDownIcon } from '@/components/tiptap-icons/chevron-down-icon';
 // Utils
 import { getTextStyleAtCursor } from '@/lib/editor-utils';
 
+// Store - dynamic weight configuration + heading style reactivity
+import { useStyleStore } from '@/stores/styleStore';
+
 // TipTap UI Primitives
 import { Button, ButtonGroup } from '@/components/tiptap-ui-primitive/button';
 import {
@@ -24,19 +27,6 @@ import {
 } from '@/components/tiptap-ui-primitive/dropdown-menu';
 import { Card, CardBody } from '@/components/tiptap-ui-primitive/card';
 
-// Font weights with CSS values
-export const FONT_WEIGHTS = [
-  { name: 'Thin', value: '100' },
-  { name: 'Extra Light', value: '200' },
-  { name: 'Light', value: '300' },
-  { name: 'Normal', value: '400' },
-  { name: 'Medium', value: '500' },
-  { name: 'Semi Bold', value: '600' },
-  { name: 'Bold', value: '700' },
-  { name: 'Extra Bold', value: '800' },
-  { name: 'Black', value: '900' },
-];
-
 interface FontWeightDropdownProps {
   editor: Editor;
 }
@@ -44,24 +34,28 @@ interface FontWeightDropdownProps {
 export const FontWeightDropdown = forwardRef<HTMLButtonElement, FontWeightDropdownProps>(
   ({ editor }, ref) => {
     const [isOpen, setIsOpen] = useState(false);
-    const [currentWeight, setCurrentWeight] = useState('Normal');
+    const [currentWeight, setCurrentWeight] = useState('Regular');
 
-    // Update current weight when editor selection changes
+    // Subscribe to styleStore - dynamic weight configuration + heading style reactivity
+    const headingCustomStyles = useStyleStore((state) => state.headingCustomStyles);
+    const availableFontWeights = useStyleStore((state) => state.availableFontWeights);
+
+    // Update current weight when editor selection changes OR heading styles/weights change
     useEffect(() => {
       const updateWeight = () => {
         const attrs = getTextStyleAtCursor(editor);
         const fontWeight = attrs.fontWeight as string | undefined;
 
-        // Find matching weight
-        let match = FONT_WEIGHTS.find((w) => w.value === fontWeight);
+        // Find matching weight in dynamic list from store
+        let match = availableFontWeights.find((w) => String(w.value) === fontWeight);
 
         // If not found and we have a value, try parsing as number
         if (!match && fontWeight) {
           const numericWeight = parseInt(fontWeight, 10);
-          match = FONT_WEIGHTS.find((w) => parseInt(w.value, 10) === numericWeight);
+          match = availableFontWeights.find((w) => w.value === numericWeight);
         }
 
-        setCurrentWeight(match?.name || 'Normal');
+        setCurrentWeight(match?.label || 'Regular');
       };
 
       updateWeight();
@@ -72,7 +66,7 @@ export const FontWeightDropdown = forwardRef<HTMLButtonElement, FontWeightDropdo
         editor.off('selectionUpdate', updateWeight);
         editor.off('transaction', updateWeight);
       };
-    }, [editor]);
+    }, [editor, headingCustomStyles, availableFontWeights]); // Re-run when weights or headingCustomStyles changes
 
     const handleWeightSelect = useCallback(
       (weightValue: string) => {
@@ -121,18 +115,19 @@ export const FontWeightDropdown = forwardRef<HTMLButtonElement, FontWeightDropdo
                     <span className="tiptap-button-text">Default</span>
                   </Button>
                 </DropdownMenuItem>
-                {FONT_WEIGHTS.map((weight) => (
+                {/* Dynamic weights from store */}
+                {availableFontWeights.map((weight) => (
                   <DropdownMenuItem key={weight.value} asChild>
                     <Button
                       type="button"
                       data-style="ghost"
                       data-active-state={
-                        editor.getAttributes('textStyle').fontWeight === weight.value ? 'on' : 'off'
+                        editor.getAttributes('textStyle').fontWeight === String(weight.value) ? 'on' : 'off'
                       }
-                      onClick={() => handleWeightSelect(weight.value)}
+                      onClick={() => handleWeightSelect(String(weight.value))}
                       style={{ width: '100%', justifyContent: 'flex-start', fontWeight: weight.value }}
                     >
-                      <span className="tiptap-button-text">{weight.name}</span>
+                      <span className="tiptap-button-text">{weight.label}</span>
                     </Button>
                   </DropdownMenuItem>
                 ))}

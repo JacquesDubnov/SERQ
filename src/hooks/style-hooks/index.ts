@@ -31,6 +31,8 @@ export {
 } from './useUnifiedStyle';
 
 // Typography
+// NOTE: Font options (fonts, weights, sizes) come from styleStore (dynamic, user-configurable)
+// Never export hardcoded lists from hooks - read from store instead
 export {
   useUnifiedFontFamily,
   type UseUnifiedFontFamilyResult,
@@ -38,13 +40,12 @@ export {
 
 export {
   useUnifiedFontSize,
-  FONT_SIZES,
+  FONT_SIZES,  // Preset font sizes for quick selection (user can input custom values)
   type UseUnifiedFontSizeResult,
 } from './useUnifiedFontSize';
 
 export {
   useUnifiedFontWeight,
-  FONT_WEIGHTS,
   type UseUnifiedFontWeightResult,
 } from './useUnifiedFontWeight';
 

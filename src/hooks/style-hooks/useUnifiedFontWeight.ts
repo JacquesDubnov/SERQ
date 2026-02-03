@@ -1,23 +1,14 @@
 /**
  * useUnifiedFontWeight - Hook for font weight operations
+ *
+ * IMPORTANT: Weight options come from styleStore (dynamic, user-configurable).
+ * Never hardcode lists here - read from store.
  */
 
 import { useMemo } from 'react';
 import type { Editor } from '@tiptap/core';
 import { useUnifiedStyle } from './useUnifiedStyle';
-
-// Font weight options
-export const FONT_WEIGHTS = [
-  { value: 100, label: 'Thin' },
-  { value: 200, label: 'Extralight' },
-  { value: 300, label: 'Light' },
-  { value: 400, label: 'Regular' },
-  { value: 500, label: 'Medium' },
-  { value: 600, label: 'Semibold' },
-  { value: 700, label: 'Bold' },
-  { value: 800, label: 'Extrabold' },
-  { value: 900, label: 'Black' },
-];
+import { useStyleStore, type FontWeightOption } from '@/stores/styleStore';
 
 export interface UseUnifiedFontWeightResult {
   /** Current font weight value (100-900) */
@@ -39,17 +30,17 @@ export interface UseUnifiedFontWeightResult {
 /**
  * Get display label for a font weight value
  */
-function getWeightLabel(value: number | null): string {
-  if (value === null) return 'Weight';
+function getWeightLabel(value: number | null, availableFontWeights: FontWeightOption[]): string {
+  if (value === null || availableFontWeights.length === 0) return 'Weight';
 
-  const match = FONT_WEIGHTS.find(w => w.value === value);
+  const match = availableFontWeights.find(w => w.value === value);
   if (match) return match.label;
 
   // Find closest weight
-  let closest = FONT_WEIGHTS[0];
+  let closest = availableFontWeights[0];
   let minDiff = Math.abs(value - closest.value);
 
-  for (const w of FONT_WEIGHTS) {
+  for (const w of availableFontWeights) {
     const diff = Math.abs(value - w.value);
     if (diff < minDiff) {
       minDiff = diff;
@@ -61,6 +52,9 @@ function getWeightLabel(value: number | null): string {
 }
 
 export function useUnifiedFontWeight(editor: Editor | null): UseUnifiedFontWeightResult {
+  // Get dynamic weight list from store
+  const availableFontWeights = useStyleStore((state) => state.availableFontWeights);
+
   const result = useUnifiedStyle<number | null>({
     editor,
     property: 'fontWeight',
@@ -68,8 +62,8 @@ export function useUnifiedFontWeight(editor: Editor | null): UseUnifiedFontWeigh
   });
 
   const displayLabel = useMemo(() => {
-    return getWeightLabel(result.value);
-  }, [result.value]);
+    return getWeightLabel(result.value, availableFontWeights);
+  }, [result.value, availableFontWeights]);
 
   return {
     value: result.value,

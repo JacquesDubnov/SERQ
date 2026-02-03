@@ -66,6 +66,10 @@ export function HeadingContextMenu({ level, editor, children }: HeadingContextMe
   const hasDivider = currentStyle?.divider?.enabled ?? false;
   const hasAnyCustomization = hasCustomization(currentStyle);
 
+  console.log('[HeadingContextMenu] level:', level);
+  console.log('[HeadingContextMenu] headingCustomStyles:', JSON.stringify(headingCustomStyles, null, 2));
+  console.log('[HeadingContextMenu] currentStyle for H' + level + ':', JSON.stringify(currentStyle, null, 2));
+
   // Auto-expand customize panel when menu opens if there's existing customization
   useEffect(() => {
     if (open && hasAnyCustomization) {

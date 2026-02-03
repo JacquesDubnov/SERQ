@@ -1,13 +1,14 @@
 /**
  * useUnifiedFontFamily - Hook for font family operations
+ *
+ * IMPORTANT: Font options come from styleStore (dynamic, user-configurable).
+ * Never hardcode lists here - read from store.
  */
 
 import { useMemo } from 'react';
 import type { Editor } from '@tiptap/core';
 import { useUnifiedStyle } from './useUnifiedStyle';
-
-// Re-export the font list from the dropdown component
-export { GOOGLE_FONTS } from '@/components/tiptap-ui-custom/font-family-dropdown';
+import { useStyleStore, type FontOption } from '@/stores/styleStore';
 
 export interface UseUnifiedFontFamilyResult {
   /** Current font family value (e.g., 'Inter, sans-serif') */
@@ -26,46 +27,33 @@ export interface UseUnifiedFontFamilyResult {
   clearFontFamily: () => void;
 }
 
-// All fonts flattened for lookup
-const ALL_FONTS = (() => {
-  try {
-    // Dynamic import might fail, so we have a fallback
-    const { GOOGLE_FONTS } = require('@/components/tiptap-ui-custom/font-family-dropdown');
-    return [
-      ...GOOGLE_FONTS.sansSerif,
-      ...GOOGLE_FONTS.serif,
-      ...GOOGLE_FONTS.display,
-      ...GOOGLE_FONTS.monospace,
-    ];
-  } catch {
-    return [];
-  }
-})();
-
 /**
  * Get display name for a font family value
  */
-function getFontDisplayName(value: string | null): string {
+function getFontDisplayName(value: string | null, availableFonts: FontOption[]): string {
   if (!value) return 'Font';
 
-  // Try to find a matching font in our list
-  const match = ALL_FONTS.find((f: { value: string }) => f.value === value);
-  if (match) return match.name;
+  // Try to find a matching font in our dynamic list
+  const match = availableFonts.find((f) => f.value === value);
+  if (match) return match.label;
 
   // Partial match - check first font in stack
   const cleanValue = value.split(',')[0].replace(/['"]/g, '').trim().toLowerCase();
-  const partialMatch = ALL_FONTS.find((f: { value: string }) => {
+  const partialMatch = availableFonts.find((f) => {
     const fontName = f.value.split(',')[0].replace(/['"]/g, '').trim().toLowerCase();
     return fontName === cleanValue || cleanValue.includes(fontName) || fontName.includes(cleanValue);
   });
 
-  if (partialMatch) return partialMatch.name;
+  if (partialMatch) return partialMatch.label;
 
-  // Return the first font name from the stack
+  // Return the first font name from the stack (for custom fonts not in list)
   return value.split(',')[0].replace(/['"]/g, '').trim();
 }
 
 export function useUnifiedFontFamily(editor: Editor | null): UseUnifiedFontFamilyResult {
+  // Get dynamic font list from store
+  const availableFonts = useStyleStore((state) => state.availableFonts);
+
   const result = useUnifiedStyle<string | null>({
     editor,
     property: 'fontFamily',
@@ -73,8 +61,8 @@ export function useUnifiedFontFamily(editor: Editor | null): UseUnifiedFontFamil
   });
 
   const displayName = useMemo(() => {
-    return getFontDisplayName(result.value);
-  }, [result.value]);
+    return getFontDisplayName(result.value, availableFonts);
+  }, [result.value, availableFonts]);
 
   return {
     value: result.value,

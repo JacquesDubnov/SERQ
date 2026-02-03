@@ -143,4 +143,113 @@ src-tauri/                # Rust backend (Tauri)
 
 ---
 
-*Last updated: 2026-02-02*
+## Debug Bridge (Autonomous Debugging)
+
+SERQ has a built-in debug bridge that pipes ALL webview console output and errors to `~/.serq-debug.log`. This means you do NOT need to ask the user to open Safari Inspector, check the console, or copy-paste errors. You can read the logs yourself.
+
+### Reading Logs
+
+```bash
+# Last 50 lines (default)
+./scripts/read-log.sh
+
+# Last N lines
+./scripts/read-log.sh 100
+
+# Errors only
+./scripts/read-log.sh errors
+
+# Clear log before a test
+./scripts/read-log.sh clear
+
+# Or read directly
+cat ~/.serq-debug.log
+tail -n 50 ~/.serq-debug.log
+```
+
+### Taking Screenshots
+
+```bash
+# Capture SERQ window to default location
+./scripts/screenshot.sh
+
+# View it
+open ~/.serq-screenshot.png
+```
+
+### What Gets Logged
+
+- All `console.log/info/warn/error/debug/trace` calls
+- Uncaught exceptions with stack traces and source locations
+- Unhandled promise rejections
+- DOM snapshots when triggered via `window.__serqDumpDOM()`
+
+### Debug Workflow
+
+Instead of asking the user to check things:
+1. Clear the log: `./scripts/read-log.sh clear`
+2. Tell the user to reproduce the issue (or trigger it if you can)
+3. Read the log: `cat ~/.serq-debug.log`
+4. If visual inspection needed: `./scripts/screenshot.sh` then analyze the image
+
+### Architecture
+
+- Frontend: `src/lib/debug-bridge/` - console interceptor + DOM snapshot
+- Backend: `src-tauri/src/commands/debug_bridge.rs` - writes to `~/.serq-debug.log`
+- Scripts: `scripts/screenshot.sh`, `scripts/read-log.sh`
+- Auto-rotates at 5MB (keeps last 1MB)
+- Disabled in production builds (`import.meta.env.PROD`)
+
+---
+
+## ⚠️ CRITICAL: No Hardcoded Lists - Everything is Dynamic
+
+**NEVER hardcode lists of options in components.** This is a fundamental architectural principle.
+
+### The Rule
+
+All configurable options MUST come from a central store (`styleStore.ts`), NOT be defined as constants in components:
+
+- **Font families** - User-configurable, stored in styleStore
+- **Font weights** - User-configurable, stored in styleStore
+- **Color palettes** - User-configurable, stored in styleStore
+- **Default values** - Configurable per block type, stored in styleStore
+- **Any dropdown options** - Dynamic, from store
+
+### Why This Matters
+
+Users will:
+- Add custom fonts
+- Remove fonts they don't use
+- Reorder options by preference
+- Create custom color palettes
+- Modify default styles
+
+If options are hardcoded in components, these customizations are impossible.
+
+### Implementation Pattern
+
+```tsx
+// ❌ WRONG - Hardcoded in component
+const FONT_FAMILIES = [
+  { value: 'Inter', label: 'Inter' },
+  { value: 'Georgia', label: 'Georgia' },
+];
+
+// ✅ RIGHT - Read from store
+const { availableFonts } = useStyleStore();
+```
+
+### Files That Need This Pattern
+
+All dropdown/selector components must read options from styleStore:
+- Font family selectors
+- Font weight selectors
+- Color pickers
+- Line height options
+- Letter spacing presets
+- Any configurable list
+
+---
+
+*Last updated: 2026-02-03*
