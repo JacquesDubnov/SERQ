@@ -1,50 +1,52 @@
 # SERQ Session Handover
 
 **Last Updated:** 2026-02-03
-**Branch:** main
+**Branch:** feature/unified-style-system
+**Next Task:** Notion-Style Block System
 
 ---
 
-## Project Overview
+## CURRENT MISSION: Notion-Style Blocks
 
-SERQ is a Tauri-based desktop text editor using TipTap (ProseMirror). We've built a **Unified Style System** that makes the toolbar heading-aware - when cursor is in a heading with assigned custom styles, the toolbar shows those styles instead of TipTap's default mark values.
+Implement the full Notion experience:
+- **Drag handles** (⋮⋮) on every block
+- **Block menus** - duplicate, delete, turn into, color
+- **Add block button** (+) with block type selector
+- **Smooth animations** - Notion-quality drag & drop
+- **Tables** - Full table support with TipTap
+- **New blocks** - Callouts, toggles, dividers
+
+**Full plan:** `.planning/NOTION-STYLE-BLOCKS-PLAN.md`
 
 ---
 
-## Current State: Heading-Aware Toolbar COMPLETE
+## Quick Context
 
-### What's Working
+### What SERQ Is
+Tauri desktop text editor using TipTap (ProseMirror). Has a unified style system where heading styles can be assigned and reflected in the toolbar.
 
-1. **UnifiedToolbar** - Single toolbar (exact replica of original EditorToolbar)
-   - Two rows: History, Fonts, Marks, Colors, Links, Clear / Headings, Lists, Alignment, Spacing
-   - All original components with input fields, +/- buttons, dropdowns
+### What's Already Built
+- TipTap editor with basic blocks (paragraphs, headings, lists)
+- Unified toolbar with heading-aware styling
+- Dynamic configuration system (fonts, colors from store)
+- Debug bridge (console output to ~/.serq-debug.log)
 
-2. **Heading Context Menu** - Right-click H1-H6 buttons to:
-   - Assign current style to heading type
-   - Customize style (inline typography panel)
-   - Reset to default
-   - Add dividing line with settings
+### What We're Adding
+The Notion-style block system on top of the existing editor.
 
-3. **Heading-Aware Toolbar Components**
-   - Font dropdowns read from styleStore for headings (via editor-utils.ts)
-   - Mark buttons (Bold/Italic/Underline/Strike) read from styleStore for headings
-   - Color popover reads from styleStore for headings, resolves CSS variables
+---
 
-### Architecture
+## Key Commands
 
-**See `.planning/UNIFIED-STYLE-SYSTEM-ARCHITECTURE.md`** for complete documentation.
+```bash
+# Start app (ALWAYS use this)
+npm run tauri dev
 
-Key concept: **editor-utils.ts is THE BRIDGE** between toolbar and styles.
+# Type check
+npm run build
 
-```
-Toolbar Component
-       ↓
-editor-utils.ts (getTextStyleAtCursor, etc.)
-       ↓
-Is heading with custom style?
-       ↓
-YES → Read from styleStore.headingCustomStyles
-NO  → Read from TipTap marks/defaults
+# TipTap CLI (we have Teams license)
+npx @tiptap/cli add <component>
 ```
 
 ---
@@ -53,128 +55,133 @@ NO  → Read from TipTap marks/defaults
 
 | File | Purpose |
 |------|---------|
-| `src/lib/editor-utils.ts` | **THE BRIDGE** - All toolbar style queries go through here |
-| `src/stores/styleStore.ts` | Zustand store for heading custom styles |
-| `src/components/unified-toolbar/UnifiedToolbar.tsx` | The single toolbar |
-| `src/components/tiptap-ui-custom/heading-aware-mark-button/` | Bold/Italic/Underline/Strike |
-| `src/components/tiptap-ui-custom/heading-aware-color-popover/` | Color picker |
-| `src/components/tiptap-ui-custom/heading-context-menu/` | Right-click menu for H1-H6 |
-| `.planning/UNIFIED-STYLE-SYSTEM-ARCHITECTURE.md` | Full architecture docs |
+| `.planning/NOTION-STYLE-BLOCKS-PLAN.md` | Full implementation plan |
+| `src/stores/styleStore.ts` | Zustand store for styles |
+| `src/lib/editor-utils.ts` | Editor utility functions |
+| `CLAUDE.md` | Project rules and context |
 
 ---
 
-## What's Next
+## TipTap Teams License
 
-### Immediate
-1. **Test** - Run `npm run tauri dev` and verify heading styles work
-2. **Clean up** - Remove debug console.log statements once verified
+**We have full access to TipTap Pro components.**
 
-### Pending Tasks
-- **Task #8** - Blue dot indicator for "default" values in dropdowns
+Relevant for this task:
+- `@tiptap-pro/extension-drag-handle` - Drag handle functionality
+- `@tiptap/extension-table` - Table support
+- All Pro UI components
+
+NPM registry already configured in `.npmrc`.
 
 ---
 
-## Commands
+## Implementation Phases
 
-```bash
-# Start Tauri app (ALWAYS use this, not npm run dev)
-npm run tauri dev
+### Phase 1: Drag Handle Foundation
+- [ ] Install/configure DragHandle extension
+- [ ] Create BlockWrapper component with hover detection
+- [ ] Position handle left of blocks
+- [ ] Basic drag functionality
 
-# Type check / build
-npm run build
-```
+### Phase 2: Drag Animations
+- [ ] Lifted block styling (scale, shadow)
+- [ ] Other blocks slide to make room
+- [ ] Drop indicator line
+- [ ] Smooth drop animation
+
+### Phase 3: Block Menu
+- [ ] Menu appears on handle click
+- [ ] Duplicate, delete, move up/down
+- [ ] Turn into submenu (paragraph, headings, lists, etc.)
+- [ ] Color submenu (text and background)
+
+### Phase 4: Add Block Button
+- [ ] (+) button on hover
+- [ ] Block type selector popup
+- [ ] Search/filter blocks
+- [ ] Insert block at position
+
+### Phase 5: Table Block
+- [ ] Install TipTap table extension
+- [ ] Row/column add buttons
+- [ ] Cell selection and merging
+- [ ] Header row toggle
+
+### Phase 6: Additional Blocks
+- [ ] Callout block with icons
+- [ ] Toggle/collapsible block
+- [ ] Divider block
+
+---
+
+## Design Reference
+
+### Notion's Block Handle
+- Appears ~16px left of block on hover
+- 6 dots (⋮⋮) icon, gray, subtle
+- Click = menu, Drag = move
+- 150ms fade in/out
+
+### Notion's Drag Animation
+- Block lifts slightly (scale 1.02)
+- Shadow appears (0 4px 12px rgba(0,0,0,0.15))
+- Other blocks slide apart smoothly
+- Blue line shows drop position
+- 200ms transitions, ease-out
+
+### Notion's Block Menu
+- Appears below handle on click
+- Sections: Edit actions, Turn into, Color
+- Keyboard navigable
+- Closes on outside click or Escape
 
 ---
 
 ## Technical Notes
 
-### Heading-Level Styling
-When cursor is in a heading with assigned custom style:
-- Style values come from `styleStore.headingCustomStyles.h1` (or h2, etc.)
-- CSS variables applied to document for rendering
-- Inline marks are cleared when style is assigned (CSS takes precedence)
+### TipTap DragHandle Extension
+```typescript
+import { DragHandle } from '@tiptap-pro/extension-drag-handle'
 
-### CSS Variables
-Colors may be stored as CSS variables like `var(--tt-color-text-blue)`. Use `resolveCssVariable()` from editor-utils.ts to convert to hex for display in color pickers.
-
-### What NOT To Do
-1. Don't modify standard TipTap components - create heading-aware wrappers
-2. Don't check styleStore directly in toolbar components - use editor-utils
-3. Don't store resolved hex colors - store CSS variables, resolve at display time
-4. Don't assume inline marks exist for headings with custom styles
-
----
-
-## Recent Session Work (2026-02-03)
-
-### Session 2: Dynamic Configuration Refactoring
-
-**Major architectural change:** Removed ALL hardcoded lists from components. Everything is now dynamic.
-
-#### What Changed
-
-1. **styleStore.ts** - Added dynamic configuration system:
-   - `FontOption`, `FontWeightOption`, `ColorOption` types
-   - `FontCategories` interface for categorized fonts
-   - `fontCategories`, `availableFonts`, `availableFontWeights`, `availableTextColors`, `availableHighlightColors`
-   - Actions: `addFont`, `removeFont`, `reorderFonts`, etc.
-   - Default values defined as constants outside store
-
-2. **Toolbar Components** - Now read from store:
-   - `font-family-dropdown.tsx` - Uses `fontCategories` and `availableFonts` from store
-   - `font-weight-dropdown.tsx` - Uses `availableFontWeights` from store
-   - `FontFamilyControl.tsx`, `FontWeightControl.tsx` - Same
-   - `TextColorControl.tsx`, `HighlightControl.tsx` - Use dynamic color lists
-
-3. **Hooks** - Updated to use store:
-   - `useUnifiedFontFamily.ts` - Gets `availableFonts` from store for label lookup
-   - `useUnifiedFontWeight.ts` - Gets `availableFontWeights` from store for label lookup
-
-4. **Index Files** - Removed hardcoded exports:
-   - `hooks/style-hooks/index.ts` - Removed `FONT_WEIGHTS`, `GOOGLE_FONTS` exports
-   - `unified-toolbar/controls/index.ts` - Removed `TEXT_COLORS`, `HIGHLIGHT_COLORS` exports
-   - `tiptap-ui-custom/index.tsx` - Removed `GOOGLE_FONTS`, `FONT_WEIGHTS` exports
-
-5. **HeadingStyleSettings.tsx** - Already updated to use dynamic store
-
-#### Why This Matters
-
-Users can now:
-- Add/remove/reorder fonts
-- Create custom color palettes
-- Modify font weight options
-- All without touching component code
-
-#### Files Modified
-
-- `src/stores/styleStore.ts`
-- `src/components/tiptap-ui-custom/font-family-dropdown/font-family-dropdown.tsx`
-- `src/components/tiptap-ui-custom/font-weight-dropdown/font-weight-dropdown.tsx`
-- `src/components/unified-toolbar/controls/FontFamilyControl.tsx`
-- `src/components/unified-toolbar/controls/FontWeightControl.tsx`
-- `src/components/unified-toolbar/controls/TextColorControl.tsx`
-- `src/components/unified-toolbar/controls/HighlightControl.tsx`
-- `src/hooks/style-hooks/useUnifiedFontFamily.ts`
-- `src/hooks/style-hooks/useUnifiedFontWeight.ts`
-- Various index.ts files
-
-### Session 1: Heading-Aware Toolbar
-
-Fixed toolbar to accurately reflect heading custom styles:
-
-1. **Created HeadingAwareMarkButton** - Bold/Italic/Underline/Strike read from styleStore
-2. **Created HeadingAwareColorPopover** - Color picker reads from styleStore
-3. **Added resolveCssVariable()** - Converts CSS variables to hex for display
-4. **Updated HeadingStyleSettings** - Context menu color pickers resolve CSS variables
-
----
-
-## Build Status
-
-```bash
-npm run build    # ✓ Compiles successfully (2026-02-03)
+const editor = useEditor({
+  extensions: [
+    DragHandle.configure({
+      render: () => {
+        // Custom drag handle element
+      }
+    })
+  ]
+})
 ```
 
+### NodeView for Block Wrapper
+May need custom NodeView to wrap blocks with hover detection and handle positioning.
+
+### Tauri Considerations
+- No browser drag-and-drop API restrictions
+- Can use native cursor styles
+- File drops handled by Tauri
+
 ---
 
-*For detailed architecture, see `.planning/UNIFIED-STYLE-SYSTEM-ARCHITECTURE.md`*
+## Don't Forget
+
+1. **Use TipTap Teams components** - We paid for them
+2. **Check TipTap docs first** - https://tiptap.dev/docs
+3. **Run with Tauri** - `npm run tauri dev`, not `npm run dev`
+4. **Dynamic config** - Any new options go in styleStore, not hardcoded
+
+---
+
+## Previous Session Summary
+
+Completed dynamic configuration refactor:
+- Removed all hardcoded lists from components
+- Fonts, weights, colors now from styleStore
+- Build passing, pushed to remote
+
+**Commit:** `4016c8c feat: dynamic configuration system`
+
+---
+
+*Full plan: `.planning/NOTION-STYLE-BLOCKS-PLAN.md`*
