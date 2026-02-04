@@ -149,6 +149,7 @@ export const ColorHighlightButton = forwardRef<
         aria-label={label}
         aria-pressed={isActive}
         tooltip={label}
+        shortcutKeys={shortcutKeys}
         onClick={handleClick}
         style={buttonStyle}
         {...buttonProps}

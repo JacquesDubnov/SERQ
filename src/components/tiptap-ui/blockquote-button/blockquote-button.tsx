@@ -104,6 +104,7 @@ export const BlockquoteButton = forwardRef<
         aria-label={label}
         aria-pressed={isActive}
         tooltip="Blockquote"
+        shortcutKeys={shortcutKeys}
         onClick={handleClick}
         {...buttonProps}
         ref={ref}

@@ -12,6 +12,17 @@ import { Button, ButtonGroup } from '@/components/tiptap-ui-primitive/button';
 import { HeadingContextMenu } from '@/components/tiptap-ui-custom/heading-context-menu';
 import type { HeadingLevel } from '@/stores/styleStore';
 
+// Shortcut keys for heading levels (matches TipTap defaults)
+const HEADING_SHORTCUTS: Record<string, string> = {
+  paragraph: 'ctrl+alt+0',
+  1: 'ctrl+alt+1',
+  2: 'ctrl+alt+2',
+  3: 'ctrl+alt+3',
+  4: 'ctrl+alt+4',
+  5: 'ctrl+alt+5',
+  6: 'ctrl+alt+6',
+};
+
 interface HeadingToggleButtonsProps {
   editor: Editor;
 }
@@ -63,7 +74,8 @@ export const HeadingToggleButtons = forwardRef<HTMLDivElement, HeadingToggleButt
           data-active-state={activeLevel === level ? 'on' : 'off'}
           onClick={() => handleHeading(level)}
           aria-label={`Heading ${level}`}
-          tooltip={`Heading ${level} (right-click for style options)`}
+          tooltip={`Heading ${level}`}
+          shortcutKeys={HEADING_SHORTCUTS[level]}
           style={{ padding: '4px 8px', minWidth: '28px', fontWeight: 600 }}
         >
           <span style={{ fontSize: '12px' }}>H{level}</span>
@@ -80,6 +92,7 @@ export const HeadingToggleButtons = forwardRef<HTMLDivElement, HeadingToggleButt
           onClick={handleParagraph}
           aria-label="Paragraph"
           tooltip="Paragraph"
+          shortcutKeys={HEADING_SHORTCUTS.paragraph}
           style={{ padding: '4px 8px', minWidth: '28px', fontWeight: 500 }}
         >
           <span style={{ fontSize: '12px' }}>P</span>
