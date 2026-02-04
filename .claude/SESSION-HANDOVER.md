@@ -2,7 +2,7 @@
 
 **Date:** 2026-02-04
 **Branch:** `feature/unified-style-system`
-**Last Commit:** `d4b9f23` - feat: architecture v4.0 and block selection infrastructure
+**Last Commit:** `8f13138` - feat: add style system, command registry, and database infrastructure
 
 ---
 
@@ -29,71 +29,72 @@ PROJECT (root defaults)
                  └── CHARACTER (inline marks)
 ```
 
-### Data Layer
-- **SQLite** with `tauri-plugin-sql` for native performance
-- **Flat block storage** with ID references (not nested trees)
-- **Fractional indexing** for ordering
-- **Event sourcing** for version control (snapshots + operations)
-
-### Export Formats
-PDF, Word, Apple Pages, Google Docs, Markdown, RTF, TXT, HTML, EPUB, .shtml (our schema-based HTML)
-
-### AI Integration
-- Agent Supervisor orchestrating specialized agents
-- Voice pipeline: VAD → Transcription → Intent Router
-- Research Agent, Data Validation Agent, Literary Agent
-- All through hooks/APIs (infrastructure only - not implementing yet)
-
 ---
 
 ## What's Complete
 
-### Architecture Documentation
-- Comprehensive v4.0 architecture document
+### 1. Architecture Documentation
+- Comprehensive v4.0 architecture in `.claude/STYLING-HIERARCHY-ARCHITECTURE.md`
 - SQLite schema design
-- Platform deployment considerations
+- Platform deployment (macOS, Windows, iOS, Android, web)
+- Export/import formats (PDF, Word, Pages, Markdown, etc.)
+- AI integration architecture (Agent Supervisor, Voice pipeline)
 - Schema versioning with Migration Registry
 
-### Block Indicator System
+### 2. Block Indicator System (DONE)
 - Hover tracking with animated vertical line
 - Frame mode (Command held) shows border
+- Command+click multi-block selection
+- Command+Shift+click range selection
+- Click without modifiers deselects all
+- Contiguous blocks grouped into single frame
 - Hide on typing, reappear on mouse move
 - Toggle enable/disable button in toolbar
+- Long-press drag-and-drop with animations
 
-### Block Drag-and-Drop
-- Long-press (400ms) activates drag
-- Source text fades via overlay
-- Two-stage drop animation
+### 3. Infrastructure (DONE - Not Yet Integrated)
 
-### Multi-Block Selection (Partial)
-- Code exists but needs plan implementation
-- Plan at `~/.claude/plans/adaptive-giggling-whisper.md`
+**Style System** (`src/lib/style-system/`):
+- Core types: BlockIdentity, BlockStyle, StyleDefinition, etc.
+- StyleResolver with version-counter caching
+- Named styles with basedOn chain resolution
+- DEFAULT_BLOCK_STYLE baseline
+
+**Command Registry** (`src/lib/command-registry/`):
+- Central command pattern for all UI interactions
+- Keyboard shortcut registration
+- Search by name/keywords
+- `useCommand` React hook
+- Category-based organization
+
+**Database** (`src/lib/database/`):
+- SQLite schema with tauri-plugin-sql
+- Tables: documents, blocks, styles, colors, fonts, operations, snapshots
+- FTS5 full-text search with auto-sync triggers
+- Built-in named styles (Heading 1-3, Body, Quote, Code)
+- CRUD operations for documents and blocks
 
 ---
 
 ## What Remains
 
-### Immediate: Block Selection Plan
-From `adaptive-giggling-whisper.md`:
-1. Replace Shift with Command for frame mode (may be done)
-2. Add selection state tracking
-3. Command+click toggle selection
-4. Command+Shift+click range selection
-5. Click without modifiers = deselect all
-6. Render multiple selection indicators
-7. Handle position updates on doc change
+### Phase 3: Integration
+- Initialize database on app startup
+- Connect StyleResolver to existing styleStore
+- Wire Command Registry to toolbar buttons
+- Migrate existing heading styles to named styles system
 
-### Phase 2: Infrastructure
-- SQLite database setup
-- Style stores (project, document, page, block, character)
-- Style resolution with caching
-- Command Registry pattern
+### Phase 4: Block Styling
+- Block-level style toolbar/inspector
+- Apply styles to selected blocks
+- Named style picker dropdown
+- Style override indicators
 
-### Phase 3+: Features (Infrastructure Only)
-- Block styling toolbar
+### Phase 5+: Advanced Features (Infrastructure Only)
 - Export/Import system hooks
 - AI integration hooks
 - Voice pipeline hooks
+- Version control UI
 
 ---
 
@@ -102,11 +103,12 @@ From `adaptive-giggling-whisper.md`:
 | File | Purpose |
 |------|---------|
 | `.claude/STYLING-HIERARCHY-ARCHITECTURE.md` | Master architecture v4.0 |
-| `src/extensions/block-indicator.ts` | Block hover/selection extension |
-| `src/components/BlockIndicator/` | Visual indicator components |
-| `src/components/unified-toolbar/` | Main toolbar |
-| `src/hooks/use-block-selection.ts` | React hook for selection |
-| `~/.claude/plans/adaptive-giggling-whisper.md` | Block selection plan |
+| `src/lib/style-system/` | Types, resolver, caching |
+| `src/lib/command-registry/` | Central command pattern |
+| `src/lib/database/` | SQLite schema, operations |
+| `src/extensions/block-indicator.ts` | Block hover/selection |
+| `src/components/BlockIndicator/` | Visual indicators |
+| `src/stores/styleStore.ts` | Existing document-level styles |
 
 ---
 
@@ -123,10 +125,21 @@ npm run build              # TypeScript check
 
 ## Notes
 
+- **Block selection is complete** - Plan in `adaptive-giggling-whisper.md` fully implemented
+- **Infrastructure done but not integrated** - Files exist, need wiring
 - **API was unstable** - Work in small atomic commits
-- **No emojis** - SVG icons only
-- **Debug bridge** - Console → `~/.serq-debug.log`
+- **Debug bridge** - Console output at `~/.serq-debug.log`
 - **TipTap first** - Check docs before custom code
+
+---
+
+## Recent Commits
+
+```
+8f13138 feat: add style system, command registry, and database infrastructure
+4230931 docs: update session handover with architecture v4.0 status
+d4b9f23 feat: architecture v4.0 and block selection infrastructure
+```
 
 ---
 
