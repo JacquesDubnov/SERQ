@@ -1,187 +1,130 @@
 # SERQ Session Handover
 
-**Last Updated:** 2026-02-03
+**Last Updated:** 2026-02-04
 **Branch:** feature/unified-style-system
-**Next Task:** Notion-Style Block System
+**Current Task:** DragHandle Not Working - BLOCKED
 
 ---
 
-## CURRENT MISSION: Notion-Style Blocks
+## CRITICAL: DragHandle Issue - What We Know
 
-Implement the full Notion experience:
-- **Drag handles** (⋮⋮) on every block
-- **Block menus** - duplicate, delete, turn into, color
-- **Add block button** (+) with block type selector
-- **Smooth animations** - Notion-quality drag & drop
-- **Tables** - Full table support with TipTap
-- **New blocks** - Callouts, toggles, dividers
+### The Problem
+TipTap's DragHandle doesn't show in SERQ, even though:
+- It works PERFECTLY in a clean sandbox (`/Users/jacquesdubnov/Coding/drag-test`)
+- Same TipTap packages, same component, same import
 
-**Full plan:** `.planning/NOTION-STYLE-BLOCKS-PLAN.md`
+### What We Proved
+
+1. **Clean sandbox works flawlessly** (32 seconds to set up, instant success)
+   - Path: `/Users/jacquesdubnov/Coding/drag-test/src/App.tsx`
+   - Just StarterKit + DragHandle - nothing else
+   - Handles appear, drag works, drop works
+
+2. **SERQ's custom code breaks it** - Per Jacques: "It is something out of the things that we've done in order to deal with bugs that screwed the entire thing"
+
+3. **DragHandle IS receiving mouse events** (from debug logs):
+   ```
+   [DragHandle] Node changed: undefined at pos: -1
+   ```
+   The plugin fires, but returns `pos: -1` meaning it can't resolve node coordinates.
+
+4. **Mouse events reach the editor DOM** (verified with listener)
+
+### What This Means
+The DragHandle plugin can detect mouse movement but **cannot map coordinates to document positions**. Something in SERQ's structure breaks `view.posAtCoords()`.
+
+### Suspects (Not Yet Proven)
+
+1. **CSS Transform** - Was using `transform: scale(zoom/100)` for zoom - KNOWN to break floating-ui
+2. **Canvas padding** - 74px padding might affect coordinate mapping
+3. **EditorWrapper** - Has click handlers, positioned children, background overlay
+4. **overflow: hidden** - Root app has this, could clip absolutely positioned handle
+5. **Custom extensions** - VirtualCursor, StubCommands, etc.
+
+### What NOT to Do
+- Random trial-and-error changes
+- Breaking other functionality to debug this
+- Removing essential components without reverting
+
+---
+
+## Clean Slate Plan
+
+### Step 1: Isolate Variables
+Create a minimal test INSIDE SERQ (not separate app) that progressively adds:
+1. Just TipTap + StarterKit + DragHandle (no custom extensions)
+2. Add custom extensions one by one
+3. Add wrappers one by one
+4. Find the exact component that breaks it
+
+### Step 2: Compare Working vs Broken
+Side-by-side comparison of:
+- DOM structure (working sandbox vs SERQ)
+- CSS applied to editor elements
+- Event propagation paths
+
+### Step 3: Fix Root Cause
+Don't patch symptoms - find why `posAtCoords` fails.
+
+---
+
+## Files Reverted
+
+All experimental changes from the debugging session were reverted:
+```bash
+git checkout src/App.tsx src/components/Editor/EditorCore.tsx
+```
+
+App is back to working state (minus DragHandle).
+
+---
+
+## Current App Structure
+
+```
+App.tsx
+├── <main> (overflow-x: hidden, overflow-y: auto)
+│   ├── [Paginated mode]
+│   │   └── EditorWrapper > EditorCore
+│   └── [Continuous mode]
+│       └── Canvas (74px padding) > EditorWrapper > EditorCore
+│           └── EditorCore contains:
+│               └── EditorContent + all extensions
+└── DragContextMenu (separate, receives editor prop)
+```
+
+The working sandbox has:
+```
+App.tsx
+└── <div> (simple padding)
+    ├── EditorContent
+    └── DragHandle (sibling)
+```
 
 ---
 
 ## Quick Context
 
 ### What SERQ Is
-Tauri desktop text editor using TipTap (ProseMirror). Has a unified style system where heading styles can be assigned and reflected in the toolbar.
+Tauri desktop text editor using TipTap (ProseMirror). Has zoom, pagination, unified styling.
 
-### What's Already Built
-- TipTap editor with basic blocks (paragraphs, headings, lists)
-- Unified toolbar with heading-aware styling
-- Dynamic configuration system (fonts, colors from store)
-- Debug bridge (console output to ~/.serq-debug.log)
-
-### What We're Adding
-The Notion-style block system on top of the existing editor.
-
----
-
-## Key Commands
-
+### Key Commands
 ```bash
-# Start app (ALWAYS use this)
-npm run tauri dev
-
-# Type check
-npm run build
-
-# TipTap CLI (we have Teams license)
-npx @tiptap/cli add <component>
+npm run tauri dev    # Start app (ALWAYS this)
+./scripts/read-log.sh # Check debug log
 ```
 
----
-
-## Key Files
-
-| File | Purpose |
-|------|---------|
-| `.planning/NOTION-STYLE-BLOCKS-PLAN.md` | Full implementation plan |
-| `src/stores/styleStore.ts` | Zustand store for styles |
-| `src/lib/editor-utils.ts` | Editor utility functions |
-| `CLAUDE.md` | Project rules and context |
+### TipTap Teams License
+Full Pro access. DragHandle component installed and configured.
 
 ---
 
-## TipTap Teams License
+## Next Session: Fresh Start Required
 
-**We have full access to TipTap Pro components.**
+Jacques' advice: "Take a nap, get a fresh mind, restart in the morning."
 
-Relevant for this task:
-- `@tiptap-pro/extension-drag-handle` - Drag handle functionality
-- `@tiptap/extension-table` - Table support
-- All Pro UI components
-
-NPM registry already configured in `.npmrc`.
+The debugging approach of random changes didn't work. Need systematic isolation testing.
 
 ---
 
-## Implementation Phases
-
-### Phase 1: Drag Handle Foundation
-- [ ] Install/configure DragHandle extension
-- [ ] Create BlockWrapper component with hover detection
-- [ ] Position handle left of blocks
-- [ ] Basic drag functionality
-
-### Phase 2: Drag Animations
-- [ ] Lifted block styling (scale, shadow)
-- [ ] Other blocks slide to make room
-- [ ] Drop indicator line
-- [ ] Smooth drop animation
-
-### Phase 3: Block Menu
-- [ ] Menu appears on handle click
-- [ ] Duplicate, delete, move up/down
-- [ ] Turn into submenu (paragraph, headings, lists, etc.)
-- [ ] Color submenu (text and background)
-
-### Phase 4: Add Block Button
-- [ ] (+) button on hover
-- [ ] Block type selector popup
-- [ ] Search/filter blocks
-- [ ] Insert block at position
-
-### Phase 5: Table Block
-- [ ] Install TipTap table extension
-- [ ] Row/column add buttons
-- [ ] Cell selection and merging
-- [ ] Header row toggle
-
-### Phase 6: Additional Blocks
-- [ ] Callout block with icons
-- [ ] Toggle/collapsible block
-- [ ] Divider block
-
----
-
-## Design Reference
-
-### Notion's Block Handle
-- Appears ~16px left of block on hover
-- 6 dots (⋮⋮) icon, gray, subtle
-- Click = menu, Drag = move
-- 150ms fade in/out
-
-### Notion's Drag Animation
-- Block lifts slightly (scale 1.02)
-- Shadow appears (0 4px 12px rgba(0,0,0,0.15))
-- Other blocks slide apart smoothly
-- Blue line shows drop position
-- 200ms transitions, ease-out
-
-### Notion's Block Menu
-- Appears below handle on click
-- Sections: Edit actions, Turn into, Color
-- Keyboard navigable
-- Closes on outside click or Escape
-
----
-
-## Technical Notes
-
-### TipTap DragHandle Extension
-```typescript
-import { DragHandle } from '@tiptap-pro/extension-drag-handle'
-
-const editor = useEditor({
-  extensions: [
-    DragHandle.configure({
-      render: () => {
-        // Custom drag handle element
-      }
-    })
-  ]
-})
-```
-
-### NodeView for Block Wrapper
-May need custom NodeView to wrap blocks with hover detection and handle positioning.
-
-### Tauri Considerations
-- No browser drag-and-drop API restrictions
-- Can use native cursor styles
-- File drops handled by Tauri
-
----
-
-## Don't Forget
-
-1. **Use TipTap Teams components** - We paid for them
-2. **Check TipTap docs first** - https://tiptap.dev/docs
-3. **Run with Tauri** - `npm run tauri dev`, not `npm run dev`
-4. **Dynamic config** - Any new options go in styleStore, not hardcoded
-
----
-
-## Previous Session Summary
-
-Completed dynamic configuration refactor:
-- Removed all hardcoded lists from components
-- Fonts, weights, colors now from styleStore
-- Build passing, pushed to remote
-
-**Commit:** `4016c8c feat: dynamic configuration system`
-
----
-
-*Full plan: `.planning/NOTION-STYLE-BLOCKS-PLAN.md`*
+*Working sandbox reference: `/Users/jacquesdubnov/Coding/drag-test`*

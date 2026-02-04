@@ -20,3 +20,8 @@
     align-items: center;
   }
 }
+
+// Smooth opacity transitions for drag handle button group
+.drag-handle .tiptap-button-group {
+  transition: opacity 150ms ease-out;
+}
