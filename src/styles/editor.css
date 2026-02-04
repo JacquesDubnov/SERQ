@@ -5,6 +5,11 @@
  * Variables prefixed with --color- come from color presets.
  */
 
+/* Editor wrapper - positioning context for block indicator */
+.editor-content-wrapper {
+  position: relative;
+}
+
 /* Editor container */
 .editor-content {
   min-height: 100%;

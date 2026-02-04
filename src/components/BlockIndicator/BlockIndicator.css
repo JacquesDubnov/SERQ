@@ -1,0 +1,140 @@
+/**
+ * Block Indicator Styles
+ *
+ * All values configurable via CSS variables:
+ * --block-indicator-width: Line thickness
+ * --block-indicator-color: Line color
+ * --block-indicator-opacity-visible: Opacity when visible (default 0.6)
+ * --block-indicator-opacity-hidden: Opacity when hidden (default 0)
+ * --block-indicator-radius: Border radius
+ * --block-indicator-offset: Distance from block left edge (default 16px)
+ * --block-indicator-transition-duration: Animation duration for movement
+ * --block-indicator-transition-easing: Animation easing function
+ * --block-indicator-fade-duration: Fade in/out duration
+ */
+
+.block-indicator-line {
+  width: var(--block-indicator-width, 2px);
+  background-color: var(--block-indicator-color, var(--color-brand, #3b82f6));
+  border-radius: var(--block-indicator-radius, 1px);
+  pointer-events: none;
+  z-index: 1001;  /* Above source overlay (999) and ghost (1000) */
+
+  /* Default: hidden */
+  opacity: var(--block-indicator-opacity-hidden, 0);
+}
+
+/* Visible state */
+.block-indicator-line[data-visible="true"] {
+  opacity: var(--block-indicator-opacity-visible, 0.6);
+}
+
+/* Frame mode (Shift held) - show border on all sides */
+.block-indicator-line[data-frame="true"] {
+  background-color: transparent;
+  border: var(--block-indicator-width, 2px) solid var(--block-indicator-color, var(--color-brand, #3b82f6));
+  border-radius: var(--block-indicator-frame-radius, 4px);
+}
+
+/* Drop indicator line (shown during drag) */
+.block-drop-indicator {
+  background-color: var(--block-indicator-color, var(--color-brand, #3b82f6));
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 100;
+  opacity: var(--block-indicator-opacity-visible, 0.8);
+  box-shadow: 0 0 8px var(--block-indicator-color, var(--color-brand, #3b82f6));
+}
+
+/* Body class during drag */
+body.block-dragging,
+body.block-dragging * {
+  cursor: grabbing !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+  caret-color: transparent !important;
+}
+
+/* Hide all cursors during drag and drop animation */
+body.block-dragging .ProseMirror,
+body.block-animating .ProseMirror {
+  caret-color: transparent !important;
+}
+
+body.block-dragging .ProseMirror-gapcursor,
+body.block-animating .ProseMirror-gapcursor,
+body.block-dragging .prosemirror-virtual-cursor,
+body.block-animating .prosemirror-virtual-cursor,
+body.block-dragging [data-virtual-cursor],
+body.block-animating [data-virtual-cursor] {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+/* Source overlay - covers original block during drag, fades in to hide text */
+.block-source-overlay {
+  pointer-events: none;
+  z-index: 999;
+  /* Match page/editor background */
+  background: white;
+  /* Start invisible */
+  opacity: 0;
+  /* Transition for fade in effect - 1.5s as specified */
+  transition: opacity 1500ms ease-in-out;
+}
+
+/* Visible state - text completely hidden */
+.block-source-overlay[data-visible="true"] {
+  opacity: 1;
+}
+
+/* Dark mode source overlay */
+[data-theme="dark"] .block-source-overlay,
+.theme-dark .block-source-overlay {
+  background: #1f1f1f;
+}
+
+
+/* Dropped block fades in from top after displacement */
+.block-fade-in {
+  animation: block-fade-in 500ms ease-out forwards;
+}
+
+@keyframes block-fade-in {
+  from {
+    opacity: 0;
+    clip-path: inset(0 0 100% 0);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+/* Animate after first appearance (prevents jump on initial render) */
+.block-indicator-line[data-animate="true"] {
+  /*
+   * Smooth easing for morphing between vertical and horizontal
+   * Width IS transitioned for the morph effect
+   */
+  transition:
+    top var(--block-indicator-transition-duration, 510ms) var(--block-indicator-transition-easing, cubic-bezier(0.22, 0.1, 0.25, 1.0)),
+    height var(--block-indicator-transition-duration, 510ms) var(--block-indicator-transition-easing, cubic-bezier(0.22, 0.1, 0.25, 1.0)),
+    width var(--block-indicator-transition-duration, 510ms) var(--block-indicator-transition-easing, cubic-bezier(0.22, 0.1, 0.25, 1.0)),
+    opacity var(--block-indicator-fade-duration, 340ms) var(--block-indicator-transition-easing, cubic-bezier(0.22, 0.1, 0.25, 1.0)),
+    background-color var(--block-indicator-fade-duration, 340ms) var(--block-indicator-transition-easing, cubic-bezier(0.22, 0.1, 0.25, 1.0)),
+    border var(--block-indicator-fade-duration, 340ms) var(--block-indicator-transition-easing, cubic-bezier(0.22, 0.1, 0.25, 1.0));
+}
+
+/* Shrinking animation - horizontal line shrinks to dot at top-left */
+.block-indicator-line[data-shrinking="true"] {
+  transition: width 300ms ease-in-out;
+}
+
+/* Growing animation - vertical line grows from top to bottom */
+.block-indicator-line[data-growing="true"] {
+  transition: height 400ms ease-out;
+}

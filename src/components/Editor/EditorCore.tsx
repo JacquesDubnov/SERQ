@@ -36,6 +36,8 @@ import { LetterSpacing } from '@/extensions/letter-spacing';
 // ParagraphSpacing is now global via CSS variables (see styleStore)
 import { StubCommands } from '@/extensions/stub-commands';
 import { VirtualCursor } from '@/extensions/virtual-cursor';
+import { BlockIndicator } from '@/extensions/block-indicator';
+import { BlockIndicator as BlockIndicatorComponent } from '@/components/BlockIndicator';
 // import { MultiSelection } from '@/extensions/multi-selection'; // Disabled for debugging
 
 export interface EditorCoreRef {
@@ -108,6 +110,8 @@ export const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
         StubCommands,
         // Virtual cursor renders custom caret, preventing visual stretching in pagination
         VirtualCursor,
+        // Block indicator - shows subtle blue line on hovered block
+        BlockIndicator,
         // Markdown paste support - converts pasted markdown to rich text
         Markdown.configure({
           html: true, // Allow HTML in markdown
@@ -259,6 +263,7 @@ export const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
           editor={editor}
           className="editor-content"
         />
+        <BlockIndicatorComponent />
       </div>
     );
   }
