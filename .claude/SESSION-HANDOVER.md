@@ -1,130 +1,181 @@
-# SERQ Session Handover
+# SERQ Session Handover - Block Drag Animation System
 
-**Last Updated:** 2026-02-04
+**Date:** 2026-02-04
 **Branch:** feature/unified-style-system
-**Current Task:** DragHandle Not Working - BLOCKED
+**Last Commit:** a997399 - feat: implement block drag-and-drop with custom animations
 
 ---
 
-## CRITICAL: DragHandle Issue - What We Know
+## Project Overview
 
-### The Problem
-TipTap's DragHandle doesn't show in SERQ, even though:
-- It works PERFECTLY in a clean sandbox (`/Users/jacquesdubnov/Coding/drag-test`)
-- Same TipTap packages, same component, same import
-
-### What We Proved
-
-1. **Clean sandbox works flawlessly** (32 seconds to set up, instant success)
-   - Path: `/Users/jacquesdubnov/Coding/drag-test/src/App.tsx`
-   - Just StarterKit + DragHandle - nothing else
-   - Handles appear, drag works, drop works
-
-2. **SERQ's custom code breaks it** - Per Jacques: "It is something out of the things that we've done in order to deal with bugs that screwed the entire thing"
-
-3. **DragHandle IS receiving mouse events** (from debug logs):
-   ```
-   [DragHandle] Node changed: undefined at pos: -1
-   ```
-   The plugin fires, but returns `pos: -1` meaning it can't resolve node coordinates.
-
-4. **Mouse events reach the editor DOM** (verified with listener)
-
-### What This Means
-The DragHandle plugin can detect mouse movement but **cannot map coordinates to document positions**. Something in SERQ's structure breaks `view.posAtCoords()`.
-
-### Suspects (Not Yet Proven)
-
-1. **CSS Transform** - Was using `transform: scale(zoom/100)` for zoom - KNOWN to break floating-ui
-2. **Canvas padding** - 74px padding might affect coordinate mapping
-3. **EditorWrapper** - Has click handlers, positioned children, background overlay
-4. **overflow: hidden** - Root app has this, could clip absolutely positioned handle
-5. **Custom extensions** - VirtualCursor, StubCommands, etc.
-
-### What NOT to Do
-- Random trial-and-error changes
-- Breaking other functionality to debug this
-- Removing essential components without reverting
+SERQ is a TipTap-based rich text editor built as a Tauri desktop app. We implemented a custom drag-and-drop system for block reordering using mouse events (HTML5 Drag API doesn't work in Tauri WebView).
 
 ---
 
-## Clean Slate Plan
+## What Was Built
 
-### Step 1: Isolate Variables
-Create a minimal test INSIDE SERQ (not separate app) that progressively adds:
-1. Just TipTap + StarterKit + DragHandle (no custom extensions)
-2. Add custom extensions one by one
-3. Add wrappers one by one
-4. Find the exact component that breaks it
+### Block Drag-and-Drop System
 
-### Step 2: Compare Working vs Broken
-Side-by-side comparison of:
-- DOM structure (working sandbox vs SERQ)
-- CSS applied to editor elements
-- Event propagation paths
+**Activation:**
+- Long press (400ms) on any block activates drag mode
+- Movement threshold (10px) cancels long press if user starts selecting text
 
-### Step 3: Fix Root Cause
-Don't patch symptoms - find why `posAtCoords` fails.
+**During Drag:**
+- Source block text fades out via white overlay (1.5s CSS transition)
+- Horizontal blue drop indicator shows where block will land
+- Text selection disabled via CSS `user-select: none`
+- Virtual cursor hidden via CSS targeting `.prosemirror-virtual-cursor`
+- Cursor changes to `grabbing`
+
+**On Drop:**
+- Block reorders instantly (ProseMirror handles the actual move)
+- Two-stage indicator animation:
+  1. Horizontal line shrinks right-to-left to a dot (300ms ease-in-out)
+  2. Vertical line grows from dot downward (400ms ease-out)
 
 ---
 
-## Files Reverted
+## Architecture
 
-All experimental changes from the debugging session were reverted:
+### Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/extensions/block-indicator.ts` | Core ProseMirror plugin (~700 lines) |
+| `src/components/BlockIndicator/BlockIndicator.tsx` | React component for rendering |
+| `src/components/BlockIndicator/BlockIndicator.css` | Styles and transitions |
+
+### State Management Pattern
+
+```
+Module-level state (block-indicator.ts)
+    ↓ notifyListeners()
+React component subscribes via useEffect
+    ↓ setState()
+React re-renders with new props
+    ↓ data-* attributes
+CSS transitions animate the changes
+```
+
+### BlockIndicatorState Interface
+
+```typescript
+interface BlockIndicatorState {
+  visible: boolean
+  top: number
+  height: number
+  blockLeft: number
+  blockWidth: number
+  shiftHeld: boolean
+  isLongPressing: boolean
+  isDragging: boolean
+  dropIndicatorTop: number | null
+  sourceOverlay: { left, top, width, height } | null
+  isAnimating: boolean
+  indicatorTransition: { fromTop, fromHeight, toTop, toHeight } | null
+  dropAnimation: 'none' | 'shrinking' | 'growing'
+}
+```
+
+---
+
+## Critical Technical Learnings
+
+### 1. ProseMirror DOM Control
+**Problem:** Direct DOM manipulation gets wiped by ProseMirror re-renders
+**Solution:** All visual changes must go through React state → CSS transitions
+
+### 2. CSS Transition Triggering
+**Problem:** Setting initial and final values in same frame doesn't animate
+**Solution:** Double `requestAnimationFrame` to ensure browser commits initial state
+
+```typescript
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    // Now set final value - CSS will animate
+  })
+})
+```
+
+### 3. Virtual Cursor Hiding
+**Problem:** `caret-color: transparent` doesn't work - SERQ uses prosemirror-virtual-cursor
+**Solution:** CSS targeting the virtual cursor element directly:
+```css
+body.block-dragging .prosemirror-virtual-cursor {
+  display: none !important;
+}
+```
+
+### 4. Text Selection During Drag
+**Problem:** Text gets selected while dragging
+**Solution:** CSS `user-select: none` on body + `window.getSelection()?.removeAllRanges()` on every mousemove
+
+### 5. Displaced Blocks Animation
+**Attempted:** FLIP animation, CSS transforms, React overlays with cloned HTML
+**Result:** FAILED - ProseMirror wipes all DOM changes before animation can play
+**Current:** Blocks snap into place instantly (no animation)
+
+---
+
+## What Works
+
+| Feature | Status |
+|---------|--------|
+| Long press detection (400ms) | WORKS |
+| Source overlay fade (text disappears) | WORKS |
+| Horizontal drop indicator | WORKS |
+| Drop indicator position tracking | WORKS |
+| Block reordering on drop | WORKS |
+| Text selection disabled during drag | WORKS |
+| Cursor hidden during drag | WORKS |
+| Two-stage drop animation (shrink → grow) | WORKS |
+| Normal text selection when not dragging | WORKS |
+
+---
+
+## What Doesn't Work (By Design)
+
+| Feature | Reason |
+|---------|--------|
+| Displaced blocks push-down animation | ProseMirror controls DOM, wipes transforms |
+| Ghost block following cursor | Removed - simplified to just drop indicator |
+
+---
+
+## CSS Variables for Customization
+
+```css
+--block-indicator-width: 2px
+--block-indicator-color: var(--color-brand, #3b82f6)
+--block-indicator-opacity-visible: 0.6
+--block-indicator-opacity-hidden: 0
+--block-indicator-radius: 1px
+--block-indicator-offset: 16px
+--block-indicator-transition-duration: 510ms
+--block-indicator-transition-easing: cubic-bezier(0.22, 0.1, 0.25, 1.0)
+--block-indicator-fade-duration: 340ms
+```
+
+---
+
+## Debug Commands
+
 ```bash
-git checkout src/App.tsx src/components/Editor/EditorCore.tsx
-```
-
-App is back to working state (minus DragHandle).
-
----
-
-## Current App Structure
-
-```
-App.tsx
-├── <main> (overflow-x: hidden, overflow-y: auto)
-│   ├── [Paginated mode]
-│   │   └── EditorWrapper > EditorCore
-│   └── [Continuous mode]
-│       └── Canvas (74px padding) > EditorWrapper > EditorCore
-│           └── EditorCore contains:
-│               └── EditorContent + all extensions
-└── DragContextMenu (separate, receives editor prop)
-```
-
-The working sandbox has:
-```
-App.tsx
-└── <div> (simple padding)
-    ├── EditorContent
-    └── DragHandle (sibling)
+npm run tauri dev          # Start the app
+./scripts/read-log.sh      # Read debug logs
+./scripts/read-log.sh clear # Clear logs before test
+./scripts/screenshot.sh    # Take screenshot
 ```
 
 ---
 
-## Quick Context
+## Next Steps (Potential)
 
-### What SERQ Is
-Tauri desktop text editor using TipTap (ProseMirror). Has zoom, pagination, unified styling.
-
-### Key Commands
-```bash
-npm run tauri dev    # Start app (ALWAYS this)
-./scripts/read-log.sh # Check debug log
-```
-
-### TipTap Teams License
-Full Pro access. DragHandle component installed and configured.
+1. Add haptic feedback on long press (if Tauri supports)
+2. Add sound feedback on drop
+3. Consider alternative visual feedback for displaced blocks (flash/highlight instead of animation)
+4. Multi-block selection and drag
 
 ---
 
-## Next Session: Fresh Start Required
-
-Jacques' advice: "Take a nap, get a fresh mind, restart in the morning."
-
-The debugging approach of random changes didn't work. Need systematic isolation testing.
-
----
-
-*Working sandbox reference: `/Users/jacquesdubnov/Coding/drag-test`*
+*Session completed: 2026-02-04*
