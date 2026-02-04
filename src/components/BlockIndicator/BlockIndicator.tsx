@@ -10,7 +10,7 @@
  * Also renders: Ghost block, source overlay during drag
  */
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, useMemo } from "react"
 import {
   subscribeToBlockIndicator,
   finishAnimation,
@@ -42,6 +42,7 @@ export const BlockIndicator: React.FC = () => {
     dropAnimation: 'none',
     selectedBlocks: [],
     lastSelectedPos: null,
+    paginationEnabled: false,
   })
 
   const hasEverShown = useRef(false)
@@ -98,11 +99,17 @@ export const BlockIndicator: React.FC = () => {
 
   // Group contiguous selected blocks into single frames
   // Blocks are contiguous if they're visually adjacent (bottom meets top)
-  const groupedSelections = (() => {
+  // In pagination mode, blocks on different pages are never merged
+  const groupedSelections = useMemo(() => {
     if (state.selectedBlocks.length === 0) return []
 
-    // Sort by vertical position (top)
-    const sorted = [...state.selectedBlocks].sort((a, b) => a.top - b.top)
+    // Sort by page first, then by top within page
+    const sorted = [...state.selectedBlocks].sort((a, b) => {
+      if (state.paginationEnabled && a.pageNumber !== b.pageNumber) {
+        return a.pageNumber - b.pageNumber
+      }
+      return a.top - b.top
+    })
 
     const groups: Array<{
       top: number
@@ -110,6 +117,7 @@ export const BlockIndicator: React.FC = () => {
       blockLeft: number
       blockWidth: number
       key: string
+      pageNumber: number
     }> = []
 
     let currentGroup = {
@@ -118,16 +126,23 @@ export const BlockIndicator: React.FC = () => {
       blockLeft: sorted[0].blockLeft,
       blockRight: sorted[0].blockLeft + sorted[0].blockWidth,
       positions: [sorted[0].pos],
+      pageNumber: sorted[0].pageNumber ?? 1,
     }
 
     for (let i = 1; i < sorted.length; i++) {
       const block = sorted[i]
       const blockBottom = block.top + block.height
+      const blockPage = block.pageNumber ?? 1
+
+      // Don't merge across pages in pagination mode
+      const samePage = !state.paginationEnabled || blockPage === currentGroup.pageNumber
 
       // Check if this block is contiguous with current group
       // Allow gap up to 24px for block margins/padding
       const gap = block.top - currentGroup.bottom
-      if (gap <= 24) {
+      const isContiguous = gap <= 24 && samePage
+
+      if (isContiguous) {
         // Extend current group
         currentGroup.bottom = Math.max(currentGroup.bottom, blockBottom)
         currentGroup.blockLeft = Math.min(currentGroup.blockLeft, block.blockLeft)
@@ -141,6 +156,7 @@ export const BlockIndicator: React.FC = () => {
           blockLeft: currentGroup.blockLeft,
           blockWidth: currentGroup.blockRight - currentGroup.blockLeft,
           key: currentGroup.positions.join('-'),
+          pageNumber: currentGroup.pageNumber,
         })
 
         currentGroup = {
@@ -149,6 +165,7 @@ export const BlockIndicator: React.FC = () => {
           blockLeft: block.blockLeft,
           blockRight: block.blockLeft + block.blockWidth,
           positions: [block.pos],
+          pageNumber: blockPage,
         }
       }
     }
@@ -160,10 +177,11 @@ export const BlockIndicator: React.FC = () => {
       blockLeft: currentGroup.blockLeft,
       blockWidth: currentGroup.blockRight - currentGroup.blockLeft,
       key: currentGroup.positions.join('-'),
+      pageNumber: currentGroup.pageNumber,
     })
 
     return groups
-  })()
+  }, [state.selectedBlocks, state.paginationEnabled])
 
   // Calculate indicator style based on mode
   const isDragMode = state.isDragging && state.dropAnimation !== 'shrinking'

@@ -17,7 +17,7 @@
  * 4. CSS transitions handle the animation
  */
 
-console.log('[BlockIndicator] MODULE LOADED')
+console.log('[BlockIndicator] MODULE LOADED at', new Date().toISOString())
 
 import { Extension } from "@tiptap/core"
 import type { Node as PMNode } from "@tiptap/pm/model"
@@ -33,7 +33,7 @@ export interface BlockIndicatorState {
   blockLeft: number
   /** Width of the block */
   blockWidth: number
-  /** Whether Command is held (shows full frame instead of left line) */
+  /** Whether Option is held (shows full frame instead of left line) */
   commandHeld: boolean
   /** Long press state */
   isLongPressing: boolean
@@ -68,15 +68,30 @@ export interface BlockIndicatorState {
     height: number
     blockLeft: number
     blockWidth: number
+    pageNumber: number // Page number (1-indexed) for pagination support
   }>
   /** Last selected block position (for range selection) */
   lastSelectedPos: number | null
+
+  /** Whether pagination mode is active */
+  paginationEnabled: boolean
 }
 
 export const blockIndicatorKey = new PluginKey<{ isDragging: boolean }>("blockIndicator")
 
-// Module-level state for React subscription
-let currentState: BlockIndicatorState = {
+// HMR state persistence - preserve state across hot reloads
+interface HMRState {
+  currentState: BlockIndicatorState
+  listeners: ((state: BlockIndicatorState) => void)[]
+  selectedBlockPositions: Set<number>
+  lastSelectedPos: number | null
+  commandHeld: boolean
+  indicatorEnabled: boolean
+  enabledListeners: ((enabled: boolean) => void)[]
+}
+
+// Try to restore state from HMR, otherwise use defaults
+const defaultState: BlockIndicatorState = {
   visible: false,
   top: 0,
   height: 0,
@@ -92,17 +107,39 @@ let currentState: BlockIndicatorState = {
   dropAnimation: 'none',
   selectedBlocks: [],
   lastSelectedPos: null,
+  paginationEnabled: false,
 }
-let listeners: ((state: BlockIndicatorState) => void)[] = []
+
+// Get persisted state from HMR or use defaults
+const hmrData = (import.meta.hot?.data as HMRState | undefined)
+
+// Module-level state for React subscription
+let currentState: BlockIndicatorState = hmrData?.currentState ?? { ...defaultState }
+let listeners: ((state: BlockIndicatorState) => void)[] = hmrData?.listeners ?? []
 
 // Module-level selection tracking
-let selectedBlockPositions = new Set<number>()
-let lastSelectedPos: number | null = null
-let commandHeld = false
+let selectedBlockPositions = hmrData?.selectedBlockPositions ?? new Set<number>()
+let lastSelectedPos: number | null = hmrData?.lastSelectedPos ?? null
+let commandHeld = hmrData?.commandHeld ?? false
 
 // Enable/disable state
-let indicatorEnabled = true
-let enabledListeners: ((enabled: boolean) => void)[] = []
+let indicatorEnabled = hmrData?.indicatorEnabled ?? true
+let enabledListeners: ((enabled: boolean) => void)[] = hmrData?.enabledListeners ?? []
+
+// Preserve state on HMR
+if (import.meta.hot) {
+  import.meta.hot.accept()
+  import.meta.hot.dispose(() => {
+    const data = import.meta.hot!.data as HMRState
+    data.currentState = currentState
+    data.listeners = listeners
+    data.selectedBlockPositions = selectedBlockPositions
+    data.lastSelectedPos = lastSelectedPos
+    data.commandHeld = commandHeld
+    data.indicatorEnabled = indicatorEnabled
+    data.enabledListeners = enabledListeners
+  })
+}
 
 /**
  * Enable or disable the block indicator feature
@@ -198,6 +235,110 @@ function notifyListeners() {
   listeners.forEach((fn) => fn({ ...currentState }))
 }
 
+/**
+ * Check if an element is in a non-content area (header, footer, or page gap)
+ * These areas should not show the block indicator
+ */
+const isNonContentArea = (element: HTMLElement): boolean => {
+  // Direct check for header/footer/gap elements
+  const inGap = element.closest('.tiptap-pagination-gap') !== null
+  const inHeader = element.closest('.tiptap-page-header') !== null
+  const inFooter = element.closest('.tiptap-page-footer') !== null
+
+  if (inHeader || inFooter || inGap) {
+    return true
+  }
+
+  return false
+}
+
+/**
+ * Check if coordinates are in a non-content area (gap, header, footer) in pagination mode.
+ * Returns false if over a gap, header, or footer. Returns true otherwise.
+ */
+const isInPageContentArea = (clientY: number, _editorDom: HTMLElement): boolean => {
+  // Find pagination container anywhere in the document
+  const paginationContainer = document.querySelector('[data-tiptap-pagination]') as HTMLElement | null
+  if (!paginationContainer) return true // Not paginated, always in content
+
+  // Buffer to catch edge pixels at boundaries between content and gap/header/footer
+  // Needs to be large enough to cover any visual transition areas
+  const EDGE_BUFFER = 30
+
+  // Check gaps - these have pointer-events:none so we check by coordinates
+  const gaps = paginationContainer.querySelectorAll('.tiptap-pagination-gap')
+  for (const gap of gaps) {
+    const rect = gap.getBoundingClientRect()
+    // Extend bounds slightly to catch edge pixels
+    if (clientY >= rect.top - EDGE_BUFFER && clientY <= rect.bottom + EDGE_BUFFER) {
+      return false // Over a gap
+    }
+  }
+
+  // Check headers - extend into gap area
+  const headers = paginationContainer.querySelectorAll('.tiptap-page-header')
+  for (const header of headers) {
+    const rect = header.getBoundingClientRect()
+    if (clientY >= rect.top - EDGE_BUFFER && clientY <= rect.bottom + EDGE_BUFFER) {
+      return false // Over a header
+    }
+  }
+
+  // Check footers - extend into gap area
+  const footers = paginationContainer.querySelectorAll('.tiptap-page-footer')
+  for (const footer of footers) {
+    const rect = footer.getBoundingClientRect()
+    if (clientY >= rect.top - EDGE_BUFFER && clientY <= rect.bottom + EDGE_BUFFER) {
+      return false // Over a footer
+    }
+  }
+
+  return true // Not in gap/header/footer, so it's content
+}
+
+/**
+ * Get the reference rect for positioning.
+ * Always use the editor-content-wrapper since that's where BlockIndicator renders.
+ */
+const getPositionReferenceRect = (editorDom: HTMLElement): DOMRect => {
+  // Find the wrapper - BlockIndicator component is a sibling of editor-content inside this wrapper
+  const wrapper = editorDom.closest('.editor-content-wrapper') as HTMLElement | null
+  if (wrapper) {
+    return wrapper.getBoundingClientRect()
+  }
+
+  // Fallback to editor dom
+  return editorDom.getBoundingClientRect()
+}
+
+/**
+ * Check if pagination mode is enabled by looking for the pagination container
+ */
+const isPaginationEnabled = (editorDom: HTMLElement): boolean => {
+  return editorDom.closest('[data-tiptap-pagination]') !== null
+}
+
+
+/**
+ * Get the page number for a given DOM element (1-indexed)
+ * Uses DOM hierarchy to find which .page element contains the block
+ */
+const getPageNumberForElement = (element: HTMLElement): number => {
+  // Find the closest .page ancestor
+  const pageElement = element.closest('.page')
+  if (!pageElement) return 1
+
+  // Find the pagination container
+  const paginationContainer = element.closest('[data-tiptap-pagination]')
+  if (!paginationContainer) return 1
+
+  // Get all page elements and find index
+  const pages = paginationContainer.querySelectorAll('.page')
+  const pageIndex = Array.from(pages).indexOf(pageElement)
+
+  return pageIndex >= 0 ? pageIndex + 1 : 1
+}
+
 export function subscribeToBlockIndicator(
   callback: (state: BlockIndicatorState) => void
 ): () => void {
@@ -271,6 +412,7 @@ function createBlockIndicatorPlugin() {
       dropAnimation: 'none',
       selectedBlocks: currentState.selectedBlocks, // Preserve selections on reset
       lastSelectedPos: currentState.lastSelectedPos,
+      paginationEnabled: currentState.paginationEnabled, // Preserve pagination state
     }
   }
 
@@ -401,19 +543,32 @@ function createBlockIndicatorPlugin() {
         try {
           const dom = editorView.nodeDOM(currentBlockPos)
           if (dom instanceof HTMLElement) {
-            const editorRect = editorView.dom.getBoundingClientRect()
-            const blockRect = dom.getBoundingClientRect()
+            // Skip headers/footers
+            if (isNonContentArea(dom)) return
 
-            const top = blockRect.top - editorRect.top
+            const refRect = getPositionReferenceRect(editorView.dom)
+            const blockRect = dom.getBoundingClientRect()
+            const isPaginated = isPaginationEnabled(editorView.dom)
+
+            const top = blockRect.top - refRect.top
             const height = blockRect.height
-            const blockLeft = blockRect.left - editorRect.left
+            const blockLeft = blockRect.left - refRect.left
             const blockWidth = blockRect.width
 
             if (
               currentState.top !== top ||
-              currentState.height !== height
+              currentState.height !== height ||
+              currentState.paginationEnabled !== isPaginated
             ) {
-              currentState = { ...currentState, visible: true, top, height, blockLeft, blockWidth }
+              currentState = {
+                ...currentState,
+                visible: true,
+                top,
+                height,
+                blockLeft,
+                blockWidth,
+                paginationEnabled: isPaginated,
+              }
               notifyListeners()
             }
           }
@@ -422,34 +577,61 @@ function createBlockIndicatorPlugin() {
         }
       }
 
-      const findDropPosition = (clientY: number): { pos: number; top: number; index: number } | null => {
+      const findDropPosition = (clientY: number): {
+        pos: number
+        top: number
+        index: number
+        pageNumber: number
+      } | null => {
         const { doc } = editorView.state
-        const editorRect = editorView.dom.getBoundingClientRect()
+        const editorRect = getPositionReferenceRect(editorView.dom)
+        const isPaginated = isPaginationEnabled(editorView.dom)
 
         // Collect all block boundaries (gaps between blocks)
-        const gaps: { pos: number; top: number; index: number }[] = []
+        const gaps: { pos: number; top: number; index: number; pageNumber: number }[] = []
         let blockIndex = 0
         let lastBottom = 0
+        let lastPageNumber = 1
 
         doc.forEach((_node, offset) => {
           const dom = editorView.nodeDOM(offset)
           if (!(dom instanceof HTMLElement)) return
 
+          // Skip headers/footers
+          if (isNonContentArea(dom)) return
+
           const rect = dom.getBoundingClientRect()
           const blockTop = rect.top - editorRect.top
           const blockBottom = blockTop + rect.height
+          const pageNumber = isPaginated ? getPageNumberForElement(dom) : 1
 
-          // Gap before this block (use midpoint between last bottom and this top)
-          const gapTop = blockIndex === 0 ? blockTop : (lastBottom + blockTop) / 2
-          gaps.push({ pos: offset, top: gapTop, index: blockIndex })
+          // Gap before this block
+          let gapTop: number
+          if (blockIndex === 0) {
+            gapTop = blockTop
+          } else if (pageNumber !== lastPageNumber) {
+            // Page boundary - gap is at the start of new page's first block
+            gapTop = blockTop
+          } else {
+            // Normal gap - midpoint between last bottom and this top
+            gapTop = (lastBottom + blockTop) / 2
+          }
+
+          gaps.push({ pos: offset, top: gapTop, index: blockIndex, pageNumber })
 
           lastBottom = blockBottom
+          lastPageNumber = pageNumber
           blockIndex++
         })
 
         // Add gap after last block
         if (blockIndex > 0) {
-          gaps.push({ pos: doc.content.size, top: lastBottom, index: blockIndex })
+          gaps.push({
+            pos: doc.content.size,
+            top: lastBottom,
+            index: blockIndex,
+            pageNumber: lastPageNumber,
+          })
         }
 
         // Find closest gap to cursor
@@ -500,20 +682,36 @@ function createBlockIndicatorPlugin() {
 
       // Update React state with current selected blocks
       const updateSelectedBlocksState = () => {
-        const blocks: Array<{ pos: number; top: number; height: number; blockLeft: number; blockWidth: number }> = []
-        const editorRect = editorView.dom.getBoundingClientRect()
+        const blocks: Array<{
+          pos: number
+          top: number
+          height: number
+          blockLeft: number
+          blockWidth: number
+          pageNumber: number
+        }> = []
+        const refRect = getPositionReferenceRect(editorView.dom)
+        const isPaginated = isPaginationEnabled(editorView.dom)
 
         selectedBlockPositions.forEach((pos) => {
           try {
             const dom = editorView.nodeDOM(pos)
             if (dom instanceof HTMLElement) {
+              // Skip headers/footers
+              if (isNonContentArea(dom)) {
+                selectedBlockPositions.delete(pos)
+                return
+              }
+
               const rect = dom.getBoundingClientRect()
+              const blockLeft = rect.left - refRect.left
               blocks.push({
                 pos,
-                top: rect.top - editorRect.top,
+                top: rect.top - refRect.top,
                 height: rect.height,
-                blockLeft: rect.left - editorRect.left,
+                blockLeft,
                 blockWidth: rect.width,
+                pageNumber: isPaginated ? getPageNumberForElement(dom) : 1,
               })
             }
           } catch {
@@ -526,6 +724,7 @@ function createBlockIndicatorPlugin() {
           ...currentState,
           selectedBlocks: blocks,
           lastSelectedPos,
+          paginationEnabled: isPaginated,
         }
         notifyListeners()
         notifySelectionListeners()
@@ -593,7 +792,7 @@ function createBlockIndicatorPlugin() {
 
         // Animate indicator: horizontal shrinks to dot, then vertical grows
         requestAnimationFrame(() => {
-          const editorRect = editorView.dom.getBoundingClientRect()
+          const refRect = getPositionReferenceRect(editorView.dom)
           const landedDom = editorView.nodeDOM(adjustedPos)
           const landedRect = landedDom instanceof HTMLElement
             ? landedDom.getBoundingClientRect()
@@ -610,9 +809,9 @@ function createBlockIndicatorPlugin() {
             visible: true,
             isDragging: true,  // Keep horizontal mode for shrinking
             commandHeld: false,
-            top: landedRect ? landedRect.top - editorRect.top : 0,
+            top: landedRect ? landedRect.top - refRect.top : 0,
             height: 2,  // Horizontal line height
-            blockLeft: landedRect ? landedRect.left - editorRect.left : 0,
+            blockLeft: landedRect ? landedRect.left - refRect.left : 0,
             blockWidth: landedRect ? landedRect.width : 0,
             dropAnimation: 'shrinking',
           }
@@ -659,6 +858,25 @@ function createBlockIndicatorPlugin() {
 
         const target = event.target
         if (!(target instanceof HTMLElement)) return
+
+        // Skip if hovering over header/footer/gap
+        if (isNonContentArea(target)) {
+          if (currentState.visible && !isDragging) {
+            currentState = { ...currentState, visible: false }
+            notifyListeners()
+          }
+          return
+        }
+
+        // In pagination mode, also check if Y coordinate is in page content area
+        // This catches gaps (which have pointer-events: none so target won't be the gap)
+        if (!isInPageContentArea(event.clientY, editorView.dom)) {
+          if (currentState.visible && !isDragging) {
+            currentState = { ...currentState, visible: false }
+            notifyListeners()
+          }
+          return
+        }
 
         // Switch to mouse mode when mouse moves in editor
         inputMode = 'mouse'
@@ -707,15 +925,19 @@ function createBlockIndicatorPlugin() {
               try {
                 const dom = editorView.nodeDOM(blockPos)
                 if (dom instanceof HTMLElement) {
-                  const editorRect = editorView.dom.getBoundingClientRect()
+                  // Skip headers/footers during drag
+                  if (isNonContentArea(dom)) return
+
+                  const refRect = getPositionReferenceRect(editorView.dom)
                   const blockRect = dom.getBoundingClientRect()
+                  const blockLeft = blockRect.left - refRect.left
 
                   currentState = {
                     ...currentState,
                     visible: true,
-                    top: dropInfo?.top ?? currentState.dropIndicatorTop ?? blockRect.top - editorRect.top,
+                    top: dropInfo?.top ?? currentState.dropIndicatorTop ?? blockRect.top - refRect.top,
                     height: 2,  // Horizontal line height
-                    blockLeft: blockRect.left - editorRect.left,
+                    blockLeft,
                     blockWidth: blockRect.width,
                     dropIndicatorTop: dropInfo?.top ?? currentState.dropIndicatorTop,
                   }
@@ -752,22 +974,30 @@ function createBlockIndicatorPlugin() {
           try {
             const dom = editorView.nodeDOM(blockPos)
             if (dom instanceof HTMLElement) {
-              const editorRect = editorView.dom.getBoundingClientRect()
-              const blockRect = dom.getBoundingClientRect()
+              // Skip header/footer nodes
+              if (isNonContentArea(dom)) {
+                currentBlockPos = null
+                if (currentState.visible) {
+                  currentState = { ...currentState, visible: false }
+                  notifyListeners()
+                }
+                return
+              }
 
-              const top = blockRect.top - editorRect.top
-              const height = blockRect.height
-              const blockLeft = blockRect.left - editorRect.left
-              const blockWidth = blockRect.width
+              const refRect = getPositionReferenceRect(editorView.dom)
+              const blockRect = dom.getBoundingClientRect()
+              const isPaginated = isPaginationEnabled(editorView.dom)
+              const blockLeft = blockRect.left - refRect.left
 
               currentState = {
                 ...currentState,
                 visible: true,
-                top,
-                height,
+                top: blockRect.top - refRect.top,
+                height: blockRect.height,
                 blockLeft,
-                blockWidth,
+                blockWidth: blockRect.width,
                 commandHeld,
+                paginationEnabled: isPaginated,
               }
               notifyListeners()
             }
@@ -786,8 +1016,8 @@ function createBlockIndicatorPlugin() {
         const dom = editorView.nodeDOM(currentBlockPos)
         if (!(dom instanceof HTMLElement)) return
 
-        // Command+click selection logic
-        if (event.metaKey) {
+        // Option+click selection logic
+        if (event.altKey) {
           event.preventDefault()
           event.stopPropagation()
 
@@ -820,7 +1050,7 @@ function createBlockIndicatorPlugin() {
           return  // Don't proceed to drag logic
         }
 
-        // Click without Command = deselect all selected blocks
+        // Click without Option = deselect all selected blocks
         if (selectedBlockPositions.size > 0) {
           clearSelections()
         }
@@ -834,7 +1064,7 @@ function createBlockIndicatorPlugin() {
         currentState = { ...currentState, isLongPressing: true }
         notifyListeners()
 
-        const editorRect = editorView.dom.getBoundingClientRect()
+        const refRect = getPositionReferenceRect(editorView.dom)
         const capturedBlockPos = currentBlockPos
         const capturedDom = dom
 
@@ -861,7 +1091,7 @@ function createBlockIndicatorPlugin() {
           `
           document.body.appendChild(dragOverlay)
 
-          startDrag(capturedBlockPos, node, capturedDom, event.clientX, event.clientY, editorRect, editorView)
+          startDrag(capturedBlockPos, node, capturedDom, event.clientX, event.clientY, refRect, editorView)
         }, LONG_PRESS_DURATION)
       }
 
@@ -917,14 +1147,14 @@ function createBlockIndicatorPlugin() {
         // In that case, the indicator should stay at the caret position
         if (inputMode === 'keyboard') return
 
-        const editorRect = editorView.dom.getBoundingClientRect()
+        const refRect = getPositionReferenceRect(editorView.dom)
         const padding = 50
 
         const isOutside =
-          event.clientX < editorRect.left - padding ||
-          event.clientX > editorRect.right + padding ||
-          event.clientY < editorRect.top - padding ||
-          event.clientY > editorRect.bottom + padding
+          event.clientX < refRect.left - padding ||
+          event.clientX > refRect.right + padding ||
+          event.clientY < refRect.top - padding ||
+          event.clientY > refRect.bottom + padding
 
         if (isOutside && !isDragging) {
           hide()
@@ -935,7 +1165,7 @@ function createBlockIndicatorPlugin() {
         // Skip if disabled
         if (!indicatorEnabled) return
 
-        if (event.key === 'Meta') {
+        if (event.key === 'Alt') {
           setCommandHeld(true)
         }
         if (event.key === 'Escape') {
@@ -950,19 +1180,19 @@ function createBlockIndicatorPlugin() {
         // Skip if disabled
         if (!indicatorEnabled) return
 
-        if (event.key === 'Meta') {
+        if (event.key === 'Alt') {
           setCommandHeld(false)
         }
       }
 
-      // Global click to deselect - anywhere without Command clears selection
+      // Global click to deselect - anywhere without Option clears selection
       const handleGlobalMouseDown = (event: MouseEvent) => {
         // Skip if disabled
         if (!indicatorEnabled) return
 
-        // Only deselect if Command is NOT held and we have selections
+        // Only deselect if Option is NOT held and we have selections
         // Skip if clicking inside the editor (editor handler will manage it)
-        if (!event.metaKey && selectedBlockPositions.size > 0) {
+        if (!event.altKey && selectedBlockPositions.size > 0) {
           const isInsideEditor = editorView.dom.contains(event.target as Node)
           if (!isInsideEditor) {
             clearSelections()
