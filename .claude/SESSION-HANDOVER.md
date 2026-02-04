@@ -1,149 +1,133 @@
 # SERQ Session Handover
 
 **Date:** 2026-02-04
-**Branch:** feature/unified-style-system
-**Last Commit:** f386e95 - feat: implement multi-block selection with Command+click
+**Branch:** `feature/unified-style-system`
+**Last Commit:** `d4b9f23` - feat: architecture v4.0 and block selection infrastructure
 
 ---
 
 ## Project Overview
 
-SERQ is a Tauri-based desktop text editor built with React, TypeScript, and TipTap (ProseMirror). Focus is on Notion-style block editing with custom animations and interactions.
+SERQ is "The Last Editor You'll Ever Need" - a Tauri-based desktop rich text editor:
+- **Frontend:** React + TypeScript + TipTap (ProseMirror)
+- **Desktop:** Tauri 2.x (Rust backend)
+- **State:** Zustand
+- **License:** TipTap Teams ($149/mo) - use native components first
+
+---
+
+## Architecture v4.0 (CRITICAL)
+
+**Master Reference:** `.claude/STYLING-HIERARCHY-ARCHITECTURE.md`
+
+### 5-Level Style Cascade
+```
+PROJECT (root defaults)
+  └── DOCUMENT (per-doc overrides)
+       └── PAGE (section styles)
+            └── BLOCK (paragraph/heading level)
+                 └── CHARACTER (inline marks)
+```
+
+### Data Layer
+- **SQLite** with `tauri-plugin-sql` for native performance
+- **Flat block storage** with ID references (not nested trees)
+- **Fractional indexing** for ordering
+- **Event sourcing** for version control (snapshots + operations)
+
+### Export Formats
+PDF, Word, Apple Pages, Google Docs, Markdown, RTF, TXT, HTML, EPUB, .shtml (our schema-based HTML)
+
+### AI Integration
+- Agent Supervisor orchestrating specialized agents
+- Voice pipeline: VAD → Transcription → Intent Router
+- Research Agent, Data Validation Agent, Literary Agent
+- All through hooks/APIs (infrastructure only - not implementing yet)
 
 ---
 
 ## What's Complete
 
-### 1. Block Indicator System
-- Animated vertical line tracks hovered block
-- Frame mode (Command held) shows border around block
-- Hides when user starts typing
-- Reappears on mouse movement
+### Architecture Documentation
+- Comprehensive v4.0 architecture document
+- SQLite schema design
+- Platform deployment considerations
+- Schema versioning with Migration Registry
 
-### 2. Block Drag-and-Drop
+### Block Indicator System
+- Hover tracking with animated vertical line
+- Frame mode (Command held) shows border
+- Hide on typing, reappear on mouse move
+- Toggle enable/disable button in toolbar
+
+### Block Drag-and-Drop
 - Long-press (400ms) activates drag
-- Source text fades via white overlay
-- Horizontal drop indicator shows target position
-- Two-stage animation on drop: shrink to dot, grow to line
+- Source text fades via overlay
+- Two-stage drop animation
 
-### 3. Multi-Block Selection (Latest)
-- **Command+click**: Toggle single block selection
-- **Command+Shift+click**: Range select/deselect
-- **Click anywhere**: Deselect all
-- Contiguous blocks grouped into single unified frame
-- Visual: 1px stroke, 70% opacity (hover), 100% (selected)
+### Multi-Block Selection (Partial)
+- Code exists but needs plan implementation
+- Plan at `~/.claude/plans/adaptive-giggling-whisper.md`
 
 ---
 
-## Architecture
+## What Remains
 
-### Key Files
+### Immediate: Block Selection Plan
+From `adaptive-giggling-whisper.md`:
+1. Replace Shift with Command for frame mode (may be done)
+2. Add selection state tracking
+3. Command+click toggle selection
+4. Command+Shift+click range selection
+5. Click without modifiers = deselect all
+6. Render multiple selection indicators
+7. Handle position updates on doc change
+
+### Phase 2: Infrastructure
+- SQLite database setup
+- Style stores (project, document, page, block, character)
+- Style resolution with caching
+- Command Registry pattern
+
+### Phase 3+: Features (Infrastructure Only)
+- Block styling toolbar
+- Export/Import system hooks
+- AI integration hooks
+- Voice pipeline hooks
+
+---
+
+## Key Files
 
 | File | Purpose |
 |------|---------|
-| `src/extensions/block-indicator.ts` | ProseMirror plugin - state, events, selection logic |
-| `src/components/BlockIndicator/BlockIndicator.tsx` | React rendering, contiguous grouping |
-| `src/components/BlockIndicator/BlockIndicator.css` | Styles, transitions, animations |
-| `.claude/BLOCK-SELECTION-IMPLEMENTATION.md` | Detailed reference for selection feature |
-
-### State Pattern
-
-```
-Module-level state (selectedBlockPositions Set, commandHeld, etc.)
-    ↓ notifyListeners()
-React subscribes via useEffect
-    ↓ setState()
-React re-renders with data-* attributes
-    ↓
-CSS handles transitions/animations
-```
-
-### BlockIndicatorState Interface
-
-```typescript
-interface BlockIndicatorState {
-  visible: boolean
-  top: number
-  height: number
-  blockLeft: number
-  blockWidth: number
-  commandHeld: boolean              // Changed from shiftHeld
-  isLongPressing: boolean
-  isDragging: boolean
-  dropIndicatorTop: number | null
-  sourceOverlay: { left, top, width, height } | null
-  isAnimating: boolean
-  indicatorTransition: { ... } | null
-  dropAnimation: 'none' | 'shrinking' | 'growing'
-  selectedBlocks: Array<{ pos, top, height, blockLeft, blockWidth }>
-  lastSelectedPos: number | null
-}
-```
-
----
-
-## Technical Learnings
-
-### Selection System
-- Track positions in Set<number> at module level
-- Group contiguous blocks (24px gap threshold) for unified frame
-- Range select: iterate doc.forEach, add/delete positions in range
-- Global mousedown (outside editor) clears selection
-
-### Key Events
-- `handleKeyDown/Up`: Track Meta key (Command on Mac)
-- `handleEditorKeyDown`: Hide indicator on typing (ignore modifier keys!)
-- `handleMouseDown`: Selection logic with metaKey/shiftKey checks
-- `handleGlobalMouseDown`: Deselect on click outside editor
-
-### CSS Transitions
-- Selection frames: `transition: none` (instant appear/disappear)
-- Hover frame: animated with existing transition system
-- Drop animation: staged via `dropAnimation` state ('shrinking' → 'growing')
+| `.claude/STYLING-HIERARCHY-ARCHITECTURE.md` | Master architecture v4.0 |
+| `src/extensions/block-indicator.ts` | Block hover/selection extension |
+| `src/components/BlockIndicator/` | Visual indicator components |
+| `src/components/unified-toolbar/` | Main toolbar |
+| `src/hooks/use-block-selection.ts` | React hook for selection |
+| `~/.claude/plans/adaptive-giggling-whisper.md` | Block selection plan |
 
 ---
 
 ## Commands
 
 ```bash
-npm run tauri dev          # Start desktop app (NOT npm run dev!)
+npm run tauri dev          # ALWAYS use this - desktop app
 npm run build              # TypeScript check
-./scripts/read-log.sh      # Read ~/.serq-debug.log
-./scripts/read-log.sh clear # Clear before testing
+./scripts/read-log.sh      # Read debug log
 ./scripts/screenshot.sh    # Capture window
 ```
 
 ---
 
-## Recent Commits
+## Notes
 
-```
-f386e95 feat: implement multi-block selection with Command+click
-6b4b91c feat: hide block indicator when typing, show on mouse move
-a997399 feat: implement block drag-and-drop with custom animations
-d424ae2 BASE VERSION - Our last good version
-```
-
----
-
-## What's Next
-
-Ready for new features. Potential:
-- Actions on selected blocks (delete, duplicate, style changes)
-- Drag multiple selected blocks
-- Slash command menu
-- Block type conversion
-- More block types (images, code, etc.)
-
----
-
-## Reminders
-
-- **Always `npm run tauri dev`** - Desktop app, not browser
-- **TipTap Teams license** - Full Pro component access
-- **No emojis in UI** - Use SVG icons
+- **API was unstable** - Work in small atomic commits
+- **No emojis** - SVG icons only
 - **Debug bridge** - Console → `~/.serq-debug.log`
+- **TipTap first** - Check docs before custom code
 
 ---
 
-*Session completed: 2026-02-04*
+*Updated: 2026-02-04*
