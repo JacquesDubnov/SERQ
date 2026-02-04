@@ -14,6 +14,7 @@ import { useStyleStore } from './stores/styleStore';
 import { useKeyboardShortcuts, useAutoSave, useSystemTheme } from './hooks';
 import { PaginationModeSelector } from './components/tiptap-ui-custom/pagination-mode-selector';
 import { useAppInit, setCurrentEditor } from './lib/app-init';
+import { CommandPalette } from './components/CommandPalette';
 import type { Editor } from '@tiptap/core';
 
 import './index.css';
@@ -61,9 +62,23 @@ function App() {
   const editorRef = useRef<EditorCoreRef>(null);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [isStylePanelOpen, setIsStylePanelOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
 
   // App initialization (database, commands, styles)
   const { loading: appLoading, error: appError } = useAppInit();
+
+  // Command palette shortcut (Cmd+P)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.metaKey && e.key === 'p') {
+        e.preventDefault();
+        setIsCommandPaletteOpen((open) => !open);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Preserve content across pagination mode changes
   const contentRef = useRef<string>('<p></p>');
@@ -508,6 +523,12 @@ function App() {
         isOpen={isStylePanelOpen}
         onClose={() => setIsStylePanelOpen(false)}
         isDark={isDark}
+      />
+
+      {/* Command Palette - Cmd+P */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
       />
     </div>
   );
