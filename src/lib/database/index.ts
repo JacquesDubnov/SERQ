@@ -93,6 +93,14 @@ class DatabaseManager {
       // Run migrations
       await this.runMigrations(currentVersion, SCHEMA_VERSION)
     }
+
+    // Always ensure built-in styles exist (INSERT OR IGNORE is safe to run multiple times)
+    try {
+      await this.db.execute(INSERT_BUILTIN_STYLES)
+      console.log('[Database] Built-in styles ensured')
+    } catch (err) {
+      console.warn('[Database] Failed to ensure built-in styles:', err)
+    }
   }
 
   /**
