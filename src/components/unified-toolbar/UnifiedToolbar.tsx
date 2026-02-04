@@ -37,6 +37,7 @@ import { LetterSpacingDropdown } from '@/components/tiptap-ui-custom/letter-spac
 import { SpacingBeforeDropdown, SpacingAfterDropdown } from '@/components/tiptap-ui-custom/paragraph-spacing-dropdown';
 import { HeadingToggleButtons } from '@/components/tiptap-ui-custom/heading-toggle-buttons';
 import { ClearFormattingButton, ClearSpacingButton } from '@/components/tiptap-ui-custom/clear-formatting-buttons';
+import { BlockIndicatorToggle } from '@/components/tiptap-ui-custom/block-indicator-toggle';
 
 // Import TipTap component styles
 import '@/components/tiptap-ui-primitive/toolbar/toolbar.scss';
@@ -149,6 +150,13 @@ export function UnifiedToolbar({ editor }: UnifiedToolbarProps) {
           <LetterSpacingDropdown editor={editor} />
           <SpacingBeforeDropdown editor={editor} />
           <SpacingAfterDropdown editor={editor} />
+        </ToolbarGroup>
+
+        <ToolbarSeparator />
+
+        {/* View options */}
+        <ToolbarGroup>
+          <BlockIndicatorToggle />
         </ToolbarGroup>
       </Toolbar>
     </ToolbarContainer>

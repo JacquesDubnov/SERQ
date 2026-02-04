@@ -100,6 +100,100 @@ let selectedBlockPositions = new Set<number>()
 let lastSelectedPos: number | null = null
 let commandHeld = false
 
+// Enable/disable state
+let indicatorEnabled = true
+let enabledListeners: ((enabled: boolean) => void)[] = []
+
+/**
+ * Enable or disable the block indicator feature
+ * When disabled, no event handlers run and indicator is hidden
+ */
+export function setBlockIndicatorEnabled(enabled: boolean) {
+  if (indicatorEnabled === enabled) return
+  indicatorEnabled = enabled
+
+  // If disabling, hide indicator and clear selections
+  if (!enabled) {
+    currentState = {
+      ...currentState,
+      visible: false,
+      selectedBlocks: [],
+      lastSelectedPos: null,
+    }
+    selectedBlockPositions.clear()
+    lastSelectedPos = null
+    notifyListeners()
+  }
+
+  // Notify enabled state listeners
+  enabledListeners.forEach((fn) => fn(enabled))
+}
+
+/**
+ * Check if block indicator is enabled
+ */
+export function isBlockIndicatorEnabled(): boolean {
+  return indicatorEnabled
+}
+
+/**
+ * Get the set of selected block positions
+ * Returns a copy to prevent external modification
+ */
+export function getSelectedBlockPositions(): Set<number> {
+  return new Set(selectedBlockPositions)
+}
+
+/**
+ * Check if any blocks are currently selected
+ */
+export function hasSelectedBlocks(): boolean {
+  return selectedBlockPositions.size > 0
+}
+
+/**
+ * Get count of selected blocks
+ */
+export function getSelectedBlockCount(): number {
+  return selectedBlockPositions.size
+}
+
+// Selection change listeners
+let selectionListeners: ((positions: Set<number>) => void)[] = []
+
+/**
+ * Subscribe to block selection changes
+ * Callback receives the set of selected positions whenever selection changes
+ */
+export function subscribeToBlockSelection(
+  callback: (positions: Set<number>) => void
+): () => void {
+  selectionListeners.push(callback)
+  callback(new Set(selectedBlockPositions))
+  return () => {
+    selectionListeners = selectionListeners.filter((fn) => fn !== callback)
+  }
+}
+
+// Notify selection listeners when selection changes
+function notifySelectionListeners() {
+  const positions = new Set(selectedBlockPositions)
+  selectionListeners.forEach((fn) => fn(positions))
+}
+
+/**
+ * Subscribe to enabled state changes
+ */
+export function subscribeToBlockIndicatorEnabled(
+  callback: (enabled: boolean) => void
+): () => void {
+  enabledListeners.push(callback)
+  callback(indicatorEnabled)
+  return () => {
+    enabledListeners = enabledListeners.filter((fn) => fn !== callback)
+  }
+}
+
 function notifyListeners() {
   listeners.forEach((fn) => fn({ ...currentState }))
 }
@@ -142,6 +236,7 @@ function clearSelections() {
     lastSelectedPos: null,
   }
   notifyListeners()
+  notifySelectionListeners()
 }
 
 function createBlockIndicatorPlugin() {
@@ -433,6 +528,7 @@ function createBlockIndicatorPlugin() {
           lastSelectedPos,
         }
         notifyListeners()
+        notifySelectionListeners()
       }
 
       // Validate selected positions still exist (after doc changes)
@@ -558,6 +654,9 @@ function createBlockIndicatorPlugin() {
       }
 
       const handleMouseMove = (event: MouseEvent) => {
+        // Skip if disabled
+        if (!indicatorEnabled) return
+
         const target = event.target
         if (!(target instanceof HTMLElement)) return
 
@@ -679,6 +778,8 @@ function createBlockIndicatorPlugin() {
       }
 
       const handleMouseDown = (event: MouseEvent) => {
+        // Skip if disabled
+        if (!indicatorEnabled) return
         if (currentBlockPos === null) return
         if (event.button !== 0) return // Only left click
 
@@ -808,6 +909,8 @@ function createBlockIndicatorPlugin() {
       }
 
       const handleGlobalMouseMove = (event: MouseEvent) => {
+        // Skip if disabled
+        if (!indicatorEnabled) return
         if (!currentState.visible && !isDragging) return
 
         // Don't hide if we're in keyboard mode (caret-tracking)
@@ -829,6 +932,9 @@ function createBlockIndicatorPlugin() {
       }
 
       const handleKeyDown = (event: KeyboardEvent) => {
+        // Skip if disabled
+        if (!indicatorEnabled) return
+
         if (event.key === 'Meta') {
           setCommandHeld(true)
         }
@@ -841,6 +947,9 @@ function createBlockIndicatorPlugin() {
       }
 
       const handleKeyUp = (event: KeyboardEvent) => {
+        // Skip if disabled
+        if (!indicatorEnabled) return
+
         if (event.key === 'Meta') {
           setCommandHeld(false)
         }
@@ -848,6 +957,9 @@ function createBlockIndicatorPlugin() {
 
       // Global click to deselect - anywhere without Command clears selection
       const handleGlobalMouseDown = (event: MouseEvent) => {
+        // Skip if disabled
+        if (!indicatorEnabled) return
+
         // Only deselect if Command is NOT held and we have selections
         // Skip if clicking inside the editor (editor handler will manage it)
         if (!event.metaKey && selectedBlockPositions.size > 0) {
@@ -870,6 +982,9 @@ function createBlockIndicatorPlugin() {
       // Hide indicator on keypress (user is typing)
       // But ignore modifier keys - they shouldn't hide the indicator
       const handleEditorKeyDown = (event: KeyboardEvent) => {
+        // Skip if disabled
+        if (!indicatorEnabled) return
+
         // Don't hide for modifier keys
         if (event.key === 'Meta' || event.key === 'Shift' || event.key === 'Control' || event.key === 'Alt') {
           return
