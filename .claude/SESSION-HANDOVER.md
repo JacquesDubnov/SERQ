@@ -1,37 +1,37 @@
-# SERQ Session Handover - Block Drag Animation System
+# SERQ Session Handover
 
 **Date:** 2026-02-04
 **Branch:** feature/unified-style-system
-**Last Commit:** a997399 - feat: implement block drag-and-drop with custom animations
+**Last Commit:** f386e95 - feat: implement multi-block selection with Command+click
 
 ---
 
 ## Project Overview
 
-SERQ is a TipTap-based rich text editor built as a Tauri desktop app. We implemented a custom drag-and-drop system for block reordering using mouse events (HTML5 Drag API doesn't work in Tauri WebView).
+SERQ is a Tauri-based desktop text editor built with React, TypeScript, and TipTap (ProseMirror). Focus is on Notion-style block editing with custom animations and interactions.
 
 ---
 
-## What Was Built
+## What's Complete
 
-### Block Drag-and-Drop System
+### 1. Block Indicator System
+- Animated vertical line tracks hovered block
+- Frame mode (Command held) shows border around block
+- Hides when user starts typing
+- Reappears on mouse movement
 
-**Activation:**
-- Long press (400ms) on any block activates drag mode
-- Movement threshold (10px) cancels long press if user starts selecting text
+### 2. Block Drag-and-Drop
+- Long-press (400ms) activates drag
+- Source text fades via white overlay
+- Horizontal drop indicator shows target position
+- Two-stage animation on drop: shrink to dot, grow to line
 
-**During Drag:**
-- Source block text fades out via white overlay (1.5s CSS transition)
-- Horizontal blue drop indicator shows where block will land
-- Text selection disabled via CSS `user-select: none`
-- Virtual cursor hidden via CSS targeting `.prosemirror-virtual-cursor`
-- Cursor changes to `grabbing`
-
-**On Drop:**
-- Block reorders instantly (ProseMirror handles the actual move)
-- Two-stage indicator animation:
-  1. Horizontal line shrinks right-to-left to a dot (300ms ease-in-out)
-  2. Vertical line grows from dot downward (400ms ease-out)
+### 3. Multi-Block Selection (Latest)
+- **Command+click**: Toggle single block selection
+- **Command+Shift+click**: Range select/deselect
+- **Click anywhere**: Deselect all
+- Contiguous blocks grouped into single unified frame
+- Visual: 1px stroke, 70% opacity (hover), 100% (selected)
 
 ---
 
@@ -41,20 +41,21 @@ SERQ is a TipTap-based rich text editor built as a Tauri desktop app. We impleme
 
 | File | Purpose |
 |------|---------|
-| `src/extensions/block-indicator.ts` | Core ProseMirror plugin (~700 lines) |
-| `src/components/BlockIndicator/BlockIndicator.tsx` | React component for rendering |
-| `src/components/BlockIndicator/BlockIndicator.css` | Styles and transitions |
+| `src/extensions/block-indicator.ts` | ProseMirror plugin - state, events, selection logic |
+| `src/components/BlockIndicator/BlockIndicator.tsx` | React rendering, contiguous grouping |
+| `src/components/BlockIndicator/BlockIndicator.css` | Styles, transitions, animations |
+| `.claude/BLOCK-SELECTION-IMPLEMENTATION.md` | Detailed reference for selection feature |
 
-### State Management Pattern
+### State Pattern
 
 ```
-Module-level state (block-indicator.ts)
+Module-level state (selectedBlockPositions Set, commandHeld, etc.)
     ↓ notifyListeners()
-React component subscribes via useEffect
+React subscribes via useEffect
     ↓ setState()
-React re-renders with new props
-    ↓ data-* attributes
-CSS transitions animate the changes
+React re-renders with data-* attributes
+    ↓
+CSS handles transitions/animations
 ```
 
 ### BlockIndicatorState Interface
@@ -66,115 +67,82 @@ interface BlockIndicatorState {
   height: number
   blockLeft: number
   blockWidth: number
-  shiftHeld: boolean
+  commandHeld: boolean              // Changed from shiftHeld
   isLongPressing: boolean
   isDragging: boolean
   dropIndicatorTop: number | null
   sourceOverlay: { left, top, width, height } | null
   isAnimating: boolean
-  indicatorTransition: { fromTop, fromHeight, toTop, toHeight } | null
+  indicatorTransition: { ... } | null
   dropAnimation: 'none' | 'shrinking' | 'growing'
+  selectedBlocks: Array<{ pos, top, height, blockLeft, blockWidth }>
+  lastSelectedPos: number | null
 }
 ```
 
 ---
 
-## Critical Technical Learnings
+## Technical Learnings
 
-### 1. ProseMirror DOM Control
-**Problem:** Direct DOM manipulation gets wiped by ProseMirror re-renders
-**Solution:** All visual changes must go through React state → CSS transitions
+### Selection System
+- Track positions in Set<number> at module level
+- Group contiguous blocks (24px gap threshold) for unified frame
+- Range select: iterate doc.forEach, add/delete positions in range
+- Global mousedown (outside editor) clears selection
 
-### 2. CSS Transition Triggering
-**Problem:** Setting initial and final values in same frame doesn't animate
-**Solution:** Double `requestAnimationFrame` to ensure browser commits initial state
+### Key Events
+- `handleKeyDown/Up`: Track Meta key (Command on Mac)
+- `handleEditorKeyDown`: Hide indicator on typing (ignore modifier keys!)
+- `handleMouseDown`: Selection logic with metaKey/shiftKey checks
+- `handleGlobalMouseDown`: Deselect on click outside editor
 
-```typescript
-requestAnimationFrame(() => {
-  requestAnimationFrame(() => {
-    // Now set final value - CSS will animate
-  })
-})
-```
-
-### 3. Virtual Cursor Hiding
-**Problem:** `caret-color: transparent` doesn't work - SERQ uses prosemirror-virtual-cursor
-**Solution:** CSS targeting the virtual cursor element directly:
-```css
-body.block-dragging .prosemirror-virtual-cursor {
-  display: none !important;
-}
-```
-
-### 4. Text Selection During Drag
-**Problem:** Text gets selected while dragging
-**Solution:** CSS `user-select: none` on body + `window.getSelection()?.removeAllRanges()` on every mousemove
-
-### 5. Displaced Blocks Animation
-**Attempted:** FLIP animation, CSS transforms, React overlays with cloned HTML
-**Result:** FAILED - ProseMirror wipes all DOM changes before animation can play
-**Current:** Blocks snap into place instantly (no animation)
+### CSS Transitions
+- Selection frames: `transition: none` (instant appear/disappear)
+- Hover frame: animated with existing transition system
+- Drop animation: staged via `dropAnimation` state ('shrinking' → 'growing')
 
 ---
 
-## What Works
-
-| Feature | Status |
-|---------|--------|
-| Long press detection (400ms) | WORKS |
-| Source overlay fade (text disappears) | WORKS |
-| Horizontal drop indicator | WORKS |
-| Drop indicator position tracking | WORKS |
-| Block reordering on drop | WORKS |
-| Text selection disabled during drag | WORKS |
-| Cursor hidden during drag | WORKS |
-| Two-stage drop animation (shrink → grow) | WORKS |
-| Normal text selection when not dragging | WORKS |
-
----
-
-## What Doesn't Work (By Design)
-
-| Feature | Reason |
-|---------|--------|
-| Displaced blocks push-down animation | ProseMirror controls DOM, wipes transforms |
-| Ghost block following cursor | Removed - simplified to just drop indicator |
-
----
-
-## CSS Variables for Customization
-
-```css
---block-indicator-width: 2px
---block-indicator-color: var(--color-brand, #3b82f6)
---block-indicator-opacity-visible: 0.6
---block-indicator-opacity-hidden: 0
---block-indicator-radius: 1px
---block-indicator-offset: 16px
---block-indicator-transition-duration: 510ms
---block-indicator-transition-easing: cubic-bezier(0.22, 0.1, 0.25, 1.0)
---block-indicator-fade-duration: 340ms
-```
-
----
-
-## Debug Commands
+## Commands
 
 ```bash
-npm run tauri dev          # Start the app
-./scripts/read-log.sh      # Read debug logs
-./scripts/read-log.sh clear # Clear logs before test
-./scripts/screenshot.sh    # Take screenshot
+npm run tauri dev          # Start desktop app (NOT npm run dev!)
+npm run build              # TypeScript check
+./scripts/read-log.sh      # Read ~/.serq-debug.log
+./scripts/read-log.sh clear # Clear before testing
+./scripts/screenshot.sh    # Capture window
 ```
 
 ---
 
-## Next Steps (Potential)
+## Recent Commits
 
-1. Add haptic feedback on long press (if Tauri supports)
-2. Add sound feedback on drop
-3. Consider alternative visual feedback for displaced blocks (flash/highlight instead of animation)
-4. Multi-block selection and drag
+```
+f386e95 feat: implement multi-block selection with Command+click
+6b4b91c feat: hide block indicator when typing, show on mouse move
+a997399 feat: implement block drag-and-drop with custom animations
+d424ae2 BASE VERSION - Our last good version
+```
+
+---
+
+## What's Next
+
+Ready for new features. Potential:
+- Actions on selected blocks (delete, duplicate, style changes)
+- Drag multiple selected blocks
+- Slash command menu
+- Block type conversion
+- More block types (images, code, etc.)
+
+---
+
+## Reminders
+
+- **Always `npm run tauri dev`** - Desktop app, not browser
+- **TipTap Teams license** - Full Pro component access
+- **No emojis in UI** - Use SVG icons
+- **Debug bridge** - Console → `~/.serq-debug.log`
 
 ---
 
