@@ -33,8 +33,8 @@ export interface BlockIndicatorState {
   blockLeft: number
   /** Width of the block */
   blockWidth: number
-  /** Whether shift is held (shows full frame instead of left line) */
-  shiftHeld: boolean
+  /** Whether Command is held (shows full frame instead of left line) */
+  commandHeld: boolean
   /** Long press state */
   isLongPressing: boolean
   /** Drag state */
@@ -59,6 +59,18 @@ export interface BlockIndicatorState {
   } | null
   /** Animation stage after drop: 'none' | 'shrinking' | 'growing' */
   dropAnimation: 'none' | 'shrinking' | 'growing'
+
+  // Multi-block selection
+  /** Array of selected blocks with their positions and dimensions */
+  selectedBlocks: Array<{
+    pos: number        // ProseMirror position
+    top: number
+    height: number
+    blockLeft: number
+    blockWidth: number
+  }>
+  /** Last selected block position (for range selection) */
+  lastSelectedPos: number | null
 }
 
 export const blockIndicatorKey = new PluginKey<{ isDragging: boolean }>("blockIndicator")
@@ -70,7 +82,7 @@ let currentState: BlockIndicatorState = {
   height: 0,
   blockLeft: 0,
   blockWidth: 0,
-  shiftHeld: false,
+  commandHeld: false,
   isLongPressing: false,
   isDragging: false,
   dropIndicatorTop: null,
@@ -78,8 +90,15 @@ let currentState: BlockIndicatorState = {
   isAnimating: false,
   indicatorTransition: null,
   dropAnimation: 'none',
+  selectedBlocks: [],
+  lastSelectedPos: null,
 }
 let listeners: ((state: BlockIndicatorState) => void)[] = []
+
+// Module-level selection tracking
+let selectedBlockPositions = new Set<number>()
+let lastSelectedPos: number | null = null
+let commandHeld = false
 
 function notifyListeners() {
   listeners.forEach((fn) => fn({ ...currentState }))
@@ -113,9 +132,20 @@ export function clearDropInfo() {
   movedBlockPos = null
 }
 
+// Helper to clear all selections
+function clearSelections() {
+  selectedBlockPositions.clear()
+  lastSelectedPos = null
+  currentState = {
+    ...currentState,
+    selectedBlocks: [],
+    lastSelectedPos: null,
+  }
+  notifyListeners()
+}
+
 function createBlockIndicatorPlugin() {
   let currentBlockPos: number | null = null
-  let shiftHeld = false
 
   // Long press state
   let longPressTimer: ReturnType<typeof setTimeout> | null = null
@@ -136,7 +166,7 @@ function createBlockIndicatorPlugin() {
       height: 0,
       blockLeft: 0,
       blockWidth: 0,
-      shiftHeld: false,
+      commandHeld: false,
       isLongPressing: false,
       isDragging: false,
       dropIndicatorTop: null,
@@ -144,6 +174,8 @@ function createBlockIndicatorPlugin() {
       isAnimating: false,
       indicatorTransition: null,
       dropAnimation: 'none',
+      selectedBlocks: currentState.selectedBlocks, // Preserve selections on reset
+      lastSelectedPos: currentState.lastSelectedPos,
     }
   }
 
@@ -244,10 +276,10 @@ function createBlockIndicatorPlugin() {
     document.body.classList.remove("block-dragging")
   }
 
-  const setShiftHeld = (held: boolean) => {
-    if (shiftHeld !== held) {
-      shiftHeld = held
-      currentState = { ...currentState, shiftHeld: held }
+  const setCommandHeld = (held: boolean) => {
+    if (commandHeld !== held) {
+      commandHeld = held
+      currentState = { ...currentState, commandHeld: held }
       notifyListeners()
     }
   }
@@ -340,6 +372,86 @@ function createBlockIndicatorPlugin() {
         return closest || null
       }
 
+      // Selection helper: select range of blocks between two positions
+      const selectBlockRange = (fromPos: number, toPos: number) => {
+        const { doc } = editorView.state
+        const minPos = Math.min(fromPos, toPos)
+        const maxPos = Math.max(fromPos, toPos)
+
+        doc.forEach((_node, offset) => {
+          if (offset >= minPos && offset <= maxPos) {
+            selectedBlockPositions.add(offset)
+          }
+        })
+        lastSelectedPos = toPos
+      }
+
+      // Selection helper: deselect range of blocks between two positions
+      const deselectBlockRange = (fromPos: number, toPos: number) => {
+        const { doc } = editorView.state
+        const minPos = Math.min(fromPos, toPos)
+        const maxPos = Math.max(fromPos, toPos)
+
+        doc.forEach((_node, offset) => {
+          if (offset >= minPos && offset <= maxPos) {
+            selectedBlockPositions.delete(offset)
+          }
+        })
+        // Update lastSelectedPos
+        lastSelectedPos = selectedBlockPositions.size > 0
+          ? Array.from(selectedBlockPositions).pop() ?? null
+          : null
+      }
+
+      // Update React state with current selected blocks
+      const updateSelectedBlocksState = () => {
+        const blocks: Array<{ pos: number; top: number; height: number; blockLeft: number; blockWidth: number }> = []
+        const editorRect = editorView.dom.getBoundingClientRect()
+
+        selectedBlockPositions.forEach((pos) => {
+          try {
+            const dom = editorView.nodeDOM(pos)
+            if (dom instanceof HTMLElement) {
+              const rect = dom.getBoundingClientRect()
+              blocks.push({
+                pos,
+                top: rect.top - editorRect.top,
+                height: rect.height,
+                blockLeft: rect.left - editorRect.left,
+                blockWidth: rect.width,
+              })
+            }
+          } catch {
+            // Position no longer valid, remove it
+            selectedBlockPositions.delete(pos)
+          }
+        })
+
+        currentState = {
+          ...currentState,
+          selectedBlocks: blocks,
+          lastSelectedPos,
+        }
+        notifyListeners()
+      }
+
+      // Validate selected positions still exist (after doc changes)
+      const validateSelectedPositions = () => {
+        const { doc } = editorView.state
+        const validPositions = new Set<number>()
+
+        doc.forEach((_node, offset) => {
+          if (selectedBlockPositions.has(offset)) {
+            validPositions.add(offset)
+          }
+        })
+
+        selectedBlockPositions = validPositions
+        if (lastSelectedPos !== null && !validPositions.has(lastSelectedPos)) {
+          lastSelectedPos = null
+        }
+      }
+
       const executeMove = () => {
         if (!dragSourceNode || dragSourcePos === null || dropTargetPos === null) return
         if (dropTargetPos === dragSourcePos || dropTargetPos === dragSourcePos + dragSourceNode.nodeSize) {
@@ -401,7 +513,7 @@ function createBlockIndicatorPlugin() {
             ...currentState,
             visible: true,
             isDragging: true,  // Keep horizontal mode for shrinking
-            shiftHeld: false,
+            commandHeld: false,
             top: landedRect ? landedRect.top - editorRect.top : 0,
             height: 2,  // Horizontal line height
             blockLeft: landedRect ? landedRect.left - editorRect.left : 0,
@@ -556,7 +668,7 @@ function createBlockIndicatorPlugin() {
                 height,
                 blockLeft,
                 blockWidth,
-                shiftHeld,
+                commandHeld,
               }
               notifyListeners()
             }
@@ -566,8 +678,6 @@ function createBlockIndicatorPlugin() {
         }
       }
 
-      let mouseDownPos: { x: number; y: number } | null = null
-
       const handleMouseDown = (event: MouseEvent) => {
         if (currentBlockPos === null) return
         if (event.button !== 0) return // Only left click
@@ -575,11 +685,47 @@ function createBlockIndicatorPlugin() {
         const dom = editorView.nodeDOM(currentBlockPos)
         if (!(dom instanceof HTMLElement)) return
 
+        // Command+click selection logic
+        if (event.metaKey) {
+          event.preventDefault()
+          event.stopPropagation()
+
+          if (event.shiftKey && lastSelectedPos !== null) {
+            // Range selection/deselection: toggle based on whether clicked block is selected
+            if (selectedBlockPositions.has(currentBlockPos)) {
+              // Clicked block is selected - deselect the range
+              deselectBlockRange(lastSelectedPos, currentBlockPos)
+            } else {
+              // Clicked block is not selected - select the range
+              selectBlockRange(lastSelectedPos, currentBlockPos)
+            }
+          } else {
+            // Toggle single block selection
+            if (selectedBlockPositions.has(currentBlockPos)) {
+              selectedBlockPositions.delete(currentBlockPos)
+              // Update lastSelectedPos if we deselected it
+              if (lastSelectedPos === currentBlockPos) {
+                lastSelectedPos = selectedBlockPositions.size > 0
+                  ? Array.from(selectedBlockPositions).pop() ?? null
+                  : null
+              }
+            } else {
+              selectedBlockPositions.add(currentBlockPos)
+              lastSelectedPos = currentBlockPos
+            }
+          }
+
+          updateSelectedBlocksState()
+          return  // Don't proceed to drag logic
+        }
+
+        // Click without Command = deselect all selected blocks
+        if (selectedBlockPositions.size > 0) {
+          clearSelections()
+        }
+
         // Don't block - allow normal text selection
         // We only take over if long press completes
-
-        // Store click position for cursor placement on quick release
-        mouseDownPos = { x: event.clientX, y: event.clientY }
 
         // Start long press detection
         longPressStartPos = { x: event.clientX, y: event.clientY }
@@ -620,7 +766,6 @@ function createBlockIndicatorPlugin() {
 
       const handleMouseUp = () => {
         const wasDragging = isDragging
-        mouseDownPos = null
 
         cancelLongPress()
 
@@ -656,6 +801,10 @@ function createBlockIndicatorPlugin() {
 
       const handleScroll = () => {
         updateBlockRect()
+        // Also update selected blocks positions on scroll
+        if (selectedBlockPositions.size > 0) {
+          updateSelectedBlocksState()
+        }
       }
 
       const handleGlobalMouseMove = (event: MouseEvent) => {
@@ -680,8 +829,8 @@ function createBlockIndicatorPlugin() {
       }
 
       const handleKeyDown = (event: KeyboardEvent) => {
-        if (event.key === 'Shift') {
-          setShiftHeld(true)
+        if (event.key === 'Meta') {
+          setCommandHeld(true)
         }
         if (event.key === 'Escape') {
           cancelLongPress()
@@ -692,13 +841,26 @@ function createBlockIndicatorPlugin() {
       }
 
       const handleKeyUp = (event: KeyboardEvent) => {
-        if (event.key === 'Shift') {
-          setShiftHeld(false)
+        if (event.key === 'Meta') {
+          setCommandHeld(false)
+        }
+      }
+
+      // Global click to deselect - anywhere without Command clears selection
+      const handleGlobalMouseDown = (event: MouseEvent) => {
+        // Only deselect if Command is NOT held and we have selections
+        // Skip if clicking inside the editor (editor handler will manage it)
+        if (!event.metaKey && selectedBlockPositions.size > 0) {
+          const isInsideEditor = editorView.dom.contains(event.target as Node)
+          if (!isInsideEditor) {
+            clearSelections()
+          }
         }
       }
 
       editorView.dom.addEventListener("mousemove", handleMouseMove)
       editorView.dom.addEventListener("mousedown", handleMouseDown, true)  // Capture phase
+      window.addEventListener("mousedown", handleGlobalMouseDown)  // Global deselect
       window.addEventListener("mouseup", handleMouseUp)
       document.addEventListener("mousemove", handleGlobalMouseMove)
       window.addEventListener("scroll", handleScroll, true)
@@ -706,7 +868,13 @@ function createBlockIndicatorPlugin() {
       window.addEventListener("keyup", handleKeyUp)
 
       // Hide indicator on keypress (user is typing)
-      const handleEditorKeyDown = () => {
+      // But ignore modifier keys - they shouldn't hide the indicator
+      const handleEditorKeyDown = (event: KeyboardEvent) => {
+        // Don't hide for modifier keys
+        if (event.key === 'Meta' || event.key === 'Shift' || event.key === 'Control' || event.key === 'Alt') {
+          return
+        }
+
         if (inputMode !== 'keyboard') {
           inputMode = 'keyboard'
           // Instantly hide the indicator
@@ -717,9 +885,18 @@ function createBlockIndicatorPlugin() {
 
       editorView.dom.addEventListener("keydown", handleEditorKeyDown)
 
+      let prevDoc = editorView.state.doc
+
       return {
-        update: () => {
+        update: (view) => {
           updateBlockRect()
+
+          // If document changed, recalculate selected block positions
+          if (view.state.doc !== prevDoc && selectedBlockPositions.size > 0) {
+            validateSelectedPositions()
+            updateSelectedBlocksState()
+          }
+          prevDoc = view.state.doc
         },
         destroy: () => {
           cancelLongPress()
@@ -729,6 +906,7 @@ function createBlockIndicatorPlugin() {
           editorView.dom.removeEventListener("mousemove", handleMouseMove)
           editorView.dom.removeEventListener("mousedown", handleMouseDown, true)
           editorView.dom.removeEventListener("keydown", handleEditorKeyDown)
+          window.removeEventListener("mousedown", handleGlobalMouseDown)
           window.removeEventListener("mouseup", handleMouseUp)
           document.removeEventListener("mousemove", handleGlobalMouseMove)
           window.removeEventListener("scroll", handleScroll, true)

@@ -14,7 +14,7 @@
  */
 
 .block-indicator-line {
-  width: var(--block-indicator-width, 2px);
+  width: var(--block-indicator-width, 1px);
   background-color: var(--block-indicator-color, var(--color-brand, #3b82f6));
   border-radius: var(--block-indicator-radius, 1px);
   pointer-events: none;
@@ -26,14 +26,24 @@
 
 /* Visible state */
 .block-indicator-line[data-visible="true"] {
-  opacity: var(--block-indicator-opacity-visible, 0.6);
+  opacity: var(--block-indicator-opacity-visible, 0.7);
 }
 
-/* Frame mode (Shift held) - show border on all sides */
+/* Frame mode (Command held) - show border on all sides */
 .block-indicator-line[data-frame="true"] {
   background-color: transparent;
-  border: var(--block-indicator-width, 2px) solid var(--block-indicator-color, var(--color-brand, #3b82f6));
+  border: var(--block-indicator-width, 1px) solid var(--block-indicator-color, var(--color-brand, #3b82f6));
   border-radius: var(--block-indicator-frame-radius, 4px);
+}
+
+/* Selected block indicator - static, no transitions, full opacity */
+.block-indicator-line[data-selected="true"] {
+  background-color: transparent;
+  border: 1px solid var(--block-indicator-color, var(--color-brand, #3b82f6));
+  border-radius: 4px;
+  opacity: 1;
+  /* Override any transitions - selection frames appear/disappear instantly */
+  transition: none !important;
 }
 
 /* Drop indicator line (shown during drag) */

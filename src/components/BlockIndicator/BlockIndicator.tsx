@@ -3,8 +3,9 @@
  *
  * The indicator morphs between states:
  * 1. Side indicator line (default hover) - vertical line on left of block
- * 2. Full frame (Shift held) - border around entire block
+ * 2. Full frame (Command held) - border around entire block for hover
  * 3. Drop indicator (during drag) - horizontal line at drop position
+ * 4. Selection frames (Command+click) - static frames around selected blocks
  *
  * Also renders: Ghost block, source overlay during drag
  */
@@ -31,7 +32,7 @@ export const BlockIndicator: React.FC = () => {
     height: 0,
     blockLeft: 0,
     blockWidth: 0,
-    shiftHeld: false,
+    commandHeld: false,
     isLongPressing: false,
     isDragging: false,
     dropIndicatorTop: null,
@@ -39,6 +40,8 @@ export const BlockIndicator: React.FC = () => {
     isAnimating: false,
     indicatorTransition: null,
     dropAnimation: 'none',
+    selectedBlocks: [],
+    lastSelectedPos: null,
   })
 
   const hasEverShown = useRef(false)
@@ -93,6 +96,75 @@ export const BlockIndicator: React.FC = () => {
 
   const offset = getCSSVar("--block-indicator-offset", 16)
 
+  // Group contiguous selected blocks into single frames
+  // Blocks are contiguous if they're visually adjacent (bottom meets top)
+  const groupedSelections = (() => {
+    if (state.selectedBlocks.length === 0) return []
+
+    // Sort by vertical position (top)
+    const sorted = [...state.selectedBlocks].sort((a, b) => a.top - b.top)
+
+    const groups: Array<{
+      top: number
+      height: number
+      blockLeft: number
+      blockWidth: number
+      key: string
+    }> = []
+
+    let currentGroup = {
+      top: sorted[0].top,
+      bottom: sorted[0].top + sorted[0].height,
+      blockLeft: sorted[0].blockLeft,
+      blockRight: sorted[0].blockLeft + sorted[0].blockWidth,
+      positions: [sorted[0].pos],
+    }
+
+    for (let i = 1; i < sorted.length; i++) {
+      const block = sorted[i]
+      const blockBottom = block.top + block.height
+
+      // Check if this block is contiguous with current group
+      // Allow gap up to 24px for block margins/padding
+      const gap = block.top - currentGroup.bottom
+      if (gap <= 24) {
+        // Extend current group
+        currentGroup.bottom = Math.max(currentGroup.bottom, blockBottom)
+        currentGroup.blockLeft = Math.min(currentGroup.blockLeft, block.blockLeft)
+        currentGroup.blockRight = Math.max(currentGroup.blockRight, block.blockLeft + block.blockWidth)
+        currentGroup.positions.push(block.pos)
+      } else {
+        // Start new group - save current one first
+        groups.push({
+          top: currentGroup.top,
+          height: currentGroup.bottom - currentGroup.top,
+          blockLeft: currentGroup.blockLeft,
+          blockWidth: currentGroup.blockRight - currentGroup.blockLeft,
+          key: currentGroup.positions.join('-'),
+        })
+
+        currentGroup = {
+          top: block.top,
+          bottom: blockBottom,
+          blockLeft: block.blockLeft,
+          blockRight: block.blockLeft + block.blockWidth,
+          positions: [block.pos],
+        }
+      }
+    }
+
+    // Don't forget the last group
+    groups.push({
+      top: currentGroup.top,
+      height: currentGroup.bottom - currentGroup.top,
+      blockLeft: currentGroup.blockLeft,
+      blockWidth: currentGroup.blockRight - currentGroup.blockLeft,
+      key: currentGroup.positions.join('-'),
+    })
+
+    return groups
+  })()
+
   // Calculate indicator style based on mode
   const isDragMode = state.isDragging && state.dropAnimation !== 'shrinking'
 
@@ -123,7 +195,7 @@ export const BlockIndicator: React.FC = () => {
       height: 2,
       width: state.blockWidth + offset * 2,
     }
-  } else if (state.shiftHeld) {
+  } else if (state.commandHeld) {
     indicatorStyle = {
       position: "absolute",
       left: state.blockLeft - offset,
@@ -140,6 +212,14 @@ export const BlockIndicator: React.FC = () => {
       width: undefined,
     }
   }
+
+  // Check if current block is in selection (to avoid double-rendering)
+  const currentBlockInSelection = state.selectedBlocks.some(
+    (block) =>
+      block.top === state.top &&
+      block.height === state.height &&
+      block.blockLeft === state.blockLeft
+  )
 
   return (
     <>
@@ -158,18 +238,38 @@ export const BlockIndicator: React.FC = () => {
         />
       )}
 
-      {/* Unified indicator */}
-      <div
-        className="block-indicator-line"
-        style={indicatorStyle}
-        data-visible={state.visible ? "true" : "false"}
-        data-animate={hasEverShown.current ? "true" : "false"}
-        data-frame={state.shiftHeld ? "true" : "false"}
-        data-horizontal={isDragMode ? "true" : "false"}
-        data-long-pressing={state.isLongPressing ? "true" : "false"}
-        data-shrinking={state.dropAnimation === 'shrinking' ? "true" : "false"}
-        data-growing={state.dropAnimation === 'growing' ? "true" : "false"}
-      />
+      {/* Selection indicators - one per contiguous group (NO animation) */}
+      {groupedSelections.map((group) => (
+        <div
+          key={group.key}
+          className="block-indicator-line"
+          style={{
+            position: "absolute",
+            left: group.blockLeft - offset,
+            top: group.top,
+            height: group.height,
+            width: group.blockWidth + offset * 2,
+          }}
+          data-visible="true"
+          data-frame="true"
+          data-selected="true"
+        />
+      ))}
+
+      {/* Hover indicator (when current block is not selected) */}
+      {!currentBlockInSelection && (
+        <div
+          className="block-indicator-line"
+          style={indicatorStyle}
+          data-visible={state.visible ? "true" : "false"}
+          data-animate={hasEverShown.current ? "true" : "false"}
+          data-frame={state.commandHeld ? "true" : "false"}
+          data-horizontal={isDragMode ? "true" : "false"}
+          data-long-pressing={state.isLongPressing ? "true" : "false"}
+          data-shrinking={state.dropAnimation === 'shrinking' ? "true" : "false"}
+          data-growing={state.dropAnimation === 'growing' ? "true" : "false"}
+        />
+      )}
     </>
   )
 }
