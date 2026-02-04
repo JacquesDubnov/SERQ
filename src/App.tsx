@@ -13,6 +13,7 @@ import { useEditorStore } from './stores/editorStore';
 import { useStyleStore } from './stores/styleStore';
 import { useKeyboardShortcuts, useAutoSave, useSystemTheme } from './hooks';
 import { PaginationModeSelector } from './components/tiptap-ui-custom/pagination-mode-selector';
+import { useAppInit, setCurrentEditor } from './lib/app-init';
 import type { Editor } from '@tiptap/core';
 
 import './index.css';
@@ -61,12 +62,21 @@ function App() {
   const [editor, setEditor] = useState<Editor | null>(null);
   const [isStylePanelOpen, setIsStylePanelOpen] = useState(false);
 
+  // App initialization (database, commands, styles)
+  const { loading: appLoading, error: appError } = useAppInit();
+
   // Preserve content across pagination mode changes
   const contentRef = useRef<string>('<p></p>');
   const [editorKey, setEditorKey] = useState(0);
 
   // System theme detection with Tauri integration
   const { effectiveTheme, toggleTheme: toggleSystemTheme } = useSystemTheme();
+
+  // Keep command registry updated with current editor
+  useEffect(() => {
+    setCurrentEditor(editor);
+    return () => setCurrentEditor(null);
+  }, [editor]);
 
   // Sync style store with system theme
   const { setEffectiveTheme, applyAllPresets } = useStyleStore();
@@ -217,7 +227,42 @@ function App() {
   const textSecondary = isDark ? '#a1a1aa' : '#6b7280';
   const textDirty = isDark ? '#fb923c' : '#f97316';
 
-  // Note: Main content positioning now handled in fixed position style
+  // Show loading state during app initialization
+  if (appLoading) {
+    return (
+      <div style={{
+        height: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: bgSurface,
+        color: textSecondary,
+        fontSize: '14px',
+      }}>
+        Initializing...
+      </div>
+    );
+  }
+
+  // Show error state if initialization failed
+  if (appError) {
+    return (
+      <div style={{
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: bgSurface,
+        color: '#ef4444',
+        fontSize: '14px',
+        gap: '8px',
+      }}>
+        <span>Failed to initialize</span>
+        <span style={{ color: textSecondary, fontSize: '12px' }}>{appError.message}</span>
+      </div>
+    );
+  }
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: bgSurface, overflow: 'hidden' }}>
