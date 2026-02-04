@@ -252,6 +252,9 @@ function createBlockIndicatorPlugin() {
     }
   }
 
+  // Track input mode: 'mouse' shows indicator at hover, 'keyboard' shows at caret
+  let inputMode: 'mouse' | 'keyboard' = 'mouse'
+
   return new Plugin({
     key: blockIndicatorKey,
 
@@ -445,6 +448,9 @@ function createBlockIndicatorPlugin() {
       const handleMouseMove = (event: MouseEvent) => {
         const target = event.target
         if (!(target instanceof HTMLElement)) return
+
+        // Switch to mouse mode when mouse moves in editor
+        inputMode = 'mouse'
 
         // Check if long press should be cancelled due to movement
         if (longPressStartPos) {
@@ -655,6 +661,10 @@ function createBlockIndicatorPlugin() {
       const handleGlobalMouseMove = (event: MouseEvent) => {
         if (!currentState.visible && !isDragging) return
 
+        // Don't hide if we're in keyboard mode (caret-tracking)
+        // In that case, the indicator should stay at the caret position
+        if (inputMode === 'keyboard') return
+
         const editorRect = editorView.dom.getBoundingClientRect()
         const padding = 50
 
@@ -695,6 +705,18 @@ function createBlockIndicatorPlugin() {
       window.addEventListener("keydown", handleKeyDown)
       window.addEventListener("keyup", handleKeyUp)
 
+      // Hide indicator on keypress (user is typing)
+      const handleEditorKeyDown = () => {
+        if (inputMode !== 'keyboard') {
+          inputMode = 'keyboard'
+          // Instantly hide the indicator
+          currentState = { ...currentState, visible: false }
+          notifyListeners()
+        }
+      }
+
+      editorView.dom.addEventListener("keydown", handleEditorKeyDown)
+
       return {
         update: () => {
           updateBlockRect()
@@ -706,6 +728,7 @@ function createBlockIndicatorPlugin() {
           }
           editorView.dom.removeEventListener("mousemove", handleMouseMove)
           editorView.dom.removeEventListener("mousedown", handleMouseDown, true)
+          editorView.dom.removeEventListener("keydown", handleEditorKeyDown)
           window.removeEventListener("mouseup", handleMouseUp)
           document.removeEventListener("mousemove", handleGlobalMouseMove)
           window.removeEventListener("scroll", handleScroll, true)
