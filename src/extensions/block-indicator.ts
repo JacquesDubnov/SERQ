@@ -17,8 +17,6 @@
  * 4. CSS transitions handle the animation
  */
 
-console.log('[BlockIndicator] MODULE LOADED at', new Date().toISOString())
-
 import { Extension } from "@tiptap/core"
 import type { Node as PMNode } from "@tiptap/pm/model"
 import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state"
@@ -125,6 +123,9 @@ let commandHeld = hmrData?.commandHeld ?? false
 // Enable/disable state
 let indicatorEnabled = hmrData?.indicatorEnabled ?? true
 let enabledListeners: ((enabled: boolean) => void)[] = hmrData?.enabledListeners ?? []
+
+// Track last known mouse Y for code paths without direct mouse event access (scroll, doc update)
+let lastMouseY: number = 0
 
 // Preserve state on HMR
 if (import.meta.hot) {
@@ -253,48 +254,122 @@ const isNonContentArea = (element: HTMLElement): boolean => {
 }
 
 /**
- * Check if the indicator's full drawing rect falls entirely within a page's content area.
+ * Get the forbidden zones in pagination mode: gaps, headers, and footers.
+ * Returns array of {top, bottom} rects where the indicator should NOT appear.
+ * Returns null if pagination is not active.
  *
- * Positive-space approach: instead of hunting for gaps/headers/footers to exclude,
- * we only allow drawing if the indicator is fully inside a page's content bounds.
- * If any pixel of the indicator would render outside content (in a gap, header,
- * footer, or above/below the document), we hide it.
- *
- * @param blockTop - Absolute screen Y of indicator top edge
- * @param blockBottom - Absolute screen Y of indicator bottom edge
- * @returns true if the indicator rect is fully contained within a page content area
+ * Uses the actual DOM elements created by TipTap Pages:
+ * - .tiptap-pagination-gap (visual separator between pages)
+ * - .tiptap-page-header (page header area)
+ * - .tiptap-page-footer (page footer area)
  */
-const isIndicatorInsidePageContent = (blockTop: number, blockBottom: number): boolean => {
+const getPaginationForbiddenZones = (): Array<{ top: number; bottom: number }> | null => {
   const paginationContainer = document.querySelector('[data-tiptap-pagination]') as HTMLElement | null
-  if (!paginationContainer) return true // Not paginated, always fine
+  if (!paginationContainer) return null
 
-  const pages = paginationContainer.querySelectorAll('.page')
-  if (pages.length === 0) return true
+  const zones: Array<{ top: number; bottom: number }> = []
 
-  for (const page of pages) {
-    const pageRect = page.getBoundingClientRect()
-
-    // Determine the content area within this page (between header and footer)
-    let contentTop = pageRect.top
-    let contentBottom = pageRect.bottom
-
-    const header = page.querySelector('.tiptap-page-header')
-    if (header) {
-      contentTop = header.getBoundingClientRect().bottom
+  // Collect gaps
+  const gaps = document.querySelectorAll('.tiptap-pagination-gap')
+  for (const gap of gaps) {
+    const rect = gap.getBoundingClientRect()
+    if (rect.height > 0) {
+      zones.push({ top: rect.top, bottom: rect.bottom })
     }
+  }
 
-    const footer = page.querySelector('.tiptap-page-footer')
-    if (footer) {
-      contentBottom = footer.getBoundingClientRect().top
+  // Collect headers
+  const headers = document.querySelectorAll('.tiptap-page-header')
+  for (const header of headers) {
+    const rect = header.getBoundingClientRect()
+    if (rect.height > 0) {
+      zones.push({ top: rect.top, bottom: rect.bottom })
     }
+  }
 
-    // The indicator must be fully inside this page's content area
-    if (blockTop >= contentTop && blockBottom <= contentBottom) {
+  // Collect footers
+  const footers = document.querySelectorAll('.tiptap-page-footer')
+  for (const footer of footers) {
+    const rect = footer.getBoundingClientRect()
+    if (rect.height > 0) {
+      zones.push({ top: rect.top, bottom: rect.bottom })
+    }
+  }
+
+  return zones
+}
+
+/**
+ * Check if a Y coordinate falls inside any forbidden pagination zone.
+ * Returns true if the point is in a gap, header, or footer.
+ */
+const isPointInForbiddenZone = (clientY: number): boolean => {
+  const zones = getPaginationForbiddenZones()
+  if (!zones) return false // Not paginated
+
+  for (const { top, bottom } of zones) {
+    if (clientY >= top && clientY <= bottom) {
       return true
     }
   }
 
-  return false // Indicator would draw outside any page's content area
+  return false
+}
+
+
+
+/**
+ * Given a mouse Y and the block's screen rect, clip the indicator to the
+ * current page's content area. Content area is defined as the space between
+ * the nearest forbidden zone edges above and below the mouse position.
+ *
+ * When a block's DOM rect spans a page gap (because TipTap Pages paginates
+ * visually but the DOM element is one continuous node), this clips the
+ * indicator so it only renders within the page the mouse is on.
+ *
+ * @returns {top, height} in screen coordinates, or null if mouse is in a forbidden zone
+ */
+const clipIndicatorToCurrentPage = (
+  mouseY: number,
+  blockTop: number,
+  blockBottom: number,
+): { clippedTop: number; clippedHeight: number } | null => {
+  const zones = getPaginationForbiddenZones()
+  if (!zones || zones.length === 0) {
+    return { clippedTop: blockTop, clippedHeight: blockBottom - blockTop }
+  }
+
+  // Check if mouse is in a forbidden zone
+  for (const { top, bottom } of zones) {
+    if (mouseY >= top && mouseY <= bottom) {
+      return null // Mouse in forbidden zone, hide indicator
+    }
+  }
+
+  // Find the content slice: nearest forbidden boundary above and below the mouse
+  let sliceTop = -Infinity
+  let sliceBottom = Infinity
+
+  for (const { top, bottom } of zones) {
+    // Forbidden zone is above the mouse -- its bottom edge constrains our slice top
+    if (bottom <= mouseY && bottom > sliceTop) {
+      sliceTop = bottom
+    }
+    // Forbidden zone is below the mouse -- its top edge constrains our slice bottom
+    if (top >= mouseY && top < sliceBottom) {
+      sliceBottom = top
+    }
+  }
+
+  // Clip the block rect to the content slice
+  const clippedTop = Math.max(blockTop, sliceTop)
+  const clippedBottom = Math.min(blockBottom, sliceBottom)
+
+  if (clippedBottom <= clippedTop) {
+    return null // Fully clipped away
+  }
+
+  return { clippedTop, clippedHeight: clippedBottom - clippedTop }
 }
 
 /**
@@ -316,7 +391,8 @@ const getPositionReferenceRect = (editorDom: HTMLElement): DOMRect => {
  * Check if pagination mode is enabled by looking for the pagination container
  */
 const isPaginationEnabled = (editorDom: HTMLElement): boolean => {
-  return editorDom.closest('[data-tiptap-pagination]') !== null
+  // Pagination container is a CHILD of the ProseMirror element, not a parent
+  return editorDom.querySelector('[data-tiptap-pagination]') !== null
 }
 
 
@@ -451,14 +527,9 @@ function createBlockIndicatorPlugin() {
     editorRect: DOMRect,
     editorView: any
   ) => {
-    console.log('[BlockIndicator] startDrag called!')
-
     // Get fresh DOM reference (the captured one might be stale)
     const freshDom = editorView.nodeDOM(pos)
-    if (!(freshDom instanceof HTMLElement)) {
-      console.log('[BlockIndicator] ERROR: Could not get fresh DOM for pos:', pos)
-      return
-    }
+    if (!(freshDom instanceof HTMLElement)) return
     const dom = freshDom
 
     isDragging = true
@@ -467,13 +538,27 @@ function createBlockIndicatorPlugin() {
     dropTargetPos = pos
 
     const blockRect = dom.getBoundingClientRect()
+    const isPaginated = isPaginationEnabled(editorView.dom)
+
+    // Clip source overlay to current page in pagination mode
+    let overlayTop = blockRect.top
+    let overlayHeight = blockRect.height
+
+    if (isPaginated) {
+      const clipped = clipIndicatorToCurrentPage(lastMouseY, blockRect.top, blockRect.bottom)
+      if (clipped) {
+        overlayTop = clipped.clippedTop
+        overlayHeight = clipped.clippedHeight
+      }
+      // If null (mouse in forbidden zone), use raw rect as fallback -- drag already started
+    }
 
     // Source overlay position (relative to editor container for React)
     const sourceOverlayRect = {
       left: blockRect.left - editorRect.left,
-      top: blockRect.top - editorRect.top,
+      top: overlayTop - editorRect.top,
       width: blockRect.width,
-      height: blockRect.height,
+      height: overlayHeight,
     }
 
     currentState = {
@@ -481,14 +566,13 @@ function createBlockIndicatorPlugin() {
       visible: true,  // Keep indicator visible during drag (becomes drop indicator)
       isLongPressing: false,
       isDragging: true,
-      dropIndicatorTop: blockRect.top - editorRect.top,
+      dropIndicatorTop: overlayTop - editorRect.top,
       sourceOverlay: sourceOverlayRect,
     }
     notifyListeners()
 
     // Add body class for cursor
     document.body.classList.add("block-dragging")
-    console.log('[BlockIndicator] Drag started')
   }
 
   const cancelDrag = () => {
@@ -551,24 +635,35 @@ function createBlockIndicatorPlugin() {
             const blockRect = dom.getBoundingClientRect()
             const isPaginated = isPaginationEnabled(editorView.dom)
 
-            const top = blockRect.top - refRect.top
-            const height = blockRect.height
+            let top = blockRect.top
+            let height = blockRect.height
+            let shouldShow = true
+
+            // Clip to current page in pagination mode
+            if (isPaginated) {
+              const clipped = clipIndicatorToCurrentPage(lastMouseY, blockRect.top, blockRect.bottom)
+              if (clipped) {
+                top = clipped.clippedTop
+                height = clipped.clippedHeight
+              } else {
+                shouldShow = false
+              }
+            }
+
+            const relativeTop = top - refRect.top
             const blockLeft = blockRect.left - refRect.left
             const blockWidth = blockRect.width
 
-            // Positive-space pagination check: only show if fully inside page content
-            const shouldBeVisible = !isPaginated || isIndicatorInsidePageContent(blockRect.top, blockRect.bottom)
-
             if (
-              currentState.top !== top ||
+              currentState.top !== relativeTop ||
               currentState.height !== height ||
-              currentState.paginationEnabled !== isPaginated ||
-              currentState.visible !== shouldBeVisible
+              currentState.visible !== shouldShow ||
+              currentState.paginationEnabled !== isPaginated
             ) {
               currentState = {
                 ...currentState,
-                visible: shouldBeVisible,
-                top,
+                visible: shouldShow,
+                top: relativeTop,
                 height,
                 blockLeft,
                 blockWidth,
@@ -709,11 +804,29 @@ function createBlockIndicatorPlugin() {
               }
 
               const rect = dom.getBoundingClientRect()
+
+              // In pagination mode, clip each selected block to its content slice
+              let blockTop = rect.top
+              let blockHeight = rect.height
+
+              if (isPaginated) {
+                // Use block's vertical center as reference for which content slice it belongs to
+                const blockCenter = rect.top + rect.height / 2
+                const clipped = clipIndicatorToCurrentPage(blockCenter, rect.top, rect.bottom)
+                if (clipped) {
+                  blockTop = clipped.clippedTop
+                  blockHeight = clipped.clippedHeight
+                } else {
+                  // Block is entirely in a forbidden zone, skip it
+                  return
+                }
+              }
+
               const blockLeft = rect.left - refRect.left
               blocks.push({
                 pos,
-                top: rect.top - refRect.top,
-                height: rect.height,
+                top: blockTop - refRect.top,
+                height: blockHeight,
                 blockLeft,
                 blockWidth: rect.width,
                 pageNumber: isPaginated ? getPageNumberForElement(dom) : 1,
@@ -861,6 +974,9 @@ function createBlockIndicatorPlugin() {
         // Skip if disabled
         if (!indicatorEnabled) return
 
+        // Track mouse Y for code paths that don't have direct event access
+        lastMouseY = event.clientY
+
         const target = event.target
         if (!(target instanceof HTMLElement)) return
 
@@ -873,8 +989,14 @@ function createBlockIndicatorPlugin() {
           return
         }
 
-        // Pagination content check moved to after block rect is computed
-        // (see isIndicatorInsidePageContent check below)
+        // Hide indicator when mouse drifts into a pagination gap, header, or footer
+        if (isPaginationEnabled(editorView.dom) && isPointInForbiddenZone(event.clientY)) {
+          if (currentState.visible && !isDragging) {
+            currentState = { ...currentState, visible: false }
+            notifyListeners()
+          }
+          return
+        }
 
         // Switch to mouse mode when mouse moves in editor
         inputMode = 'mouse'
@@ -928,7 +1050,18 @@ function createBlockIndicatorPlugin() {
 
                   const refRect = getPositionReferenceRect(editorView.dom)
                   const blockRect = dom.getBoundingClientRect()
+                  const isPaginated = isPaginationEnabled(editorView.dom)
                   const blockLeft = blockRect.left - refRect.left
+
+                  // In pagination mode, clip block reference to current page
+                  let blockWidth = blockRect.width
+                  if (isPaginated) {
+                    const clipped = clipIndicatorToCurrentPage(event.clientY, blockRect.top, blockRect.bottom)
+                    if (!clipped) {
+                      // Mouse is in a forbidden zone during drag -- keep last known state
+                      return
+                    }
+                  }
 
                   currentState = {
                     ...currentState,
@@ -936,7 +1069,7 @@ function createBlockIndicatorPlugin() {
                     top: dropInfo?.top ?? currentState.dropIndicatorTop ?? blockRect.top - refRect.top,
                     height: 2,  // Horizontal line height
                     blockLeft,
-                    blockWidth: blockRect.width,
+                    blockWidth,
                     dropIndicatorTop: dropInfo?.top ?? currentState.dropIndicatorTop,
                   }
                   notifyListeners()
@@ -966,7 +1099,10 @@ function createBlockIndicatorPlugin() {
           }
         }
 
-        if (blockPos !== null && blockPos !== currentBlockPos) {
+        // Re-evaluate when entering a new block OR when returning to content
+        // from a forbidden zone (indicator hidden but mouse now on valid block)
+        const needsUpdate = blockPos !== null && (blockPos !== currentBlockPos || !currentState.visible)
+        if (needsUpdate && blockPos !== null) {
           currentBlockPos = blockPos
 
           try {
@@ -987,14 +1123,26 @@ function createBlockIndicatorPlugin() {
               const isPaginated = isPaginationEnabled(editorView.dom)
               const blockLeft = blockRect.left - refRect.left
 
-              // Positive-space pagination check: only show if fully inside page content
-              const shouldBeVisible = !isPaginated || isIndicatorInsidePageContent(blockRect.top, blockRect.bottom)
+              // In pagination mode, clip the indicator to the current page's content area
+              let indicatorTop = blockRect.top
+              let indicatorHeight = blockRect.height
+              let shouldShow = true
+
+              if (isPaginated) {
+                const clipped = clipIndicatorToCurrentPage(event.clientY, blockRect.top, blockRect.bottom)
+                if (clipped) {
+                  indicatorTop = clipped.clippedTop
+                  indicatorHeight = clipped.clippedHeight
+                } else {
+                  shouldShow = false
+                }
+              }
 
               currentState = {
                 ...currentState,
-                visible: shouldBeVisible,
-                top: blockRect.top - refRect.top,
-                height: blockRect.height,
+                visible: shouldShow,
+                top: indicatorTop - refRect.top,
+                height: indicatorHeight,
                 blockLeft,
                 blockWidth: blockRect.width,
                 commandHeld,
@@ -1070,7 +1218,6 @@ function createBlockIndicatorPlugin() {
         const capturedDom = dom
 
         longPressTimer = setTimeout(() => {
-          console.log('[BlockIndicator] Long press timer fired!')
           // Long press completed - start drag
           const node = editorView.state.doc.nodeAt(capturedBlockPos)
           if (!node) return
