@@ -55,9 +55,6 @@ import { useList } from "@/components/tiptap-ui/list-button"
 import { useBlockquote } from "@/components/tiptap-ui/blockquote-button"
 import { useCodeBlock } from "@/components/tiptap-ui/code-block-button"
 import { ColorMenu } from "@/components/tiptap-ui/color-menu"
-import { TableAlignMenu } from "@/components/tiptap-node/table-node/ui/table-alignment-menu"
-import { useTableFitToWidth } from "@/components/tiptap-node/table-node/ui/table-fit-to-width-button"
-import { useTableClearRowColumnContent } from "@/components/tiptap-node/table-node/ui/table-clear-row-column-content-button"
 
 // Utils
 import {
@@ -202,35 +199,6 @@ const TransformActionGroup: React.FC = () => {
           label={label}
           disabled={!canReset}
           onClick={handleResetFormatting}
-        />
-      )}
-    </>
-  )
-}
-
-const TableFitToWidth: React.FC = () => {
-  const { canFitToWidth, handleFitToWidth, label, Icon } = useTableFitToWidth({
-    hideWhenUnavailable: true,
-  })
-  const clearAllContents = useTableClearRowColumnContent({ resetAttrs: true })
-
-  return (
-    <>
-      {canFitToWidth && (
-        <BaseMenuItem
-          icon={Icon}
-          label={label}
-          disabled={!canFitToWidth}
-          onClick={handleFitToWidth}
-        />
-      )}
-
-      {clearAllContents.canClearRowColumnContent && (
-        <BaseMenuItem
-          icon={clearAllContents.Icon}
-          label={"Clear all contents"}
-          disabled={!clearAllContents.canClearRowColumnContent}
-          onClick={clearAllContents.handleClear}
         />
       )}
     </>
@@ -511,8 +479,6 @@ export const DragContextMenu: React.FC<DragContextMenuProps> = ({
                 <MenuGroup>
                   <TocShowTitle />
                   <ColorMenu />
-                  <TableAlignMenu />
-                  <TableFitToWidth />
                   <TransformActionGroup />
                   <ImageActionGroup />
                 </MenuGroup>
