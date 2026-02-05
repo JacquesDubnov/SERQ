@@ -1,5 +1,5 @@
 /**
- * Block Indicator Extension
+ * Block Indicator - ProseMirror Plugin
  *
  * Tracks which block is hovered and exposes its rect for the React component.
  * Handles block drag-and-drop with long-press activation.
@@ -11,464 +11,21 @@
  * - Event handlers that bypass React state
  *
  * The pattern that works:
- * 1. Update module-level state (currentState)
+ * 1. Update store.currentState
  * 2. Call notifyListeners()
  * 3. React component re-renders with new state
  * 4. CSS transitions handle the animation
  */
 
-import { Extension } from "@tiptap/core"
 import type { Node as PMNode } from "@tiptap/pm/model"
-import { Plugin, PluginKey, TextSelection } from "@tiptap/pm/state"
+import { Plugin, TextSelection } from "@tiptap/pm/state"
 
-export interface BlockIndicatorState {
-  /** Whether indicator should be visible */
-  visible: boolean
-  /** Position relative to editor container */
-  top: number
-  height: number
-  /** Left edge of the block (for offset calculation) */
-  blockLeft: number
-  /** Width of the block */
-  blockWidth: number
-  /** Whether Option is held (shows full frame instead of left line) */
-  commandHeld: boolean
-  /** Long press state */
-  isLongPressing: boolean
-  /** Drag state */
-  isDragging: boolean
-  /** Drop indicator Y position (relative to editor container) */
-  dropIndicatorTop: number | null
-  /** Source block overlay (for fade out effect) - React renders this */
-  sourceOverlay: {
-    left: number
-    top: number
-    width: number
-    height: number
-  } | null
-  /** Animation state after drop */
-  isAnimating: boolean
-  /** Indicator should animate from source to landing position after drop */
-  indicatorTransition: {
-    fromTop: number
-    fromHeight: number
-    toTop: number
-    toHeight: number
-  } | null
-  /** Animation stage after drop: 'none' | 'shrinking' | 'growing' */
-  dropAnimation: 'none' | 'shrinking' | 'growing'
+import { blockIndicatorKey } from './types'
+import { store, notifyListeners, notifySelectionListeners, clearSelections } from './state'
+import { isNonContentArea, isPointInForbiddenZone, clipIndicatorToCurrentPage } from './pagination'
+import { getPositionReferenceRect, isPaginationEnabled, getZoomFactor, getPageNumberForElement } from './dom-utils'
 
-  // Multi-block selection
-  /** Array of selected blocks with their positions and dimensions */
-  selectedBlocks: Array<{
-    pos: number        // ProseMirror position
-    top: number
-    height: number
-    blockLeft: number
-    blockWidth: number
-    pageNumber: number // Page number (1-indexed) for pagination support
-  }>
-  /** Last selected block position (for range selection) */
-  lastSelectedPos: number | null
-
-  /** Whether pagination mode is active */
-  paginationEnabled: boolean
-}
-
-export const blockIndicatorKey = new PluginKey<{ isDragging: boolean }>("blockIndicator")
-
-// HMR state persistence - preserve state across hot reloads
-interface HMRState {
-  currentState: BlockIndicatorState
-  listeners: ((state: BlockIndicatorState) => void)[]
-  selectedBlockPositions: Set<number>
-  lastSelectedPos: number | null
-  commandHeld: boolean
-  indicatorEnabled: boolean
-  enabledListeners: ((enabled: boolean) => void)[]
-}
-
-// Try to restore state from HMR, otherwise use defaults
-const defaultState: BlockIndicatorState = {
-  visible: false,
-  top: 0,
-  height: 0,
-  blockLeft: 0,
-  blockWidth: 0,
-  commandHeld: false,
-  isLongPressing: false,
-  isDragging: false,
-  dropIndicatorTop: null,
-  sourceOverlay: null,
-  isAnimating: false,
-  indicatorTransition: null,
-  dropAnimation: 'none',
-  selectedBlocks: [],
-  lastSelectedPos: null,
-  paginationEnabled: false,
-}
-
-// Get persisted state from HMR or use defaults
-const hmrData = (import.meta.hot?.data as HMRState | undefined)
-
-// Module-level state for React subscription
-let currentState: BlockIndicatorState = hmrData?.currentState ?? { ...defaultState }
-let listeners: ((state: BlockIndicatorState) => void)[] = hmrData?.listeners ?? []
-
-// Module-level selection tracking
-let selectedBlockPositions = hmrData?.selectedBlockPositions ?? new Set<number>()
-let lastSelectedPos: number | null = hmrData?.lastSelectedPos ?? null
-let commandHeld = hmrData?.commandHeld ?? false
-
-// Enable/disable state
-let indicatorEnabled = hmrData?.indicatorEnabled ?? true
-let enabledListeners: ((enabled: boolean) => void)[] = hmrData?.enabledListeners ?? []
-
-// Track last known mouse Y for code paths without direct mouse event access (scroll, doc update)
-let lastMouseY: number = 0
-
-// Preserve state on HMR
-if (import.meta.hot) {
-  import.meta.hot.accept()
-  import.meta.hot.dispose(() => {
-    const data = import.meta.hot!.data as HMRState
-    data.currentState = currentState
-    data.listeners = listeners
-    data.selectedBlockPositions = selectedBlockPositions
-    data.lastSelectedPos = lastSelectedPos
-    data.commandHeld = commandHeld
-    data.indicatorEnabled = indicatorEnabled
-    data.enabledListeners = enabledListeners
-  })
-}
-
-/**
- * Enable or disable the block indicator feature
- * When disabled, no event handlers run and indicator is hidden
- */
-export function setBlockIndicatorEnabled(enabled: boolean) {
-  if (indicatorEnabled === enabled) return
-  indicatorEnabled = enabled
-
-  // If disabling, hide indicator and clear selections
-  if (!enabled) {
-    currentState = {
-      ...currentState,
-      visible: false,
-      selectedBlocks: [],
-      lastSelectedPos: null,
-    }
-    selectedBlockPositions.clear()
-    lastSelectedPos = null
-    notifyListeners()
-  }
-
-  // Notify enabled state listeners
-  enabledListeners.forEach((fn) => fn(enabled))
-}
-
-/**
- * Check if block indicator is enabled
- */
-export function isBlockIndicatorEnabled(): boolean {
-  return indicatorEnabled
-}
-
-/**
- * Get the set of selected block positions
- * Returns a copy to prevent external modification
- */
-export function getSelectedBlockPositions(): Set<number> {
-  return new Set(selectedBlockPositions)
-}
-
-/**
- * Check if any blocks are currently selected
- */
-export function hasSelectedBlocks(): boolean {
-  return selectedBlockPositions.size > 0
-}
-
-/**
- * Get count of selected blocks
- */
-export function getSelectedBlockCount(): number {
-  return selectedBlockPositions.size
-}
-
-// Selection change listeners
-let selectionListeners: ((positions: Set<number>) => void)[] = []
-
-/**
- * Subscribe to block selection changes
- * Callback receives the set of selected positions whenever selection changes
- */
-export function subscribeToBlockSelection(
-  callback: (positions: Set<number>) => void
-): () => void {
-  selectionListeners.push(callback)
-  callback(new Set(selectedBlockPositions))
-  return () => {
-    selectionListeners = selectionListeners.filter((fn) => fn !== callback)
-  }
-}
-
-// Notify selection listeners when selection changes
-function notifySelectionListeners() {
-  const positions = new Set(selectedBlockPositions)
-  selectionListeners.forEach((fn) => fn(positions))
-}
-
-/**
- * Subscribe to enabled state changes
- */
-export function subscribeToBlockIndicatorEnabled(
-  callback: (enabled: boolean) => void
-): () => void {
-  enabledListeners.push(callback)
-  callback(indicatorEnabled)
-  return () => {
-    enabledListeners = enabledListeners.filter((fn) => fn !== callback)
-  }
-}
-
-function notifyListeners() {
-  listeners.forEach((fn) => fn({ ...currentState }))
-}
-
-/**
- * Check if an element is in a non-content area (header, footer, or page gap)
- * These areas should not show the block indicator
- */
-const isNonContentArea = (element: HTMLElement): boolean => {
-  // Direct check for header/footer/gap elements
-  const inGap = element.closest('.tiptap-pagination-gap') !== null
-  const inHeader = element.closest('.tiptap-page-header') !== null
-  const inFooter = element.closest('.tiptap-page-footer') !== null
-
-  if (inHeader || inFooter || inGap) {
-    return true
-  }
-
-  return false
-}
-
-/**
- * Get the forbidden zones in pagination mode: gaps, headers, and footers.
- * Returns array of {top, bottom} rects where the indicator should NOT appear.
- * Returns null if pagination is not active.
- *
- * Uses the actual DOM elements created by TipTap Pages:
- * - .tiptap-pagination-gap (visual separator between pages)
- * - .tiptap-page-header (page header area)
- * - .tiptap-page-footer (page footer area)
- */
-const getPaginationForbiddenZones = (): Array<{ top: number; bottom: number }> | null => {
-  const paginationContainer = document.querySelector('[data-tiptap-pagination]') as HTMLElement | null
-  if (!paginationContainer) return null
-
-  const zones: Array<{ top: number; bottom: number }> = []
-
-  // Collect gaps
-  const gaps = document.querySelectorAll('.tiptap-pagination-gap')
-  for (const gap of gaps) {
-    const rect = gap.getBoundingClientRect()
-    if (rect.height > 0) {
-      zones.push({ top: rect.top, bottom: rect.bottom })
-    }
-  }
-
-  // Collect headers
-  const headers = document.querySelectorAll('.tiptap-page-header')
-  for (const header of headers) {
-    const rect = header.getBoundingClientRect()
-    if (rect.height > 0) {
-      zones.push({ top: rect.top, bottom: rect.bottom })
-    }
-  }
-
-  // Collect footers
-  const footers = document.querySelectorAll('.tiptap-page-footer')
-  for (const footer of footers) {
-    const rect = footer.getBoundingClientRect()
-    if (rect.height > 0) {
-      zones.push({ top: rect.top, bottom: rect.bottom })
-    }
-  }
-
-  return zones
-}
-
-/**
- * Check if a Y coordinate falls inside any forbidden pagination zone.
- * Returns true if the point is in a gap, header, or footer.
- */
-const isPointInForbiddenZone = (clientY: number): boolean => {
-  const zones = getPaginationForbiddenZones()
-  if (!zones) return false // Not paginated
-
-  for (const { top, bottom } of zones) {
-    if (clientY >= top && clientY <= bottom) {
-      return true
-    }
-  }
-
-  return false
-}
-
-
-
-/**
- * Given a mouse Y and the block's screen rect, clip the indicator to the
- * current page's content area. Content area is defined as the space between
- * the nearest forbidden zone edges above and below the mouse position.
- *
- * When a block's DOM rect spans a page gap (because TipTap Pages paginates
- * visually but the DOM element is one continuous node), this clips the
- * indicator so it only renders within the page the mouse is on.
- *
- * @returns {top, height} in screen coordinates, or null if mouse is in a forbidden zone
- */
-const clipIndicatorToCurrentPage = (
-  mouseY: number,
-  blockTop: number,
-  blockBottom: number,
-): { clippedTop: number; clippedHeight: number } | null => {
-  const zones = getPaginationForbiddenZones()
-  if (!zones || zones.length === 0) {
-    return { clippedTop: blockTop, clippedHeight: blockBottom - blockTop }
-  }
-
-  // Check if mouse is in a forbidden zone
-  for (const { top, bottom } of zones) {
-    if (mouseY >= top && mouseY <= bottom) {
-      return null // Mouse in forbidden zone, hide indicator
-    }
-  }
-
-  // Find the content slice: nearest forbidden boundary above and below the mouse
-  let sliceTop = -Infinity
-  let sliceBottom = Infinity
-
-  for (const { top, bottom } of zones) {
-    // Forbidden zone is above the mouse -- its bottom edge constrains our slice top
-    if (bottom <= mouseY && bottom > sliceTop) {
-      sliceTop = bottom
-    }
-    // Forbidden zone is below the mouse -- its top edge constrains our slice bottom
-    if (top >= mouseY && top < sliceBottom) {
-      sliceBottom = top
-    }
-  }
-
-  // Clip the block rect to the content slice
-  const clippedTop = Math.max(blockTop, sliceTop)
-  const clippedBottom = Math.min(blockBottom, sliceBottom)
-
-  if (clippedBottom <= clippedTop) {
-    return null // Fully clipped away
-  }
-
-  return { clippedTop, clippedHeight: clippedBottom - clippedTop }
-}
-
-/**
- * Get the reference rect for positioning.
- * Always use the editor-content-wrapper since that's where BlockIndicator renders.
- */
-const getPositionReferenceRect = (editorDom: HTMLElement): DOMRect => {
-  // Find the wrapper - BlockIndicator component is a sibling of editor-content inside this wrapper
-  const wrapper = editorDom.closest('.editor-content-wrapper') as HTMLElement | null
-  if (wrapper) {
-    return wrapper.getBoundingClientRect()
-  }
-
-  // Fallback to editor dom
-  return editorDom.getBoundingClientRect()
-}
-
-/**
- * Check if pagination mode is enabled by looking for the pagination container
- */
-const isPaginationEnabled = (editorDom: HTMLElement): boolean => {
-  // Pagination container is a CHILD of the ProseMirror element, not a parent
-  return editorDom.querySelector('[data-tiptap-pagination]') !== null
-}
-
-/**
- * Get the effective zoom/scale factor from an ancestor transform:scale().
- * Compares getBoundingClientRect (scaled viewport px) to offsetWidth (unscaled CSS px).
- * With transform:scale(0.5): BCR.width=360, offsetWidth=720, ratio=0.5
- * Without transform: ratio=1.0
- */
-const getZoomFactor = (editorDom: HTMLElement): number => {
-  if (editorDom.offsetWidth === 0) return 1
-  return editorDom.getBoundingClientRect().width / editorDom.offsetWidth
-}
-
-
-/**
- * Get the page number for a given DOM element (1-indexed)
- * Uses DOM hierarchy to find which .page element contains the block
- */
-const getPageNumberForElement = (element: HTMLElement): number => {
-  // Find the closest .page ancestor
-  const pageElement = element.closest('.page')
-  if (!pageElement) return 1
-
-  // Find the pagination container
-  const paginationContainer = element.closest('[data-tiptap-pagination]')
-  if (!paginationContainer) return 1
-
-  // Get all page elements and find index
-  const pages = paginationContainer.querySelectorAll('.page')
-  const pageIndex = Array.from(pages).indexOf(pageElement)
-
-  return pageIndex >= 0 ? pageIndex + 1 : 1
-}
-
-export function subscribeToBlockIndicator(
-  callback: (state: BlockIndicatorState) => void
-): () => void {
-  listeners.push(callback)
-  callback({ ...currentState })
-  return () => {
-    listeners = listeners.filter((fn) => fn !== callback)
-  }
-}
-
-// Store block positions before transaction for FLIP animation
-let preDropPositions: Map<number, DOMRect> = new Map()
-let dropTargetIndex: number = 0
-let movedBlockPos: number | null = null
-
-export function getPreDropPositions() {
-  return preDropPositions
-}
-
-export function getDropInfo() {
-  return { dropTargetIndex, movedBlockPos }
-}
-
-export function clearDropInfo() {
-  preDropPositions.clear()
-  movedBlockPos = null
-}
-
-// Helper to clear all selections
-function clearSelections() {
-  selectedBlockPositions.clear()
-  lastSelectedPos = null
-  currentState = {
-    ...currentState,
-    selectedBlocks: [],
-    lastSelectedPos: null,
-  }
-  notifyListeners()
-  notifySelectionListeners()
-}
-
-function createBlockIndicatorPlugin() {
+export function createBlockIndicatorPlugin() {
   let currentBlockPos: number | null = null
 
   // Long press state
@@ -484,7 +41,7 @@ function createBlockIndicatorPlugin() {
   let dropTargetPos: number | null = null
 
   const resetState = () => {
-    currentState = {
+    store.currentState = {
       visible: false,
       top: 0,
       height: 0,
@@ -498,9 +55,9 @@ function createBlockIndicatorPlugin() {
       isAnimating: false,
       indicatorTransition: null,
       dropAnimation: 'none',
-      selectedBlocks: currentState.selectedBlocks, // Preserve selections on reset
-      lastSelectedPos: currentState.lastSelectedPos,
-      paginationEnabled: currentState.paginationEnabled, // Preserve pagination state
+      selectedBlocks: store.currentState.selectedBlocks, // Preserve selections on reset
+      lastSelectedPos: store.currentState.lastSelectedPos,
+      paginationEnabled: store.currentState.paginationEnabled, // Preserve pagination state
     }
   }
 
@@ -510,8 +67,8 @@ function createBlockIndicatorPlugin() {
       longPressTimer = null
     }
     longPressStartPos = null
-    if (currentState.isLongPressing) {
-      currentState = { ...currentState, isLongPressing: false }
+    if (store.currentState.isLongPressing) {
+      store.currentState = { ...store.currentState, isLongPressing: false }
       notifyListeners()
     }
   }
@@ -557,7 +114,7 @@ function createBlockIndicatorPlugin() {
     let overlayHeight = blockRect.height
 
     if (isPaginated) {
-      const clipped = clipIndicatorToCurrentPage(lastMouseY, blockRect.top, blockRect.bottom)
+      const clipped = clipIndicatorToCurrentPage(store.lastMouseY, blockRect.top, blockRect.bottom)
       if (clipped) {
         overlayTop = clipped.clippedTop
         overlayHeight = clipped.clippedHeight
@@ -574,8 +131,8 @@ function createBlockIndicatorPlugin() {
       height: overlayHeight / zoom,
     }
 
-    currentState = {
-      ...currentState,
+    store.currentState = {
+      ...store.currentState,
       visible: true,  // Keep indicator visible during drag (becomes drop indicator)
       isLongPressing: false,
       isDragging: true,
@@ -600,8 +157,8 @@ function createBlockIndicatorPlugin() {
     dragSourceNode = null
     dropTargetPos = null
 
-    currentState = {
-      ...currentState,
+    store.currentState = {
+      ...store.currentState,
       isDragging: false,
       dropIndicatorTop: null,
       sourceOverlay: null,
@@ -612,9 +169,9 @@ function createBlockIndicatorPlugin() {
   }
 
   const setCommandHeld = (held: boolean) => {
-    if (commandHeld !== held) {
-      commandHeld = held
-      currentState = { ...currentState, commandHeld: held }
+    if (store.commandHeld !== held) {
+      store.commandHeld = held
+      store.currentState = { ...store.currentState, commandHeld: held }
       notifyListeners()
     }
   }
@@ -655,7 +212,7 @@ function createBlockIndicatorPlugin() {
 
             // Clip to current page in pagination mode
             if (isPaginated) {
-              const clipped = clipIndicatorToCurrentPage(lastMouseY, blockRect.top, blockRect.bottom)
+              const clipped = clipIndicatorToCurrentPage(store.lastMouseY, blockRect.top, blockRect.bottom)
               if (clipped) {
                 top = clipped.clippedTop
                 height = clipped.clippedHeight
@@ -671,13 +228,13 @@ function createBlockIndicatorPlugin() {
             const blockWidth = blockRect.width / zoom
 
             if (
-              currentState.top !== relativeTop ||
-              currentState.height !== height ||
-              currentState.visible !== shouldShow ||
-              currentState.paginationEnabled !== isPaginated
+              store.currentState.top !== relativeTop ||
+              store.currentState.height !== height ||
+              store.currentState.visible !== shouldShow ||
+              store.currentState.paginationEnabled !== isPaginated
             ) {
-              currentState = {
-                ...currentState,
+              store.currentState = {
+                ...store.currentState,
                 visible: shouldShow,
                 top: relativeTop,
                 height: height / zoom,
@@ -773,10 +330,10 @@ function createBlockIndicatorPlugin() {
 
         doc.forEach((_node, offset) => {
           if (offset >= minPos && offset <= maxPos) {
-            selectedBlockPositions.add(offset)
+            store.selectedBlockPositions.add(offset)
           }
         })
-        lastSelectedPos = toPos
+        store.lastSelectedPos = toPos
       }
 
       // Selection helper: deselect range of blocks between two positions
@@ -787,12 +344,12 @@ function createBlockIndicatorPlugin() {
 
         doc.forEach((_node, offset) => {
           if (offset >= minPos && offset <= maxPos) {
-            selectedBlockPositions.delete(offset)
+            store.selectedBlockPositions.delete(offset)
           }
         })
         // Update lastSelectedPos
-        lastSelectedPos = selectedBlockPositions.size > 0
-          ? Array.from(selectedBlockPositions).pop() ?? null
+        store.lastSelectedPos = store.selectedBlockPositions.size > 0
+          ? Array.from(store.selectedBlockPositions).pop() ?? null
           : null
       }
 
@@ -810,13 +367,13 @@ function createBlockIndicatorPlugin() {
         const isPaginated = isPaginationEnabled(editorView.dom)
         const zoom = getZoomFactor(editorView.dom)
 
-        selectedBlockPositions.forEach((pos) => {
+        store.selectedBlockPositions.forEach((pos) => {
           try {
             const dom = editorView.nodeDOM(pos)
             if (dom instanceof HTMLElement) {
               // Skip headers/footers
               if (isNonContentArea(dom)) {
-                selectedBlockPositions.delete(pos)
+                store.selectedBlockPositions.delete(pos)
                 return
               }
 
@@ -852,14 +409,14 @@ function createBlockIndicatorPlugin() {
             }
           } catch {
             // Position no longer valid, remove it
-            selectedBlockPositions.delete(pos)
+            store.selectedBlockPositions.delete(pos)
           }
         })
 
-        currentState = {
-          ...currentState,
+        store.currentState = {
+          ...store.currentState,
           selectedBlocks: blocks,
-          lastSelectedPos,
+          lastSelectedPos: store.lastSelectedPos,
           paginationEnabled: isPaginated,
         }
         notifyListeners()
@@ -872,14 +429,14 @@ function createBlockIndicatorPlugin() {
         const validPositions = new Set<number>()
 
         doc.forEach((_node, offset) => {
-          if (selectedBlockPositions.has(offset)) {
+          if (store.selectedBlockPositions.has(offset)) {
             validPositions.add(offset)
           }
         })
 
-        selectedBlockPositions = validPositions
-        if (lastSelectedPos !== null && !validPositions.has(lastSelectedPos)) {
-          lastSelectedPos = null
+        store.selectedBlockPositions = validPositions
+        if (store.lastSelectedPos !== null && !validPositions.has(store.lastSelectedPos)) {
+          store.lastSelectedPos = null
         }
       }
 
@@ -916,8 +473,8 @@ function createBlockIndicatorPlugin() {
         tr = tr.setMeta(blockIndicatorKey, { isDragging: false, justMoved: adjustedPos })
 
         // Set animating state
-        currentState = {
-          ...currentState,
+        store.currentState = {
+          ...store.currentState,
           isDragging: false,
           sourceOverlay: null,
           isAnimating: true,
@@ -941,8 +498,8 @@ function createBlockIndicatorPlugin() {
           document.body.classList.add("block-animating")
 
           // Start shrinking animation - keep horizontal mode, will shrink width
-          currentState = {
-            ...currentState,
+          store.currentState = {
+            ...store.currentState,
             visible: true,
             isDragging: true,  // Keep horizontal mode for shrinking
             commandHeld: false,
@@ -957,8 +514,8 @@ function createBlockIndicatorPlugin() {
           // After shrink animation completes, immediately start growing
           setTimeout(() => {
             // Switch to vertical mode, start at dot height (2px)
-            currentState = {
-              ...currentState,
+            store.currentState = {
+              ...store.currentState,
               isDragging: false,
               height: 2,  // Start from dot
               dropAnimation: 'growing',
@@ -967,16 +524,16 @@ function createBlockIndicatorPlugin() {
 
             // Next frame: set final height - CSS will animate the growth
             requestAnimationFrame(() => {
-              currentState = {
-                ...currentState,
+              store.currentState = {
+                ...store.currentState,
                 height: finalHeight,
               }
               notifyListeners()
 
               // After grow animation, return to normal state
               setTimeout(() => {
-                currentState = {
-                  ...currentState,
+                store.currentState = {
+                  ...store.currentState,
                   dropAnimation: 'none',
                 }
                 notifyListeners()
@@ -991,18 +548,18 @@ function createBlockIndicatorPlugin() {
 
       const handleMouseMove = (event: MouseEvent) => {
         // Skip if disabled
-        if (!indicatorEnabled) return
+        if (!store.indicatorEnabled) return
 
         // Track mouse Y for code paths that don't have direct event access
-        lastMouseY = event.clientY
+        store.lastMouseY = event.clientY
 
         const target = event.target
         if (!(target instanceof HTMLElement)) return
 
         // Skip if hovering over header/footer/gap
         if (isNonContentArea(target)) {
-          if (currentState.visible && !isDragging) {
-            currentState = { ...currentState, visible: false }
+          if (store.currentState.visible && !isDragging) {
+            store.currentState = { ...store.currentState, visible: false }
             notifyListeners()
           }
           return
@@ -1010,8 +567,8 @@ function createBlockIndicatorPlugin() {
 
         // Hide indicator when mouse drifts into a pagination gap, header, or footer
         if (isPaginationEnabled(editorView.dom) && isPointInForbiddenZone(event.clientY)) {
-          if (currentState.visible && !isDragging) {
-            currentState = { ...currentState, visible: false }
+          if (store.currentState.visible && !isDragging) {
+            store.currentState = { ...store.currentState, visible: false }
             notifyListeners()
           }
           return
@@ -1040,7 +597,7 @@ function createBlockIndicatorPlugin() {
           const dropInfo = findDropPosition(event.clientY)
           if (dropInfo) {
             dropTargetPos = dropInfo.pos
-            dropTargetIndex = dropInfo.index
+            store.dropTargetIndex = dropInfo.index
           }
 
           // Track which block the cursor is over for indicator width
@@ -1074,7 +631,7 @@ function createBlockIndicatorPlugin() {
                   const blockLeft = (blockRect.left - refRect.left) / zoom
 
                   // In pagination mode, clip block reference to current page
-                  let blockWidth = blockRect.width / zoom
+                  const blockWidth = blockRect.width / zoom
                   if (isPaginated) {
                     const clipped = clipIndicatorToCurrentPage(event.clientY, blockRect.top, blockRect.bottom)
                     if (!clipped) {
@@ -1087,14 +644,14 @@ function createBlockIndicatorPlugin() {
                   let indicatorTop: number
                   if (dropInfo) {
                     indicatorTop = dropInfo.top / zoom
-                  } else if (currentState.dropIndicatorTop != null) {
-                    indicatorTop = currentState.dropIndicatorTop
+                  } else if (store.currentState.dropIndicatorTop != null) {
+                    indicatorTop = store.currentState.dropIndicatorTop
                   } else {
                     indicatorTop = (blockRect.top - refRect.top) / zoom
                   }
 
-                  currentState = {
-                    ...currentState,
+                  store.currentState = {
+                    ...store.currentState,
                     visible: true,
                     top: indicatorTop,
                     height: 2,  // Horizontal line height
@@ -1131,7 +688,7 @@ function createBlockIndicatorPlugin() {
 
         // Re-evaluate when entering a new block OR when returning to content
         // from a forbidden zone (indicator hidden but mouse now on valid block)
-        const needsUpdate = blockPos !== null && (blockPos !== currentBlockPos || !currentState.visible)
+        const needsUpdate = blockPos !== null && (blockPos !== currentBlockPos || !store.currentState.visible)
         if (needsUpdate && blockPos !== null) {
           currentBlockPos = blockPos
 
@@ -1141,8 +698,8 @@ function createBlockIndicatorPlugin() {
               // Skip header/footer nodes
               if (isNonContentArea(dom)) {
                 currentBlockPos = null
-                if (currentState.visible) {
-                  currentState = { ...currentState, visible: false }
+                if (store.currentState.visible) {
+                  store.currentState = { ...store.currentState, visible: false }
                   notifyListeners()
                 }
                 return
@@ -1169,14 +726,14 @@ function createBlockIndicatorPlugin() {
                 }
               }
 
-              currentState = {
-                ...currentState,
+              store.currentState = {
+                ...store.currentState,
                 visible: shouldShow,
                 top: (indicatorTop - refRect.top) / zoom,
                 height: indicatorHeight / zoom,
                 blockLeft,
                 blockWidth: blockRect.width / zoom,
-                commandHeld,
+                commandHeld: store.commandHeld,
                 paginationEnabled: isPaginated,
               }
               notifyListeners()
@@ -1189,7 +746,7 @@ function createBlockIndicatorPlugin() {
 
       const handleMouseDown = (event: MouseEvent) => {
         // Skip if disabled
-        if (!indicatorEnabled) return
+        if (!store.indicatorEnabled) return
         if (currentBlockPos === null) return
         if (event.button !== 0) return // Only left click
 
@@ -1201,28 +758,28 @@ function createBlockIndicatorPlugin() {
           event.preventDefault()
           event.stopPropagation()
 
-          if (event.shiftKey && lastSelectedPos !== null) {
+          if (event.shiftKey && store.lastSelectedPos !== null) {
             // Range selection/deselection: toggle based on whether clicked block is selected
-            if (selectedBlockPositions.has(currentBlockPos)) {
+            if (store.selectedBlockPositions.has(currentBlockPos)) {
               // Clicked block is selected - deselect the range
-              deselectBlockRange(lastSelectedPos, currentBlockPos)
+              deselectBlockRange(store.lastSelectedPos, currentBlockPos)
             } else {
               // Clicked block is not selected - select the range
-              selectBlockRange(lastSelectedPos, currentBlockPos)
+              selectBlockRange(store.lastSelectedPos, currentBlockPos)
             }
           } else {
             // Toggle single block selection
-            if (selectedBlockPositions.has(currentBlockPos)) {
-              selectedBlockPositions.delete(currentBlockPos)
+            if (store.selectedBlockPositions.has(currentBlockPos)) {
+              store.selectedBlockPositions.delete(currentBlockPos)
               // Update lastSelectedPos if we deselected it
-              if (lastSelectedPos === currentBlockPos) {
-                lastSelectedPos = selectedBlockPositions.size > 0
-                  ? Array.from(selectedBlockPositions).pop() ?? null
+              if (store.lastSelectedPos === currentBlockPos) {
+                store.lastSelectedPos = store.selectedBlockPositions.size > 0
+                  ? Array.from(store.selectedBlockPositions).pop() ?? null
                   : null
               }
             } else {
-              selectedBlockPositions.add(currentBlockPos)
-              lastSelectedPos = currentBlockPos
+              store.selectedBlockPositions.add(currentBlockPos)
+              store.lastSelectedPos = currentBlockPos
             }
           }
 
@@ -1231,7 +788,7 @@ function createBlockIndicatorPlugin() {
         }
 
         // Click without Option = deselect all selected blocks
-        if (selectedBlockPositions.size > 0) {
+        if (store.selectedBlockPositions.size > 0) {
           clearSelections()
         }
 
@@ -1241,7 +798,7 @@ function createBlockIndicatorPlugin() {
         // Start long press detection
         longPressStartPos = { x: event.clientX, y: event.clientY }
 
-        currentState = { ...currentState, isLongPressing: true }
+        store.currentState = { ...store.currentState, isLongPressing: true }
         notifyListeners()
 
         const refRect = getPositionReferenceRect(editorView.dom)
@@ -1301,8 +858,8 @@ function createBlockIndicatorPlugin() {
 
         document.body.classList.remove("block-dragging")
 
-        currentState = {
-          ...currentState,
+        store.currentState = {
+          ...store.currentState,
           isDragging: false,
           sourceOverlay: null,
         }
@@ -1312,15 +869,15 @@ function createBlockIndicatorPlugin() {
       const handleScroll = () => {
         updateBlockRect()
         // Also update selected blocks positions on scroll
-        if (selectedBlockPositions.size > 0) {
+        if (store.selectedBlockPositions.size > 0) {
           updateSelectedBlocksState()
         }
       }
 
       const handleGlobalMouseMove = (event: MouseEvent) => {
         // Skip if disabled
-        if (!indicatorEnabled) return
-        if (!currentState.visible && !isDragging) return
+        if (!store.indicatorEnabled) return
+        if (!store.currentState.visible && !isDragging) return
 
         // Don't hide if we're in keyboard mode (caret-tracking)
         // In that case, the indicator should stay at the caret position
@@ -1342,7 +899,7 @@ function createBlockIndicatorPlugin() {
 
       const handleKeyDown = (event: KeyboardEvent) => {
         // Skip if disabled
-        if (!indicatorEnabled) return
+        if (!store.indicatorEnabled) return
 
         if (event.key === 'Alt') {
           setCommandHeld(true)
@@ -1357,7 +914,7 @@ function createBlockIndicatorPlugin() {
 
       const handleKeyUp = (event: KeyboardEvent) => {
         // Skip if disabled
-        if (!indicatorEnabled) return
+        if (!store.indicatorEnabled) return
 
         if (event.key === 'Alt') {
           setCommandHeld(false)
@@ -1367,11 +924,11 @@ function createBlockIndicatorPlugin() {
       // Global click to deselect - anywhere without Option clears selection
       const handleGlobalMouseDown = (event: MouseEvent) => {
         // Skip if disabled
-        if (!indicatorEnabled) return
+        if (!store.indicatorEnabled) return
 
         // Only deselect if Option is NOT held and we have selections
         // Skip if clicking inside the editor (editor handler will manage it)
-        if (!event.altKey && selectedBlockPositions.size > 0) {
+        if (!event.altKey && store.selectedBlockPositions.size > 0) {
           const isInsideEditor = editorView.dom.contains(event.target as Node)
           if (!isInsideEditor) {
             clearSelections()
@@ -1392,7 +949,7 @@ function createBlockIndicatorPlugin() {
       // But ignore modifier keys - they shouldn't hide the indicator
       const handleEditorKeyDown = (event: KeyboardEvent) => {
         // Skip if disabled
-        if (!indicatorEnabled) return
+        if (!store.indicatorEnabled) return
 
         // Don't hide for modifier keys
         if (event.key === 'Meta' || event.key === 'Shift' || event.key === 'Control' || event.key === 'Alt') {
@@ -1402,7 +959,7 @@ function createBlockIndicatorPlugin() {
         if (inputMode !== 'keyboard') {
           inputMode = 'keyboard'
           // Instantly hide the indicator
-          currentState = { ...currentState, visible: false }
+          store.currentState = { ...store.currentState, visible: false }
           notifyListeners()
         }
       }
@@ -1416,7 +973,7 @@ function createBlockIndicatorPlugin() {
           updateBlockRect()
 
           // If document changed, recalculate selected block positions
-          if (view.state.doc !== prevDoc && selectedBlockPositions.size > 0) {
+          if (view.state.doc !== prevDoc && store.selectedBlockPositions.size > 0) {
             validateSelectedPositions()
             updateSelectedBlocksState()
           }
@@ -1441,22 +998,3 @@ function createBlockIndicatorPlugin() {
     },
   })
 }
-
-// Called by React component when animation completes
-export function finishAnimation() {
-  currentState = {
-    ...currentState,
-    isAnimating: false,
-    indicatorTransition: null,
-  }
-  clearDropInfo()
-  notifyListeners()
-}
-
-export const BlockIndicator = Extension.create({
-  name: "blockIndicator",
-
-  addProseMirrorPlugins() {
-    return [createBlockIndicatorPlugin()]
-  },
-})
