@@ -253,47 +253,48 @@ const isNonContentArea = (element: HTMLElement): boolean => {
 }
 
 /**
- * Check if coordinates are in a non-content area (gap, header, footer) in pagination mode.
- * Returns false if over a gap, header, or footer. Returns true otherwise.
+ * Check if the indicator's full drawing rect falls entirely within a page's content area.
+ *
+ * Positive-space approach: instead of hunting for gaps/headers/footers to exclude,
+ * we only allow drawing if the indicator is fully inside a page's content bounds.
+ * If any pixel of the indicator would render outside content (in a gap, header,
+ * footer, or above/below the document), we hide it.
+ *
+ * @param blockTop - Absolute screen Y of indicator top edge
+ * @param blockBottom - Absolute screen Y of indicator bottom edge
+ * @returns true if the indicator rect is fully contained within a page content area
  */
-const isInPageContentArea = (clientY: number, _editorDom: HTMLElement): boolean => {
-  // Find pagination container anywhere in the document
+const isIndicatorInsidePageContent = (blockTop: number, blockBottom: number): boolean => {
   const paginationContainer = document.querySelector('[data-tiptap-pagination]') as HTMLElement | null
-  if (!paginationContainer) return true // Not paginated, always in content
+  if (!paginationContainer) return true // Not paginated, always fine
 
-  // Buffer to catch edge pixels at boundaries between content and gap/header/footer
-  // Needs to be large enough to cover any visual transition areas
-  const EDGE_BUFFER = 30
+  const pages = paginationContainer.querySelectorAll('.page')
+  if (pages.length === 0) return true
 
-  // Check gaps - these have pointer-events:none so we check by coordinates
-  const gaps = paginationContainer.querySelectorAll('.tiptap-pagination-gap')
-  for (const gap of gaps) {
-    const rect = gap.getBoundingClientRect()
-    // Extend bounds slightly to catch edge pixels
-    if (clientY >= rect.top - EDGE_BUFFER && clientY <= rect.bottom + EDGE_BUFFER) {
-      return false // Over a gap
+  for (const page of pages) {
+    const pageRect = page.getBoundingClientRect()
+
+    // Determine the content area within this page (between header and footer)
+    let contentTop = pageRect.top
+    let contentBottom = pageRect.bottom
+
+    const header = page.querySelector('.tiptap-page-header')
+    if (header) {
+      contentTop = header.getBoundingClientRect().bottom
+    }
+
+    const footer = page.querySelector('.tiptap-page-footer')
+    if (footer) {
+      contentBottom = footer.getBoundingClientRect().top
+    }
+
+    // The indicator must be fully inside this page's content area
+    if (blockTop >= contentTop && blockBottom <= contentBottom) {
+      return true
     }
   }
 
-  // Check headers - extend into gap area
-  const headers = paginationContainer.querySelectorAll('.tiptap-page-header')
-  for (const header of headers) {
-    const rect = header.getBoundingClientRect()
-    if (clientY >= rect.top - EDGE_BUFFER && clientY <= rect.bottom + EDGE_BUFFER) {
-      return false // Over a header
-    }
-  }
-
-  // Check footers - extend into gap area
-  const footers = paginationContainer.querySelectorAll('.tiptap-page-footer')
-  for (const footer of footers) {
-    const rect = footer.getBoundingClientRect()
-    if (clientY >= rect.top - EDGE_BUFFER && clientY <= rect.bottom + EDGE_BUFFER) {
-      return false // Over a footer
-    }
-  }
-
-  return true // Not in gap/header/footer, so it's content
+  return false // Indicator would draw outside any page's content area
 }
 
 /**
@@ -555,14 +556,18 @@ function createBlockIndicatorPlugin() {
             const blockLeft = blockRect.left - refRect.left
             const blockWidth = blockRect.width
 
+            // Positive-space pagination check: only show if fully inside page content
+            const shouldBeVisible = !isPaginated || isIndicatorInsidePageContent(blockRect.top, blockRect.bottom)
+
             if (
               currentState.top !== top ||
               currentState.height !== height ||
-              currentState.paginationEnabled !== isPaginated
+              currentState.paginationEnabled !== isPaginated ||
+              currentState.visible !== shouldBeVisible
             ) {
               currentState = {
                 ...currentState,
-                visible: true,
+                visible: shouldBeVisible,
                 top,
                 height,
                 blockLeft,
@@ -868,15 +873,8 @@ function createBlockIndicatorPlugin() {
           return
         }
 
-        // In pagination mode, also check if Y coordinate is in page content area
-        // This catches gaps (which have pointer-events: none so target won't be the gap)
-        if (!isInPageContentArea(event.clientY, editorView.dom)) {
-          if (currentState.visible && !isDragging) {
-            currentState = { ...currentState, visible: false }
-            notifyListeners()
-          }
-          return
-        }
+        // Pagination content check moved to after block rect is computed
+        // (see isIndicatorInsidePageContent check below)
 
         // Switch to mouse mode when mouse moves in editor
         inputMode = 'mouse'
@@ -989,9 +987,12 @@ function createBlockIndicatorPlugin() {
               const isPaginated = isPaginationEnabled(editorView.dom)
               const blockLeft = blockRect.left - refRect.left
 
+              // Positive-space pagination check: only show if fully inside page content
+              const shouldBeVisible = !isPaginated || isIndicatorInsidePageContent(blockRect.top, blockRect.bottom)
+
               currentState = {
                 ...currentState,
-                visible: true,
+                visible: shouldBeVisible,
                 top: blockRect.top - refRect.top,
                 height: blockRect.height,
                 blockLeft,
