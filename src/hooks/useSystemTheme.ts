@@ -61,7 +61,6 @@ export function useSystemTheme(): UseSystemThemeReturn {
         return unlisten;
       } catch {
         // Tauri not available, use matchMedia fallback
-        console.log('[useSystemTheme] Tauri not available, using matchMedia fallback');
         return null;
       }
     };

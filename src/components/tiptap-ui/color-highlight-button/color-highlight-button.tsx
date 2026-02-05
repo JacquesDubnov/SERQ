@@ -112,10 +112,8 @@ export const ColorHighlightButton = forwardRef<
 
     const handleClick = useCallback(
       (event: React.MouseEvent<HTMLButtonElement>) => {
-        console.log('[ColorHighlightButton] click event fired', { highlightColor });
         onClick?.(event)
         if (event.defaultPrevented) {
-          console.log('[ColorHighlightButton] event was prevented');
           return;
         }
         handleColorHighlight()

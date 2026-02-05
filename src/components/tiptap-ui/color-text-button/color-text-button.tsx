@@ -88,10 +88,8 @@ export const ColorTextButton = forwardRef<
 
     const handleClick = useCallback(
       (event: React.MouseEvent<HTMLButtonElement>) => {
-        console.log('[ColorTextButton] click event fired', { textColor });
         onClick?.(event)
         if (event.defaultPrevented) {
-          console.log('[ColorTextButton] event was prevented');
           return;
         }
         handleColorText()

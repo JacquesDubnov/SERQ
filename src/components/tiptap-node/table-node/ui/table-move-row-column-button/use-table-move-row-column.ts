@@ -297,8 +297,6 @@ function tableMoveRowColumn({
     const moveOperation =
       finalOrientation === "row" ? moveTableRow : moveTableColumn
 
-    console.log({ from, to, finalOrientation, direction })
-
     const dispatch = (tr: Transaction) => editor.view.dispatch(tr)
 
     if (editor.state.selection instanceof CellSelection) {

@@ -51,8 +51,6 @@ export const FontFamilyDropdown = forwardRef<HTMLButtonElement, FontFamilyDropdo
 
         // Find match in dynamic font list from store
         const match = availableFonts.find((f) => f.value === fontFamily);
-        console.log('[FontFamilyDropdown] fontFamily:', fontFamily, '| match:', match?.label || 'none');
-
         setCurrentValue(fontFamily);
         setCurrentFont(match?.label || 'Font');
       };

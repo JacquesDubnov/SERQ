@@ -93,7 +93,6 @@ export function getTextStyleAtCursor(editor: Editor): Record<string, unknown> {
         color: customStyle.textColor ?? undefined,
       };
 
-      console.log('[EditorUtils] Heading with custom style - H' + level + ' | Result:', result);
       return result;
     }
   }
@@ -158,8 +157,6 @@ export function getTextStyleAtCursor(editor: Editor): Record<string, unknown> {
       result[key] = value;
     }
   }
-
-  console.log('[EditorUtils] Block:', blockInfo.type, blockInfo.level, '| Defaults:', defaults, '| Explicit:', explicitAttrs, '| Result:', result);
 
   return result;
 }

@@ -31,14 +31,12 @@ export const StubCommands = Extension.create({
         (_options?: AiTextPromptOptions) =>
         ({ chain }) => {
           // Stub - AI not implemented yet
-          console.log('[StubCommands] aiTextPrompt called - not implemented');
           return chain().run();
         },
       insertTocNode:
         () =>
         ({ chain }) => {
           // Stub - TOC not implemented yet
-          console.log('[StubCommands] insertTocNode called - not implemented');
           return chain().run();
         },
     };

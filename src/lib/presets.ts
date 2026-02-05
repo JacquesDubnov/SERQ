@@ -362,7 +362,6 @@ export function applyColorPreset(presetId: string, mode: 'light' | 'dark'): void
 
   const root = document.documentElement;
   const variables = mode === 'dark' ? preset.dark : preset.light;
-  console.log(`[Presets] Applying color preset: ${presetId}, mode: ${mode}`, variables);
   for (const [varName, value] of Object.entries(variables)) {
     root.style.setProperty(varName, value);
   }

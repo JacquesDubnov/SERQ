@@ -50,7 +50,6 @@ export function useAutoSave(
 
         markSaved();
         lastSaveRef.current = new Date();
-        console.log('[AutoSave] Document saved at', lastSaveRef.current.toISOString());
       } catch (error) {
         console.error('[AutoSave] Failed:', error);
         // Don't mark as saved on error - user will see dirty indicator

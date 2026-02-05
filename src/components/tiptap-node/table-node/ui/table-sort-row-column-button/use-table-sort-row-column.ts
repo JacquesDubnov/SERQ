@@ -233,7 +233,6 @@ function tableSortRowColumn({
     const dataItems = allItems.filter((item) => !item.isHeader)
 
     if (dataItems.length < 2) {
-      console.log("No sortable data cells found (excluding headers)")
       return false
     }
 

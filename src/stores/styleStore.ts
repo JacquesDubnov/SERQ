@@ -699,9 +699,6 @@ export const useStyleStore = create<StyleState>((set, get) => ({
   assignStyleToHeading: (level, style) => {
     const key = `h${level}` as keyof StyleState['headingCustomStyles'];
 
-    console.log('[styleStore.assignStyleToHeading] level:', level, 'key:', key);
-    console.log('[styleStore.assignStyleToHeading] style being saved:', JSON.stringify(style, null, 2));
-
     // Apply CSS variables for this heading level
     applyHeadingCustomStyleCSS(level, style);
 
@@ -712,7 +709,6 @@ export const useStyleStore = create<StyleState>((set, get) => ({
           [key]: style,
         },
       };
-      console.log('[styleStore.assignStyleToHeading] new headingCustomStyles:', JSON.stringify(newState.headingCustomStyles, null, 2));
       return newState;
     });
     markDocumentDirty();
@@ -806,7 +802,6 @@ export const useStyleStore = create<StyleState>((set, get) => ({
   getHeadingCustomStyle: (level) => {
     const key = `h${level}` as keyof StyleState['headingCustomStyles'];
     const style = get().headingCustomStyles[key];
-    console.log('[styleStore.getHeadingCustomStyle] level:', level, 'key:', key, 'style:', style);
     return style;
   },
 
@@ -843,8 +838,6 @@ export const useStyleStore = create<StyleState>((set, get) => ({
       }
     });
 
-    console.log('[FormatPainter] Captured marks:', marks, 'textAlign:', textAlign);
-
     set({
       formatPainter: {
         active: true,
@@ -867,8 +860,6 @@ export const useStyleStore = create<StyleState>((set, get) => ({
       return; // No selection to apply to
     }
 
-    console.log('[FormatPainter] Applying marks:', marks, 'textAlign:', textAlign);
-
     // Build a single chain for all operations
     let chain = editor.chain().focus();
 
@@ -877,8 +868,6 @@ export const useStyleStore = create<StyleState>((set, get) => ({
 
     // Apply stored marks using specific commands where available
     marks.forEach(({ type, attrs }) => {
-      console.log('[FormatPainter] Applying mark:', type, attrs);
-
       // Handle specific mark types with their dedicated commands
       if (type === 'bold') {
         chain = chain.setBold();

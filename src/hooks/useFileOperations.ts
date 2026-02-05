@@ -129,7 +129,6 @@ export function useFileOperations(
       // Update store
       markSaved();
 
-      console.log('[useFileOperations] Saved to:', docMeta.path);
       return true;
     } catch (error) {
       console.error('[useFileOperations] Error saving file:', error);
@@ -183,7 +182,6 @@ export function useFileOperations(
       await addRecentFile(filePath, name);
       await updateWorkingFolderFromFile(filePath);
 
-      console.log('[useFileOperations] Saved as:', filePath);
       return filePath;
     } catch (error) {
       console.error('[useFileOperations] Error in Save As:', error);
@@ -200,7 +198,6 @@ export function useFileOperations(
     editorRef.current?.setContent('<p></p>');
     clearDocument();
     editorRef.current?.focus();
-    console.log('[useFileOperations] New document created');
   }, [editorRef, clearDocument]);
 
   return {

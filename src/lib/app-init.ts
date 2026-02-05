@@ -365,7 +365,6 @@ async function loadNamedStyles(): Promise<void> {
       })
     }
 
-    console.log(`[AppInit] Loaded ${styles.length} named styles`)
   } catch (error) {
     console.warn('[AppInit] Failed to load named styles:', error)
   }
@@ -381,7 +380,6 @@ async function loadNamedStyles(): Promise<void> {
  */
 export async function initializeApp(): Promise<void> {
   if (initialized) {
-    console.log('[AppInit] Already initialized')
     return
   }
 
@@ -390,27 +388,20 @@ export async function initializeApp(): Promise<void> {
   }
 
   initPromise = (async () => {
-    console.log('[AppInit] Starting initialization...')
-
     try {
       // 1. Initialize database
-      console.log('[AppInit] Initializing database...')
       await database.initialize()
 
       // 2. Set up command registry context provider
-      console.log('[AppInit] Setting up command registry...')
       commandRegistry.setContextProvider(buildCommandContext)
 
       // 3. Register core commands
-      console.log('[AppInit] Registering core commands...')
       registerCoreCommands()
 
       // 4. Load named styles from database
-      console.log('[AppInit] Loading named styles...')
       await loadNamedStyles()
 
       initialized = true
-      console.log('[AppInit] Initialization complete')
     } catch (error) {
       console.error('[AppInit] Initialization failed:', error)
       throw error

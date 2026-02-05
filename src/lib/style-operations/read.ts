@@ -56,13 +56,6 @@ function readFromStore(
   const store = useStyleStore.getState();
   const customStyle = store.getHeadingCustomStyle(level);
 
-  console.log('[readFromStore]', {
-    level,
-    property,
-    storeKey: meta.storeKey,
-    customStyle,
-    value: customStyle ? customStyle[meta.storeKey as keyof typeof customStyle] : null,
-  });
 
   // Check if there's a custom value in the store
   if (customStyle && meta.storeKey) {
@@ -222,19 +215,9 @@ export function readStyle(
   ctx: StyleContext,
   property: StyleProperty
 ): StyleValue {
-  console.log('[readStyle]', {
-    blockType: ctx.blockType,
-    headingLevel: ctx.headingLevel,
-    property,
-    isHeading: isHeadingContext(ctx),
-    isHeadingLevelProp: isHeadingLevelProperty(property),
-  });
-
   // For headings, check if this property supports heading-level styling
   if (isHeadingContext(ctx) && isHeadingLevelProperty(property)) {
     const storeValue = readFromStore(ctx.headingLevel, property);
-
-    console.log('[readStyle] storeValue:', storeValue);
 
     // If there's a custom heading style, use it
     if (storeValue.isCustomized) {

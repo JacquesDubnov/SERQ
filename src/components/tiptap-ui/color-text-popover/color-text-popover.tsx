@@ -337,16 +337,11 @@ export const TextStyleColorPanel: React.FC<TextStyleColorPanelProps> = ({
     autoSelectFirstItem: false,
   })
 
-  console.log('[TextStyleColorPanel] Rendering with', { recentColors: recentColors.length, textColors: allTextColors.length, highlightColors: allHighlightColors.length });
-
   return (
     <Card
       ref={containerRef}
       tabIndex={0}
       role="menu"
-      onClick={(e) => console.log('[TextStyleColorPanel] Card onClick', e.target)}
-      onPointerDown={(e) => console.log('[TextStyleColorPanel] Card onPointerDown', e.target)}
-      onMouseDown={(e) => console.log('[TextStyleColorPanel] Card onMouseDown', e.target)}
     >
       <CardBody>
         {isInitialized && (

@@ -74,70 +74,46 @@ export function captureBlockStyle(editor: Editor): HeadingCustomStyle {
   let underline = false;
   let strikethrough = false;
 
-  console.log('[StyleCapture] ========== STYLE CAPTURE START ==========');
-  console.log('[StyleCapture] Cursor position node:', node.type.name, '| level:', node.attrs?.level);
-  console.log('[StyleCapture] Node content size:', node.content.size);
-  console.log('[StyleCapture] Node text content:', node.textContent?.substring(0, 50));
-
-  // DUMP ALL MARKS ON ALL TEXT - comprehensive debug
-  console.log('[StyleCapture] --- Scanning ALL text nodes for marks ---');
-  let textNodeCount = 0;
-
   // === SCAN ALL TEXT CONTENT FOR MARKS ===
   // This is more reliable than just checking $from.marks()
   if (node.content.size > 0) {
     node.descendants((child) => {
       if (!child.isText) return;
 
-      textNodeCount++;
-      console.log(`[StyleCapture] Text node #${textNodeCount}: "${child.text?.substring(0, 30)}..." | marks: ${child.marks.length}`);
-
-      child.marks.forEach((mark, idx) => {
-        console.log(`[StyleCapture]   Mark ${idx}: ${mark.type.name} | ALL attrs:`, JSON.stringify(mark.attrs));
-
+      child.marks.forEach((mark) => {
         if (mark.type.name === 'textStyle') {
           const attrs = mark.attrs;
           // Use first non-null value found
           if (!fontFamily && attrs.fontFamily) {
             fontFamily = attrs.fontFamily;
-            console.log('[StyleCapture] Captured fontFamily from textStyle mark:', fontFamily);
           }
           if (fontSize === null && attrs.fontSize) {
             fontSize = parseNumericValue(attrs.fontSize);
-            console.log('[StyleCapture] Captured fontSize:', fontSize);
           }
           if (fontWeight === null && attrs.fontWeight) {
             fontWeight = parseNumericValue(attrs.fontWeight);
-            console.log('[StyleCapture] Captured fontWeight:', fontWeight);
           }
           if (letterSpacing === null && attrs.letterSpacing) {
             letterSpacing = parseNumericValue(attrs.letterSpacing);
-            console.log('[StyleCapture] Captured letterSpacing:', letterSpacing);
           }
           if (lineHeight === null && attrs.lineHeight) {
             lineHeight = parseNumericValue(attrs.lineHeight);
-            console.log('[StyleCapture] Captured lineHeight:', lineHeight);
           }
           if (!textColor && attrs.color) {
             textColor = rgbToHex(attrs.color);
-            console.log('[StyleCapture] Captured textColor:', textColor);
           }
         }
         if (mark.type.name === 'bold') {
           bold = true;
-          console.log('[StyleCapture] Captured bold mark');
         }
         if (mark.type.name === 'italic') {
           italic = true;
-          console.log('[StyleCapture] Captured italic mark');
         }
         if (mark.type.name === 'underline') {
           underline = true;
-          console.log('[StyleCapture] Captured underline mark');
         }
         if (mark.type.name === 'strike') {
           strikethrough = true;
-          console.log('[StyleCapture] Captured strikethrough mark');
         }
       });
     });
@@ -145,14 +121,12 @@ export function captureBlockStyle(editor: Editor): HeadingCustomStyle {
 
   // Also check marks at cursor position
   const cursorMarks = state.selection.$from.marks();
-  console.log('[StyleCapture] Cursor has', cursorMarks.length, 'marks');
 
   cursorMarks.forEach((mark) => {
     if (mark.type.name === 'textStyle') {
       const attrs = mark.attrs;
       if (!fontFamily && attrs.fontFamily) {
         fontFamily = attrs.fontFamily;
-        console.log('[StyleCapture] Captured fontFamily from cursor mark:', fontFamily);
       }
       if (fontSize === null && attrs.fontSize) {
         fontSize = parseNumericValue(attrs.fontSize);
@@ -178,8 +152,6 @@ export function captureBlockStyle(editor: Editor): HeadingCustomStyle {
 
   // === BLOCK-LEVEL NODE ATTRIBUTES ===
   if (node.attrs) {
-    console.log('[StyleCapture] Node attributes:', JSON.stringify(node.attrs));
-
     // lineHeight can be a block attribute
     if (lineHeight === null && node.attrs.lineHeight) {
       lineHeight = parseNumericValue(node.attrs.lineHeight);
@@ -195,7 +167,6 @@ export function captureBlockStyle(editor: Editor): HeadingCustomStyle {
     // Some extensions store typography on node
     if (!fontFamily && node.attrs.fontFamily) {
       fontFamily = node.attrs.fontFamily;
-      console.log('[StyleCapture] Captured fontFamily from node attrs:', fontFamily);
     }
     if (fontSize === null && node.attrs.fontSize) {
       fontSize = parseNumericValue(node.attrs.fontSize);
@@ -207,11 +178,9 @@ export function captureBlockStyle(editor: Editor): HeadingCustomStyle {
 
   // Also try editor.getAttributes which might catch things we missed
   const textStyleAttrs = editor.getAttributes('textStyle');
-  console.log('[StyleCapture] editor.getAttributes(textStyle):', JSON.stringify(textStyleAttrs));
 
   if (!fontFamily && textStyleAttrs.fontFamily) {
     fontFamily = textStyleAttrs.fontFamily;
-    console.log('[StyleCapture] Captured fontFamily from getAttributes:', fontFamily);
   }
   if (fontSize === null && textStyleAttrs.fontSize) {
     fontSize = parseNumericValue(textStyleAttrs.fontSize);
@@ -233,19 +202,7 @@ export function captureBlockStyle(editor: Editor): HeadingCustomStyle {
   const highlightAttrs = editor.getAttributes('highlight');
   if (!backgroundColor && highlightAttrs.color) {
     backgroundColor = rgbToHex(highlightAttrs.color);
-    console.log('[StyleCapture] Captured backgroundColor from highlight:', backgroundColor);
   }
-
-  console.log('[StyleCapture] --- FINAL CAPTURED VALUES ---');
-  console.log('[StyleCapture] fontFamily:', fontFamily, '| (null means NOT captured)');
-  console.log('[StyleCapture] fontSize:', fontSize);
-  console.log('[StyleCapture] fontWeight:', fontWeight);
-  console.log('[StyleCapture] letterSpacing:', letterSpacing);
-  console.log('[StyleCapture] lineHeight:', lineHeight);
-  console.log('[StyleCapture] textColor:', textColor);
-  console.log('[StyleCapture] backgroundColor:', backgroundColor);
-  console.log('[StyleCapture] marks:', { bold, italic, underline, strikethrough });
-  console.log('[StyleCapture] ========== STYLE CAPTURE END ==========');
 
   return {
     fontFamily,
@@ -268,9 +225,7 @@ export function captureBlockStyle(editor: Editor): HeadingCustomStyle {
  * Uses captureBlockStyle first, then fills in missing values from computed styles.
  */
 export function captureComputedStyle(editor: Editor): HeadingCustomStyle {
-  console.log('[StyleCapture] === captureComputedStyle START ===');
   const baseStyle = captureBlockStyle(editor);
-  console.log('[StyleCapture] After captureBlockStyle, fontFamily:', baseStyle.fontFamily);
 
   // Try to get computed styles from the DOM
   const { view, state } = editor;
@@ -278,7 +233,6 @@ export function captureComputedStyle(editor: Editor): HeadingCustomStyle {
 
   try {
     const domNode = view.domAtPos(from);
-    console.log('[StyleCapture] DOM node type:', domNode.node.nodeType, '| nodeName:', domNode.node.nodeName);
 
     if (domNode.node instanceof Element || domNode.node.parentElement) {
       const element = domNode.node instanceof Element
@@ -287,17 +241,14 @@ export function captureComputedStyle(editor: Editor): HeadingCustomStyle {
 
       if (element) {
         const computed = window.getComputedStyle(element);
-        console.log('[StyleCapture] DOM computed fontFamily:', computed.fontFamily);
 
         // Only use computed values if we didn't get them from marks/attrs
         if (baseStyle.fontFamily === null) {
           // Clean up font family string
           let family = computed.fontFamily || null;
-          console.log('[StyleCapture] fontFamily is null, falling back to computed:', family);
           if (family) {
             // Remove quotes and take first font in stack
             family = family.split(',')[0].replace(/['"]/g, '').trim();
-            console.log('[StyleCapture] Cleaned family:', family);
           }
           baseStyle.fontFamily = family;
         }
@@ -362,12 +313,6 @@ export function captureComputedStyle(editor: Editor): HeadingCustomStyle {
   } catch (err) {
     console.warn('[StyleCapture] Error getting computed styles:', err);
   }
-
-  console.log('[StyleCapture] === captureComputedStyle FINAL RESULT ===');
-  console.log('[StyleCapture] fontFamily:', baseStyle.fontFamily, baseStyle.fontFamily === null ? '⚠️ NULL - WILL USE DEFAULT' : '✓');
-  console.log('[StyleCapture] fontSize:', baseStyle.fontSize);
-  console.log('[StyleCapture] fontWeight:', baseStyle.fontWeight);
-  console.log('[StyleCapture] Full style:', JSON.stringify(baseStyle, null, 2));
 
   return baseStyle;
 }

@@ -228,15 +228,12 @@ export function useColorText(config: UseColorTextConfig) {
   }, [editor, hideWhenUnavailable])
 
   const handleColorText = useCallback(() => {
-    console.log('[ColorText] handleColorText called', { canColorTextState, isActive, textColor });
     if (!editor || !canColorTextState) {
-      console.log('[ColorText] Early return - no editor or cannot color');
       return false;
     }
 
     // If already this color, unset it (toggle behavior)
     if (isActive) {
-      console.log('[ColorText] Unsetting color (toggle off)');
       const success = editor.chain().focus().unsetColor().run()
       if (success) {
         onApplied?.({ color: '', label: 'Default' })
@@ -246,14 +243,11 @@ export function useColorText(config: UseColorTextConfig) {
 
     // If no selection, select entire block first
     if (editor.state.selection.empty) {
-      console.log('[ColorText] Empty selection, selecting block content');
       selectCurrentBlockContent(editor)
     }
 
     // Apply color using the Color extension's command
-    console.log('[ColorText] Applying color:', textColor);
     const success = editor.chain().focus().setColor(textColor).run()
-    console.log('[ColorText] setColor result:', success);
     if (success) {
       onApplied?.({ color: textColor, label })
     }

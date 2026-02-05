@@ -36,13 +36,11 @@ class DatabaseManager {
    */
   async initialize(config?: Partial<DatabaseConfig>): Promise<void> {
     if (this.initialized && this.db) {
-      console.log('[Database] Already initialized')
       return
     }
 
     try {
       const dbPath = config?.inMemory ? ':memory:' : (config?.path || 'serq.db')
-      console.log('[Database] Initializing:', dbPath)
 
       // Connect to SQLite
       this.db = await Database.load(`sqlite:${dbPath}`)
@@ -51,7 +49,6 @@ class DatabaseManager {
       await this.runSchema()
 
       this.initialized = true
-      console.log('[Database] Initialized successfully')
     } catch (error) {
       console.error('[Database] Initialization failed:', error)
       throw error
@@ -66,11 +63,9 @@ class DatabaseManager {
 
     // Check current schema version
     const currentVersion = await this.getSchemaVersion()
-    console.log('[Database] Current schema version:', currentVersion)
 
     if (currentVersion === 0) {
       // Fresh database - create all tables
-      console.log('[Database] Creating schema v' + SCHEMA_VERSION)
 
       // Create tables
       await this.db.execute(CREATE_TABLES)
@@ -87,8 +82,6 @@ class DatabaseManager {
 
       // Insert built-in styles
       await this.db.execute(INSERT_BUILTIN_STYLES)
-
-      console.log('[Database] Schema created successfully')
     } else if (currentVersion < SCHEMA_VERSION) {
       // Run migrations
       await this.runMigrations(currentVersion, SCHEMA_VERSION)
@@ -97,7 +90,6 @@ class DatabaseManager {
     // Always ensure built-in styles exist (INSERT OR IGNORE is safe to run multiple times)
     try {
       await this.db.execute(INSERT_BUILTIN_STYLES)
-      console.log('[Database] Built-in styles ensured')
     } catch (err) {
       console.warn('[Database] Failed to ensure built-in styles:', err)
     }
@@ -123,9 +115,7 @@ class DatabaseManager {
   /**
    * Run migrations between versions
    */
-  private async runMigrations(from: number, to: number): Promise<void> {
-    console.log(`[Database] Running migrations from v${from} to v${to}`)
-
+  private async runMigrations(_from: number, to: number): Promise<void> {
     // Future: Add migration logic here
     // For now, just update the version
     if (this.db) {

@@ -262,9 +262,7 @@ export function useColorHighlight(config: UseColorHighlightConfig) {
   }, [editor, hideWhenUnavailable, mode])
 
   const handleColorHighlight = useCallback(() => {
-    console.log('[ColorHighlight] handleColorHighlight called', { canColorHighlightState, highlightColor, mode });
     if (!editor || !canColorHighlightState || !highlightColor || !label) {
-      console.log('[ColorHighlight] Early return - missing required params');
       return false;
     }
 
@@ -279,13 +277,11 @@ export function useColorHighlight(config: UseColorHighlightConfig) {
       }
 
       setTimeout(() => {
-        console.log('[ColorHighlight] Applying highlight:', highlightColor);
         const success = editor
           .chain()
           .focus()
           .toggleMark("highlight", { color: highlightColor })
           .run()
-        console.log('[ColorHighlight] toggleMark result:', success);
         if (success) {
           onApplied?.({ color: highlightColor, label, mode })
         }

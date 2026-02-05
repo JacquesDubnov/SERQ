@@ -49,12 +49,8 @@ export function useFormatPainter(editor: Editor | null) {
   const capture = useCallback(() => {
     if (!editor) return;
     const isEmpty = editor.state.selection.empty;
-    console.log('[FormatPainter] capture() called, selection empty:', isEmpty);
     if (isEmpty) return;
     captureFormat(editor);
-    // Verify state was set
-    const newState = useStyleStore.getState();
-    console.log('[FormatPainter] After capture - active:', newState.formatPainter.active, 'hasFormat:', !!newState.formatPainter.storedFormat);
   }, [editor, captureFormat]);
 
   // Track Option key state for repeat mode
@@ -96,7 +92,6 @@ export function useFormatPainter(editor: Editor | null) {
 
     const handleMouseDown = () => {
       isMouseDown.current = true;
-      console.log('[FormatPainter] mousedown in editor');
     };
 
     const handleMouseUp = () => {
@@ -111,10 +106,7 @@ export function useFormatPainter(editor: Editor | null) {
         const state = useStyleStore.getState();
         const { formatPainter: fp } = state;
 
-        console.log('[FormatPainter] mouseup in editor - active:', fp.active, 'hasFormat:', !!fp.storedFormat, 'selectionEmpty:', editor.state.selection.empty);
-
         if (fp.active && fp.storedFormat && !editor.state.selection.empty) {
-          console.log('[FormatPainter] Applying format!');
           state.applyFormat(editor);
         }
       }, 50);
