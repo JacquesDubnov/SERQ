@@ -6,7 +6,6 @@
  */
 
 import { create } from 'zustand';
-import type { Editor } from '@tiptap/core';
 import {
   applyTypographyPreset,
   applyColorPreset,
@@ -14,230 +13,30 @@ import {
   applyLayoutPreset,
   applyMasterTheme,
   getMasterThemeById,
-} from '../lib/presets';
-import { useEditorStore } from './editorStore';
+} from '../../lib/presets';
+import { useEditorStore } from '../editorStore';
 
-// ===== TYPES =====
+import type { StyleState, HeadingCustomStyle, ThemeMode, CustomStyle } from './types';
+import { DEFAULT_FONT_CATEGORIES, DEFAULT_FONT_WEIGHTS, DEFAULT_TEXT_COLORS, DEFAULT_HIGHLIGHT_COLORS, flattenFontCategories } from './defaults';
+import { applyHeadingCustomStyleCSS, clearHeadingCustomStyleCSS } from './heading-css';
 
-export type ThemeMode = 'light' | 'dark' | 'system';
-
-// ===== CONFIGURABLE OPTIONS (User can add/remove/reorder these) =====
-
-export interface FontOption {
-  value: string;    // CSS value, e.g., '"Source Sans 3", sans-serif'
-  label: string;    // Display label, e.g., 'Source Sans 3'
-}
-
-export interface FontWeightOption {
-  value: number;    // CSS font-weight value (100-900)
-  label: string;    // Display label, e.g., 'Bold'
-}
-
-export interface ColorOption {
-  value: string;    // Hex, HSL, or CSS variable
-  label: string;    // Display label
-}
-
-// Categorized fonts for dropdowns with groupings
-export interface FontCategories {
-  sansSerif: FontOption[];
-  serif: FontOption[];
-  display: FontOption[];
-  monospace: FontOption[];
-}
-
-export interface StoredFormat {
-  marks: Array<{ type: string; attrs: Record<string, unknown> }>;
-  textAlign: string | null;
-}
-
-export interface CustomStyle {
-  id: string;
-  name: string;
-  typography: string;
-  colors: string;
-  canvas: string;
-  layout: string;
-  createdAt: string;
-}
-
-export interface HeadingSpacingConfig {
-  before: number | null;
-  after: number | null;
-}
-
-export interface HeadingDividerConfig {
-  enabled: boolean;
-  position: 'below' | 'above' | 'both';
-  distance: number;              // line units (gap between text and line)
-  color: string | null;          // null = use theme default (currentColor)
-  thickness: number;             // 0.25-10px
-  double: boolean;
-  style: 'solid' | 'dashed' | 'dotted' | 'wavy' | 'zigzag' | 'gradient';
-}
-
-export interface HeadingCustomStyle {
-  // Typography
-  fontFamily: string | null;
-  fontSize: number | null;        // in px
-  fontWeight: number | null;      // 100-900
-  letterSpacing: number | null;   // in px
-  lineHeight: number | null;      // unitless ratio (e.g., 1.5)
-
-  // Marks
-  bold: boolean;
-  italic: boolean;
-  underline: boolean;
-  strikethrough: boolean;
-  textColor: string | null;
-  backgroundColor: string | null; // Block background color
-
-  // Divider
-  divider: HeadingDividerConfig | null;
-}
-
-export type HeadingLevel = 1 | 2 | 3 | 4 | 5 | 6;
-
-export interface StyleMetadata {
-  typography: string;
-  colors: string;
-  canvas: string;
-  layout: string;
-  masterTheme: string | null;
-  themeMode: ThemeMode;
-  paragraphSpacingBefore: number;
-  paragraphSpacingAfter: number;
-  headingSpacing?: {
-    h1?: HeadingSpacingConfig;
-    h2?: HeadingSpacingConfig;
-    h3?: HeadingSpacingConfig;
-    h4?: HeadingSpacingConfig;
-    h5?: HeadingSpacingConfig;
-    h6?: HeadingSpacingConfig;
-  };
-  headingCustomStyles?: {
-    h1?: HeadingCustomStyle | null;
-    h2?: HeadingCustomStyle | null;
-    h3?: HeadingCustomStyle | null;
-    h4?: HeadingCustomStyle | null;
-    h5?: HeadingCustomStyle | null;
-    h6?: HeadingCustomStyle | null;
-  };
-}
-
-interface FormatPainterState {
-  active: boolean;
-  mode: 'toggle' | 'hold';
-  storedFormat: StoredFormat | null;
-}
-
-interface StyleState {
-  // Current active presets
-  currentTypography: string;
-  currentColor: string;
-  currentCanvas: string;
-  currentLayout: string;
-  currentMasterTheme: string | null;
-  themeMode: ThemeMode;
-  effectiveTheme: 'light' | 'dark';
-
-  // Global paragraph spacing (in line units)
-  paragraphSpacingBefore: number;
-  paragraphSpacingAfter: number;
-
-  // Per-heading type spacing overrides (null = use global)
-  headingSpacing: {
-    h1: { before: number | null; after: number | null };
-    h2: { before: number | null; after: number | null };
-    h3: { before: number | null; after: number | null };
-    h4: { before: number | null; after: number | null };
-    h5: { before: number | null; after: number | null };
-    h6: { before: number | null; after: number | null };
-  };
-
-  // Per-heading custom styles (typography, marks, dividers)
-  headingCustomStyles: {
-    h1: HeadingCustomStyle | null;
-    h2: HeadingCustomStyle | null;
-    h3: HeadingCustomStyle | null;
-    h4: HeadingCustomStyle | null;
-    h5: HeadingCustomStyle | null;
-    h6: HeadingCustomStyle | null;
-  };
-
-  // Recently used (max 5 each)
-  recentTypography: string[];
-  recentColors: string[];
-  recentCanvas: string[];
-  recentLayout: string[];
-  recentMasterThemes: string[];
-
-  // Format painter
-  formatPainter: FormatPainterState;
-
-  // Custom saved styles
-  customStyles: CustomStyle[];
-
-  // ===== CONFIGURABLE OPTIONS (Dynamic - user can modify) =====
-  // Fonts organized by category for grouped dropdowns
-  fontCategories: FontCategories;
-  // Flat list of all fonts (computed from categories)
-  availableFonts: FontOption[];
-  availableFontWeights: FontWeightOption[];
-  availableTextColors: ColorOption[];
-  availableHighlightColors: ColorOption[];
-
-  // Actions
-  setTypography: (presetId: string) => void;
-  setColor: (presetId: string) => void;
-  setCanvas: (presetId: string) => void;
-  setLayout: (presetId: string) => void;
-  setMasterTheme: (themeId: string) => void;
-  setThemeMode: (mode: ThemeMode) => void;
-  setEffectiveTheme: (theme: 'light' | 'dark') => void;
-  setParagraphSpacingBefore: (spacing: number) => void;
-  setParagraphSpacingAfter: (spacing: number) => void;
-  setHeadingSpacingBefore: (level: 1 | 2 | 3 | 4 | 5 | 6, spacing: number) => void;
-  setHeadingSpacingAfter: (level: 1 | 2 | 3 | 4 | 5 | 6, spacing: number) => void;
-  clearAllSpacing: () => void;
-
-  // Heading custom style actions
-  assignStyleToHeading: (level: HeadingLevel, style: HeadingCustomStyle) => void;
-  resetHeadingStyle: (level: HeadingLevel) => void;
-  setHeadingDivider: (level: HeadingLevel, config: HeadingDividerConfig) => void;
-  clearHeadingDivider: (level: HeadingLevel) => void;
-  getHeadingCustomStyle: (level: HeadingLevel) => HeadingCustomStyle | null;
-
-  // Format painter actions
-  captureFormat: (editor: Editor) => void;
-  applyFormat: (editor: Editor) => void;
-  toggleFormatPainter: () => void;
-  deactivateFormatPainter: () => void;
-  setFormatPainterMode: (mode: 'toggle' | 'hold') => void;
-
-  // Custom style actions
-  saveCustomStyle: (name: string) => void;
-  deleteCustomStyle: (id: string) => void;
-  renameCustomStyle: (id: string, newName: string) => void;
-  applyCustomStyle: (id: string) => void;
-
-  // Bulk operations
-  applyAllPresets: () => void;
-  resetToDefaults: () => void;
-  loadFromMetadata: (metadata: Partial<StyleMetadata>) => void;
-  getStyleMetadata: () => StyleMetadata;
-
-  // Configurable options actions
-  addFont: (font: FontOption) => void;
-  removeFont: (value: string) => void;
-  reorderFonts: (fonts: FontOption[]) => void;
-  addFontWeight: (weight: FontWeightOption) => void;
-  removeFontWeight: (value: number) => void;
-  addTextColor: (color: ColorOption) => void;
-  removeTextColor: (value: string) => void;
-  addHighlightColor: (color: ColorOption) => void;
-  removeHighlightColor: (value: string) => void;
-}
+// Re-export all types for consumers
+export type {
+  ThemeMode,
+  FontOption,
+  FontWeightOption,
+  ColorOption,
+  FontCategories,
+  StoredFormat,
+  CustomStyle,
+  HeadingSpacingConfig,
+  HeadingDividerConfig,
+  HeadingCustomStyle,
+  HeadingLevel,
+  StyleMetadata,
+  FormatPainterState,
+  StyleState,
+} from './types';
 
 // ===== HELPERS =====
 
@@ -255,223 +54,6 @@ function getEffectiveTheme(mode: ThemeMode, systemTheme: 'light' | 'dark'): 'lig
     return systemTheme;
   }
   return mode;
-}
-
-/**
- * Apply CSS variables for a heading custom style
- */
-function applyHeadingCustomStyleCSS(level: HeadingLevel, style: HeadingCustomStyle) {
-  const root = document.documentElement;
-  const prefix = `--h${level}`;
-
-  // Typography
-  if (style.fontFamily !== null) {
-    root.style.setProperty(`${prefix}-font-family`, style.fontFamily);
-  } else {
-    root.style.removeProperty(`${prefix}-font-family`);
-  }
-
-  if (style.fontSize !== null) {
-    root.style.setProperty(`${prefix}-font-size`, `${style.fontSize}px`);
-  } else {
-    root.style.removeProperty(`${prefix}-font-size`);
-  }
-
-  // Font weight - use explicit value, or 700 if bold is set without explicit weight
-  if (style.fontWeight !== null) {
-    root.style.setProperty(`${prefix}-font-weight`, String(style.fontWeight));
-  } else if (style.bold) {
-    // Only use 700 for bold if no explicit weight was set
-    root.style.setProperty(`${prefix}-font-weight`, '700');
-  } else {
-    root.style.removeProperty(`${prefix}-font-weight`);
-  }
-
-  if (style.letterSpacing !== null) {
-    root.style.setProperty(`${prefix}-letter-spacing`, `${style.letterSpacing}px`);
-  } else {
-    root.style.removeProperty(`${prefix}-letter-spacing`);
-  }
-
-  if (style.lineHeight !== null) {
-    root.style.setProperty(`${prefix}-line-height`, String(style.lineHeight));
-  } else {
-    root.style.removeProperty(`${prefix}-line-height`);
-  }
-
-  // Text color
-  if (style.textColor !== null) {
-    root.style.setProperty(`${prefix}-color`, style.textColor);
-  } else {
-    root.style.removeProperty(`${prefix}-color`);
-  }
-
-  // Italic
-  if (style.italic) {
-    root.style.setProperty(`${prefix}-font-style`, 'italic');
-  } else {
-    root.style.removeProperty(`${prefix}-font-style`);
-  }
-
-  // Text decoration (underline, strikethrough)
-  const decorations: string[] = [];
-  if (style.underline) decorations.push('underline');
-  if (style.strikethrough) decorations.push('line-through');
-  if (decorations.length > 0) {
-    root.style.setProperty(`${prefix}-text-decoration`, decorations.join(' '));
-  } else {
-    root.style.removeProperty(`${prefix}-text-decoration`);
-  }
-
-  // Background color
-  if (style.backgroundColor !== null) {
-    root.style.setProperty(`${prefix}-background-color`, style.backgroundColor);
-  } else {
-    root.style.removeProperty(`${prefix}-background-color`);
-  }
-
-  // Divider
-  if (style.divider?.enabled) {
-    const div = style.divider;
-    root.style.setProperty(`${prefix}-divider-enabled`, '1');
-    root.style.setProperty(`${prefix}-divider-position`, div.position);
-    root.style.setProperty(`${prefix}-divider-distance`, `${div.distance}em`);
-    root.style.setProperty(`${prefix}-divider-color`, div.color || 'currentColor');
-    root.style.setProperty(`${prefix}-divider-thickness`, `${div.thickness}px`);
-    root.style.setProperty(`${prefix}-divider-double`, div.double ? '1' : '0');
-    root.style.setProperty(`${prefix}-divider-style`, div.double ? 'double' : div.style);
-
-    // Set display properties for ::before and ::after based on position
-    const showBefore = div.position === 'above' || div.position === 'both';
-    const showAfter = div.position === 'below' || div.position === 'both';
-    root.style.setProperty(`${prefix}-divider-show-before`, showBefore ? 'block' : 'none');
-    root.style.setProperty(`${prefix}-divider-show-after`, showAfter ? 'block' : 'none');
-  } else {
-    clearHeadingDividerCSS(level);
-  }
-}
-
-/**
- * Clear all CSS variables for a heading custom style
- */
-function clearHeadingCustomStyleCSS(level: HeadingLevel) {
-  const root = document.documentElement;
-  const prefix = `--h${level}`;
-
-  // Typography
-  root.style.removeProperty(`${prefix}-font-family`);
-  root.style.removeProperty(`${prefix}-font-size`);
-  root.style.removeProperty(`${prefix}-font-weight`);
-  root.style.removeProperty(`${prefix}-letter-spacing`);
-  root.style.removeProperty(`${prefix}-line-height`);
-  root.style.removeProperty(`${prefix}-color`);
-  root.style.removeProperty(`${prefix}-font-style`);
-  root.style.removeProperty(`${prefix}-text-decoration`);
-  root.style.removeProperty(`${prefix}-background-color`);
-
-  // Divider
-  clearHeadingDividerCSS(level);
-}
-
-/**
- * Clear divider CSS variables for a heading level
- */
-function clearHeadingDividerCSS(level: HeadingLevel) {
-  const root = document.documentElement;
-  const prefix = `--h${level}`;
-
-  root.style.removeProperty(`${prefix}-divider-enabled`);
-  root.style.removeProperty(`${prefix}-divider-position`);
-  root.style.removeProperty(`${prefix}-divider-distance`);
-  root.style.removeProperty(`${prefix}-divider-color`);
-  root.style.removeProperty(`${prefix}-divider-thickness`);
-  root.style.removeProperty(`${prefix}-divider-double`);
-  root.style.removeProperty(`${prefix}-divider-style`);
-  root.style.removeProperty(`${prefix}-divider-show-before`);
-  root.style.removeProperty(`${prefix}-divider-show-after`);
-}
-
-// ===== DEFAULT CONFIGURABLE OPTIONS =====
-// These are the default values - users can modify via settings
-
-const DEFAULT_FONT_CATEGORIES: FontCategories = {
-  sansSerif: [
-    { value: 'Inter, sans-serif', label: 'Inter' },
-    { value: 'Roboto, sans-serif', label: 'Roboto' },
-    { value: '"Open Sans", sans-serif', label: 'Open Sans' },
-    { value: 'Lato, sans-serif', label: 'Lato' },
-    { value: 'Montserrat, sans-serif', label: 'Montserrat' },
-    { value: 'Poppins, sans-serif', label: 'Poppins' },
-    { value: '"Source Sans 3", sans-serif', label: 'Source Sans 3' },
-    { value: 'Nunito, sans-serif', label: 'Nunito' },
-    { value: 'Raleway, sans-serif', label: 'Raleway' },
-    { value: '"Work Sans", sans-serif', label: 'Work Sans' },
-  ],
-  serif: [
-    { value: '"Playfair Display", serif', label: 'Playfair Display' },
-    { value: 'Merriweather, serif', label: 'Merriweather' },
-    { value: 'Lora, serif', label: 'Lora' },
-    { value: '"PT Serif", serif', label: 'PT Serif' },
-    { value: '"Libre Baskerville", serif', label: 'Libre Baskerville' },
-    { value: '"Crimson Text", serif', label: 'Crimson Text' },
-    { value: 'Bitter, serif', label: 'Bitter' },
-    { value: '"Source Serif 4", serif', label: 'Source Serif 4' },
-    { value: '"Noto Serif", serif', label: 'Noto Serif' },
-    { value: '"EB Garamond", serif', label: 'EB Garamond' },
-  ],
-  display: [
-    { value: 'Oswald, sans-serif', label: 'Oswald' },
-    { value: '"Bebas Neue", sans-serif', label: 'Bebas Neue' },
-    { value: 'Anton, sans-serif', label: 'Anton' },
-    { value: '"Abril Fatface", serif', label: 'Abril Fatface' },
-    { value: 'Righteous, sans-serif', label: 'Righteous' },
-  ],
-  monospace: [
-    { value: '"Fira Code", monospace', label: 'Fira Code' },
-    { value: '"JetBrains Mono", monospace', label: 'JetBrains Mono' },
-    { value: '"Source Code Pro", monospace', label: 'Source Code Pro' },
-    { value: '"IBM Plex Mono", monospace', label: 'IBM Plex Mono' },
-    { value: '"Roboto Mono", monospace', label: 'Roboto Mono' },
-  ],
-};
-
-const DEFAULT_FONT_WEIGHTS: FontWeightOption[] = [
-  { value: 100, label: 'Thin' },
-  { value: 200, label: 'Extralight' },
-  { value: 300, label: 'Light' },
-  { value: 400, label: 'Regular' },
-  { value: 500, label: 'Medium' },
-  { value: 600, label: 'Semibold' },
-  { value: 700, label: 'Bold' },
-  { value: 800, label: 'Extrabold' },
-  { value: 900, label: 'Black' },
-];
-
-const DEFAULT_TEXT_COLORS: ColorOption[] = [
-  { value: 'var(--tt-color-text-red)', label: 'Red' },
-  { value: 'var(--tt-color-text-orange)', label: 'Orange' },
-  { value: 'var(--tt-color-text-yellow)', label: 'Yellow' },
-  { value: 'var(--tt-color-text-green)', label: 'Green' },
-  { value: 'var(--tt-color-text-blue)', label: 'Blue' },
-  { value: 'var(--tt-color-text-purple)', label: 'Purple' },
-  { value: 'var(--tt-color-text-pink)', label: 'Pink' },
-  { value: 'var(--tt-color-text-gray)', label: 'Gray' },
-];
-
-const DEFAULT_HIGHLIGHT_COLORS: ColorOption[] = [
-  { value: 'var(--tt-color-highlight-red)', label: 'Red' },
-  { value: 'var(--tt-color-highlight-orange)', label: 'Orange' },
-  { value: 'var(--tt-color-highlight-yellow)', label: 'Yellow' },
-  { value: 'var(--tt-color-highlight-green)', label: 'Green' },
-  { value: 'var(--tt-color-highlight-blue)', label: 'Blue' },
-  { value: 'var(--tt-color-highlight-purple)', label: 'Purple' },
-  { value: 'var(--tt-color-highlight-pink)', label: 'Pink' },
-  { value: 'var(--tt-color-highlight-gray)', label: 'Gray' },
-];
-
-// Helper to flatten font categories
-function flattenFontCategories(cats: FontCategories): FontOption[] {
-  return [...cats.sansSerif, ...cats.serif, ...cats.display, ...cats.monospace];
 }
 
 // ===== STORE =====
@@ -524,7 +106,7 @@ export const useStyleStore = create<StyleState>((set, get) => ({
 
   customStyles: [],
 
-  // ===== CONFIGURABLE OPTIONS - Default values (user can modify) =====
+  // Configurable options - default values (user can modify)
   fontCategories: DEFAULT_FONT_CATEGORIES,
   availableFonts: flattenFontCategories(DEFAULT_FONT_CATEGORIES),
   availableFontWeights: DEFAULT_FONT_WEIGHTS,
