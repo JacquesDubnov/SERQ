@@ -395,6 +395,17 @@ const isPaginationEnabled = (editorDom: HTMLElement): boolean => {
   return editorDom.querySelector('[data-tiptap-pagination]') !== null
 }
 
+/**
+ * Get the effective zoom/scale factor from an ancestor transform:scale().
+ * Compares getBoundingClientRect (scaled viewport px) to offsetWidth (unscaled CSS px).
+ * With transform:scale(0.5): BCR.width=360, offsetWidth=720, ratio=0.5
+ * Without transform: ratio=1.0
+ */
+const getZoomFactor = (editorDom: HTMLElement): number => {
+  if (editorDom.offsetWidth === 0) return 1
+  return editorDom.getBoundingClientRect().width / editorDom.offsetWidth
+}
+
 
 /**
  * Get the page number for a given DOM element (1-indexed)
@@ -539,6 +550,7 @@ function createBlockIndicatorPlugin() {
 
     const blockRect = dom.getBoundingClientRect()
     const isPaginated = isPaginationEnabled(editorView.dom)
+    const zoom = getZoomFactor(editorView.dom)
 
     // Clip source overlay to current page in pagination mode
     let overlayTop = blockRect.top
@@ -554,11 +566,12 @@ function createBlockIndicatorPlugin() {
     }
 
     // Source overlay position (relative to editor container for React)
+    // Divide by zoom: BCR is scaled, CSS absolute positioning is unscaled
     const sourceOverlayRect = {
-      left: blockRect.left - editorRect.left,
-      top: overlayTop - editorRect.top,
-      width: blockRect.width,
-      height: overlayHeight,
+      left: (blockRect.left - editorRect.left) / zoom,
+      top: (overlayTop - editorRect.top) / zoom,
+      width: blockRect.width / zoom,
+      height: overlayHeight / zoom,
     }
 
     currentState = {
@@ -566,7 +579,7 @@ function createBlockIndicatorPlugin() {
       visible: true,  // Keep indicator visible during drag (becomes drop indicator)
       isLongPressing: false,
       isDragging: true,
-      dropIndicatorTop: overlayTop - editorRect.top,
+      dropIndicatorTop: (overlayTop - editorRect.top) / zoom,
       sourceOverlay: sourceOverlayRect,
     }
     notifyListeners()
@@ -634,6 +647,7 @@ function createBlockIndicatorPlugin() {
             const refRect = getPositionReferenceRect(editorView.dom)
             const blockRect = dom.getBoundingClientRect()
             const isPaginated = isPaginationEnabled(editorView.dom)
+            const zoom = getZoomFactor(editorView.dom)
 
             let top = blockRect.top
             let height = blockRect.height
@@ -650,9 +664,11 @@ function createBlockIndicatorPlugin() {
               }
             }
 
-            const relativeTop = top - refRect.top
-            const blockLeft = blockRect.left - refRect.left
-            const blockWidth = blockRect.width
+            // Divide by zoom: BCR returns scaled viewport px, but CSS absolute positioning
+            // inside the transform:scale container uses unscaled CSS px
+            const relativeTop = (top - refRect.top) / zoom
+            const blockLeft = (blockRect.left - refRect.left) / zoom
+            const blockWidth = blockRect.width / zoom
 
             if (
               currentState.top !== relativeTop ||
@@ -664,7 +680,7 @@ function createBlockIndicatorPlugin() {
                 ...currentState,
                 visible: shouldShow,
                 top: relativeTop,
-                height,
+                height: height / zoom,
                 blockLeft,
                 blockWidth,
                 paginationEnabled: isPaginated,
@@ -792,6 +808,7 @@ function createBlockIndicatorPlugin() {
         }> = []
         const refRect = getPositionReferenceRect(editorView.dom)
         const isPaginated = isPaginationEnabled(editorView.dom)
+        const zoom = getZoomFactor(editorView.dom)
 
         selectedBlockPositions.forEach((pos) => {
           try {
@@ -822,13 +839,14 @@ function createBlockIndicatorPlugin() {
                 }
               }
 
-              const blockLeft = rect.left - refRect.left
+              // Divide by zoom: BCR is scaled, CSS absolute positioning is unscaled
+              const blockLeft = (rect.left - refRect.left) / zoom
               blocks.push({
                 pos,
-                top: blockTop - refRect.top,
-                height: blockHeight,
+                top: (blockTop - refRect.top) / zoom,
+                height: blockHeight / zoom,
                 blockLeft,
-                blockWidth: rect.width,
+                blockWidth: rect.width / zoom,
                 pageNumber: isPaginated ? getPageNumberForElement(dom) : 1,
               })
             }
@@ -911,12 +929,13 @@ function createBlockIndicatorPlugin() {
         // Animate indicator: horizontal shrinks to dot, then vertical grows
         requestAnimationFrame(() => {
           const refRect = getPositionReferenceRect(editorView.dom)
+          const zoom = getZoomFactor(editorView.dom)
           const landedDom = editorView.nodeDOM(adjustedPos)
           const landedRect = landedDom instanceof HTMLElement
             ? landedDom.getBoundingClientRect()
             : null
 
-          const finalHeight = landedRect ? landedRect.height : 24
+          const finalHeight = landedRect ? landedRect.height / zoom : 24
 
           // Hide caret during animation
           document.body.classList.add("block-animating")
@@ -927,10 +946,10 @@ function createBlockIndicatorPlugin() {
             visible: true,
             isDragging: true,  // Keep horizontal mode for shrinking
             commandHeld: false,
-            top: landedRect ? landedRect.top - refRect.top : 0,
+            top: landedRect ? (landedRect.top - refRect.top) / zoom : 0,
             height: 2,  // Horizontal line height
-            blockLeft: landedRect ? landedRect.left - refRect.left : 0,
-            blockWidth: landedRect ? landedRect.width : 0,
+            blockLeft: landedRect ? (landedRect.left - refRect.left) / zoom : 0,
+            blockWidth: landedRect ? landedRect.width / zoom : 0,
             dropAnimation: 'shrinking',
           }
           notifyListeners()
@@ -1051,10 +1070,11 @@ function createBlockIndicatorPlugin() {
                   const refRect = getPositionReferenceRect(editorView.dom)
                   const blockRect = dom.getBoundingClientRect()
                   const isPaginated = isPaginationEnabled(editorView.dom)
-                  const blockLeft = blockRect.left - refRect.left
+                  const zoom = getZoomFactor(editorView.dom)
+                  const blockLeft = (blockRect.left - refRect.left) / zoom
 
                   // In pagination mode, clip block reference to current page
-                  let blockWidth = blockRect.width
+                  let blockWidth = blockRect.width / zoom
                   if (isPaginated) {
                     const clipped = clipIndicatorToCurrentPage(event.clientY, blockRect.top, blockRect.bottom)
                     if (!clipped) {
@@ -1063,14 +1083,24 @@ function createBlockIndicatorPlugin() {
                     }
                   }
 
+                  // dropInfo.top is a BCR diff from findDropPosition -- divide by zoom
+                  let indicatorTop: number
+                  if (dropInfo) {
+                    indicatorTop = dropInfo.top / zoom
+                  } else if (currentState.dropIndicatorTop != null) {
+                    indicatorTop = currentState.dropIndicatorTop
+                  } else {
+                    indicatorTop = (blockRect.top - refRect.top) / zoom
+                  }
+
                   currentState = {
                     ...currentState,
                     visible: true,
-                    top: dropInfo?.top ?? currentState.dropIndicatorTop ?? blockRect.top - refRect.top,
+                    top: indicatorTop,
                     height: 2,  // Horizontal line height
                     blockLeft,
                     blockWidth,
-                    dropIndicatorTop: dropInfo?.top ?? currentState.dropIndicatorTop,
+                    dropIndicatorTop: indicatorTop,
                   }
                   notifyListeners()
                 }
@@ -1121,7 +1151,8 @@ function createBlockIndicatorPlugin() {
               const refRect = getPositionReferenceRect(editorView.dom)
               const blockRect = dom.getBoundingClientRect()
               const isPaginated = isPaginationEnabled(editorView.dom)
-              const blockLeft = blockRect.left - refRect.left
+              const zoom = getZoomFactor(editorView.dom)
+              const blockLeft = (blockRect.left - refRect.left) / zoom
 
               // In pagination mode, clip the indicator to the current page's content area
               let indicatorTop = blockRect.top
@@ -1141,10 +1172,10 @@ function createBlockIndicatorPlugin() {
               currentState = {
                 ...currentState,
                 visible: shouldShow,
-                top: indicatorTop - refRect.top,
-                height: indicatorHeight,
+                top: (indicatorTop - refRect.top) / zoom,
+                height: indicatorHeight / zoom,
                 blockLeft,
-                blockWidth: blockRect.width,
+                blockWidth: blockRect.width / zoom,
                 commandHeld,
                 paginationEnabled: isPaginated,
               }

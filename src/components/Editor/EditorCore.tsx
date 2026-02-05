@@ -37,6 +37,7 @@ import { LetterSpacing } from '@/extensions/letter-spacing';
 import { StubCommands } from '@/extensions/stub-commands';
 import { VirtualCursor } from '@/extensions/virtual-cursor';
 import { BlockIndicator } from '@/extensions/block-indicator';
+import { ZoomCoordinateFix } from '@/extensions/zoom-coordinate-fix';
 import { BlockIndicator as BlockIndicatorComponent } from '@/components/BlockIndicator';
 // import { MultiSelection } from '@/extensions/multi-selection'; // Disabled for debugging
 
@@ -112,6 +113,8 @@ export const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
         VirtualCursor,
         // Block indicator - shows subtle blue line on hovered block
         BlockIndicator,
+        // Patches caretRangeFromPoint to handle transform:scale zoom correctly
+        ZoomCoordinateFix,
         // Markdown paste support - converts pasted markdown to rich text
         Markdown.configure({
           html: true, // Allow HTML in markdown
@@ -159,6 +162,7 @@ export const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
       onSelectionUpdate: () => {
         onSelectionChange?.();
       },
+
     });
 
     // Expose methods for document operations

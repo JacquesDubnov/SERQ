@@ -424,19 +424,28 @@ function App() {
       >
         {pagination.enabled ? (
           /* Paginated mode - TipTap Pages extension handles layout */
-          <div style={{ width: '100%', maxWidth: '100%' }}>
-            <EditorWrapper editor={editor} zoom={zoom}>
-              <EditorCore
-                key={`editor-${editorKey}`}
-                ref={editorRef}
-                initialContent={contentRef.current}
-                placeholder="Start writing..."
-                onUpdate={handleUpdate}
-                paginationEnabled={pagination.enabled}
-                pageSize={pagination.pageSize}
-                isDark={isDark}
-              />
-            </EditorWrapper>
+          <div style={{ width: `${100 * (zoom / 100)}%`, maxWidth: '100%' }}>
+            <div
+              data-zoom-wrapper
+              style={{
+                width: '100%',
+                transform: `scale(${zoom / 100})`,
+                transformOrigin: 'top left',
+              }}
+            >
+              <EditorWrapper editor={editor} zoom={zoom}>
+                <EditorCore
+                  key={`editor-${editorKey}`}
+                  ref={editorRef}
+                  initialContent={contentRef.current}
+                  placeholder="Start writing..."
+                  onUpdate={handleUpdate}
+                  paginationEnabled={pagination.enabled}
+                  pageSize={pagination.pageSize}
+                  isDark={isDark}
+                />
+              </EditorWrapper>
+            </div>
           </div>
         ) : (
           /* Continuous mode - use Canvas wrapper */
@@ -447,6 +456,7 @@ function App() {
             }}
           >
             <div
+              data-zoom-wrapper
               style={{
                 width: canvasWidth === 'full' ? '100%' : `${currentCanvasWidth}px`,
                 transform: `scale(${zoom / 100})`,

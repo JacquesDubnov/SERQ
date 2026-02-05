@@ -48,12 +48,9 @@ export function EditorWrapper({ editor, children, minHeight = 800, zoom = 100 }:
     // Get current paragraph count
     const currentCount = editor.state.doc.childCount;
 
-    console.log('[ClickAnywhere] Y:', clickY, 'Adjusted Y:', adjustedClickY, 'Target:', targetLine, 'Current:', currentCount);
-
     // If we need more paragraphs, add them
     if (targetLine >= currentCount) {
       const toAdd = targetLine - currentCount + 1;
-      console.log('[ClickAnywhere] Adding', toAdd, 'paragraphs');
 
       // Move to end first
       editor.commands.focus('end');
@@ -71,8 +68,6 @@ export function EditorWrapper({ editor, children, minHeight = 800, zoom = 100 }:
       const newCount = doc.childCount;
       const actualTarget = Math.min(targetLine, newCount - 1);
 
-      console.log('[ClickAnywhere] After add - Count:', newCount, 'Going to line:', actualTarget);
-
       // Calculate position: each block node is wrapped, so we need to find the right offset
       let pos = 1; // Start inside doc
       let lineIndex = 0;
@@ -83,8 +78,6 @@ export function EditorWrapper({ editor, children, minHeight = 800, zoom = 100 }:
         }
         lineIndex++;
       });
-
-      console.log('[ClickAnywhere] Setting position:', pos);
 
       editor.commands.setTextSelection(pos);
       editor.commands.focus();
