@@ -13,8 +13,8 @@
     "windows": [
       {
         "title": "SERQ",
-        "width": 1200,
-        "height": 800,
+        "width": 980,
+        "height": 1140,
         "minWidth": 900,
         "minHeight": 700,
         "resizable": true,
