@@ -98,6 +98,11 @@ Testing in browser is useless - the app depends on Tauri APIs for:
 - Window management
 - System theme detection
 
+**After every code change, restart the app so Jacques can test.** Don't wait for him to ask. Kill existing processes and relaunch:
+```bash
+pkill -f "tauri" 2>/dev/null; pkill -f "cargo" 2>/dev/null; sleep 1 && npm run tauri dev 2>&1 &
+```
+
 ---
 
 ## Tech Stack
@@ -252,4 +257,73 @@ All dropdown/selector components must read options from styleStore:
 
 ---
 
-*Last updated: 2026-02-03*
+## ⚠️ Claude Code Version Pinning (Mac CPU Bug)
+
+**Claude Code is currently pinned to v2.1.25.** Auto-updates are disabled.
+
+### The Problem
+
+Claude Code versions 2.1.26+ (including 2.1.32) cause a known bug on macOS where the CLI process spikes to 99-100% CPU and freezes the system. This is tracked across multiple GitHub issues (anthropics/claude-code #5771, #22041, #11122, #22275, #18532, #22968). As of February 2026, this is NOT resolved.
+
+### Current Setup
+
+- **Installed version:** 2.1.25 (native install at `~/.local/bin/claude`)
+- **Auto-updates disabled:** `autoUpdates: false` in settings + `DISABLE_AUTOUPDATER=1` in `~/.zshrc`
+- **Model:** Opus 4.6 via `--model claude-opus-4-6` or `ANTHROPIC_MODEL=claude-opus-4-6` (the `/model` menu in 2.1.25 only shows 4.5 labels, but the model string works server-side)
+- **Old npm-global installation removed** (was at `/usr/local/bin/claude`, caused permission conflicts)
+
+### When to Update
+
+**DO NOT update Claude Code until the macOS CPU bug is confirmed fixed.** Monitor these sources:
+- https://github.com/anthropics/claude-code/issues/22275
+- https://github.com/anthropics/claude-code/issues/22968
+- Claude Code changelog
+
+When the fix is confirmed, re-enable updates:
+```bash
+claude config set --global autoUpdates true
+# Remove DISABLE_AUTOUPDATER=1 from ~/.zshrc
+```
+
+### If CPU Spike Happens Again
+
+1. `pkill -f claude` or `kill -9 <PID>` (check Activity Monitor)
+2. Clear session cache: `rm -rf ~/.claude/projects/*/`
+3. Clear conversations: `rm -rf ~/.claude/conversations/`
+4. Restart: `claude`
+
+---
+
+## Jacques's Project Portfolio
+
+Context for all Claude sessions - these are the projects Jacques is actively working on. Understanding the full portfolio helps with cross-project decisions, time management awareness, and avoiding conflicts.
+
+### Active Development
+
+| Project | Description | Team | ETA |
+|---------|-------------|------|-----|
+| **SERQ** | Next-gen writing/document desktop app (this project) | Jacques + Claude Code | Commercial launch June 2026 |
+| **OBLIQ** | Full-stack product | Full dev team + Jacques + Claude Code | Commercial V1.0 June 2026 |
+| **BERLIN** | Full-stack product | Full dev team + Jacques + Claude Code | Commercial V1.0 June 2026 |
+| **ALIN** | Tasha's project | Jacques + Claude Code | Commercial BETA April 2026, full deployment May 2026 |
+| **ALIN Book** | Tasha's book on HRT (English, Russian, Hebrew) | Jacques + Claude Code | Publishing April 2026 |
+
+### Parked (Awaiting Financing)
+
+| Project | Description | Current Status |
+|---------|-------------|----------------|
+| **Talk2Mi** | Product in demo phase | Jacques developing demo with Claude only |
+| **CAIZER** | Product in demo phase | Jacques developing demo with Claude only |
+| **LiquidFlow** | UI/UX system primarily associated with CAIZER | Jacques developing demo with Claude only |
+
+### Key Notes
+
+- Jacques is the common thread across ALL projects, so his time is the bottleneck
+- June 2026 is a critical month with three commercial launches (SERQ, OBLIQ, BERLIN)
+- April-May 2026 is critical for ALIN and the ALIN Book
+- Claude Code is Jacques's primary development partner on SERQ, ALIN, and ALIN Book
+- The parked projects are demo-only until financing is secured
+
+---
+
+*Last updated: 2026-02-06*

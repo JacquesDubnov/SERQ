@@ -43,6 +43,12 @@ export const BlockIndicator: React.FC = () => {
     selectedBlocks: [],
     lastSelectedPos: null,
     paginationEnabled: false,
+    horizontalDropSide: null,
+    horizontalDropBlockPos: null,
+    horizontalDropRect: null,
+    horizontalDropColumnIndex: null,
+    horizontalDropGapX: null,
+    columnContentDrop: null,
   })
 
   const hasEverShown = useRef(false)
@@ -274,8 +280,8 @@ export const BlockIndicator: React.FC = () => {
         />
       ))}
 
-      {/* Hover indicator (when current block is not selected) */}
-      {!currentBlockInSelection && (
+      {/* Hover indicator (when current block is not selected) -- hide when horizontal drop active */}
+      {!currentBlockInSelection && !state.horizontalDropSide && (
         <div
           className="block-indicator-line"
           style={indicatorStyle}
@@ -286,6 +292,25 @@ export const BlockIndicator: React.FC = () => {
           data-long-pressing={state.isLongPressing ? "true" : "false"}
           data-shrinking={state.dropAnimation === 'shrinking' ? "true" : "false"}
           data-growing={state.dropAnimation === 'growing' ? "true" : "false"}
+        />
+      )}
+
+      {/* Vertical drop indicator for column creation (during drag with horizontal drop active) */}
+      {state.isDragging && state.horizontalDropSide && state.horizontalDropRect && (
+        <div
+          className="block-drop-indicator-vertical"
+          style={{
+            position: "absolute",
+            left: state.horizontalDropGapX != null
+              ? state.horizontalDropGapX
+              : state.horizontalDropSide === 'left'
+                ? state.horizontalDropRect.left - offset - 2
+                : state.horizontalDropRect.left + state.horizontalDropRect.width + offset,
+            top: state.horizontalDropRect.top,
+            width: 3,
+            height: state.horizontalDropRect.height,
+          }}
+          data-visible="true"
         />
       )}
     </>

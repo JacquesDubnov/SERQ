@@ -1,265 +1,169 @@
 # SERQ Session Handover
 
-**Date:** 2026-02-05
-**Branch:** `main` (merged from `feature/unified-style-system`)
-**Last Commit:** See git log
+**Date:** 2026-02-06
+**Branch:** `main` (uncommitted changes)
+**Build status:** `npm run build` passes clean (tsc + vite)
 
 ---
 
 ## Project Overview
 
-SERQ is "The Last Editor You'll Ever Need" - a Tauri-based desktop rich text editor:
+SERQ is a Tauri-based desktop rich text editor:
 - **Frontend:** React + TypeScript + TipTap (ProseMirror)
-- **Desktop:** Tauri 2.x (Rust backend)
+- **Desktop:** Tauri 2.x (Rust backend, WebKit/WKWebView on macOS)
 - **State:** Zustand
-- **License:** TipTap Teams ($149/mo) - use native components first
+- **License:** TipTap Teams ($149/mo)
 
 ---
 
-## Accurate Feature Inventory (2026-02-05)
+## What Was Done This Session (ALL COMPLETE EXCEPT TEXT SELECT BUG)
 
-This is the ground truth of what EXISTS in the codebase. Not what planning
-docs claim. Not what the old version had. What's actually here.
+### 1. Gutter Min/Max Clamping (COMPLETE)
 
-### WORKING -- Production Ready
+- `ColumnBlockView.tsx` -- mouseUp commit and live drag now clamp to dynamic max
+- `column-block.ts` -- parseHTML clamps to MIN_GUTTER (10) floor only (no max at parse time since container width unknown)
+- Removed fixed `MAX_GUTTER = 80` constant
+- Added `computeMaxGutter(containerWidth, columnCount)` helper: `(containerWidth - N * 30) / (N - 1)`
+- Added `containerWidth` field to `resizeState` ref, stored at drag start
+- Columns cannot shrink below 30px during gutter resize
 
-1. **TipTap Core Editor**
-   - StarterKit: bold, italic, strike, code, headings H1-H6, blockquote,
-     bullet/ordered lists, hard break, undo/redo (100 depth), dropcursor, gapcursor
-   - Underline, Highlight (multicolor), Subscript, Superscript
-   - Link (auto-detect URLs)
-   - TextAlign (heading + paragraph)
-   - TextStyle, Color
-   - Placeholder, CharacterCount
-   - Markdown (paste support, converts markdown to rich text)
+### 2. Block Drag INTO Column Content (COMPLETE)
 
-2. **Custom Typography Extensions**
-   - FontSize (custom extension)
-   - FontWeight (custom extension)
-   - LineHeight (custom extension)
-   - LetterSpacing (custom extension)
+- Added `columnContentDrop` state field to `BlockIndicatorState` in `types.ts`:
+  ```
+  { columnBlockPos, columnIndex, insertPos, indicatorTop, indicatorLeft, indicatorWidth } | null
+  ```
+- Detection in `plugin.ts` drag mousemove: when cursor is over a columnBlock but NOT in edge/gap zone, finds which `[data-column]` element contains cursor, walks child blocks to find nearest Y gap, resolves ProseMirror insert position
+- `executeColumnContentDrop()` function: deletes source, adjusts position for deletion offset, inserts at column target position
+- Wired into `executeMove()` as first priority check (before horizontal drop and normal vertical drop)
+- Nesting prevention: won't drop a columnBlock into a column
+- Existing horizontal drag indicator renders correctly (blockLeft/blockWidth set to column dimensions in state)
 
-3. **Block Indicator System** (1200+ LOC)
-   - Blue vertical line on hover
-   - Frame mode (Option held) shows border
-   - Option+click multi-block selection
-   - Option+Shift+click range selection
-   - Click without modifiers deselects all
-   - Contiguous blocks grouped into single frame
-   - Hide on typing, reappear on mouse move
-   - Toggle enable/disable button in toolbar
-   - Long-press drag-and-drop with FLIP animations
-   - Drop indicator shows where block will land
-   - Pagination support (edge detection WIP -- 30px buffer)
+### 3. Between-Column Gap Drop Indicator Position (COMPLETE)
 
-4. **Unified Style System**
-   - 5-level cascade: Project > Document > Page > Block > Character
-   - StyleResolver with caching
-   - 6 built-in named styles (h1-h3, body, quote, code)
-   - Preset system: typography, colors, canvas, layout, master themes
-   - Per-heading custom styles (font, size, weight, spacing, marks, dividers)
-   - Global paragraph spacing + per-heading overrides
-   - Heading divider support (position, color, thickness, style)
-   - CSS variable system (--h1-font-size, etc.)
-   - Format painter state (capture/apply marks -- button disabled, needs refinement)
-   - Custom saved styles
-   - Dynamic configurable options (fonts, weights, colors from store, not hardcoded)
+- Added `horizontalDropGapX: number | null` to `BlockIndicatorState`
+- Gap detection computes midpoint: `((gapLeft + gapRight) / 2 - refRect.left) / zoom`
+- `BlockIndicator.tsx` vertical indicator uses `horizontalDropGapX` when set, falls back to left/right edge calculation
+- All cleanup paths clear the field
 
-5. **Style Panel** (right-side slide-in)
-   - Typography presets
-   - Color scheme presets
-   - Canvas background presets
-   - Layout presets
-   - Master theme selection
+### 4. Divider Visibility (COMPLETE)
 
-6. **Tables** (TipTap native table-node, 50+ UI components)
-   - Full table creation with grid selector
-   - Row/column insert, delete, duplicate, move, extend
-   - Merge/split cells
-   - Sort rows/columns
-   - Cell alignment
-   - Header rows toggle
-   - Table handles with drag operations
-   - Column resize
+- `columns.css`: Divider `::after` opacity now `0` by default (was always `0.4`)
+- Shows at `opacity: 0.4` on `.column-block-wrapper:hover`
+- Shows at `opacity: 0.7` when `[data-focused]` (cursor/caret inside columnBlock)
+- `opacity: 1` with active color on divider `:hover` or `[data-resizing]`
+- `pointer-events` on `.column-divider-handle`: `none` by default, `auto` when wrapper is `:hover`, `[data-focused]`, or `[data-resizing]`
 
-7. **Pagination Mode**
-   - Toggle in header bar
-   - Page size selector: A4, Letter, Legal
-   - TipTap Pages extension (conditional load)
-   - Page gaps with proper dark/light styling
-   - VirtualCursor extension for pagination
-   - Block indicator works in pagination mode
+### 5. Text Selection During Block Drag (PARTIALLY FIXED -- BUG REMAINS)
 
-8. **File Management**
-   - Open file (Cmd+O) via Tauri native dialog
-   - Save file (Cmd+S)
-   - Save As (Cmd+Shift+S)
-   - New file (Cmd+N)
-   - Auto-save every 30 seconds (debounced)
-   - .serq.html format (valid HTML + embedded JSON metadata)
-   - Recent files tracking
-   - Working folder preference
-   - Dirty indicator in title bar + footer
-   - Last saved timestamp in footer
-
-9. **Command Palette** (Cmd+P)
-   - Custom implementation (not cmdk)
-   - 22+ registered commands
-   - Fuzzy search
-   - Keyboard navigation
-   - Grouped by category
-   - Shows keyboard shortcuts
-
-10. **Toolbar** (unified)
-    - Text formatting (bold, italic, underline, strikethrough, code)
-    - Heading selector
-    - List/quote/code block buttons
-    - Text alignment
-    - Link button
-    - Color picker (text + highlight)
-    - Undo/redo
-    - Block indicator toggle
-    - Keyboard shortcut tooltips
-
-11. **App Shell**
-    - Header: document title, dirty indicator, theme toggle, canvas width, pagination
-    - Scrollable content area (continuous or paginated)
-    - Footer: character count, zoom slider, last saved time
-    - Theme system: light/dark/system detection
-
-12. **Infrastructure**
-    - Command Registry
-    - SQLite database (tables for versions + comments -- schema only)
-    - Preferences store (Tauri plugin-store)
-    - Debug bridge (console output piped to ~/.serq-debug.log)
-    - App initialization pipeline
-
-13. **Slash Commands** (TipTap native slash-dropdown-menu)
-
-### NOT WORKING / NOT IMPLEMENTED
-
-These features either never existed in this branch or were removed during
-the unified style system rebuild:
-
-1. **Export/Import** -- NONE
-   - No export menu UI
-   - No PDF export
-   - No Word (.docx) export
-   - No HTML export
-   - No Markdown export
-   - No Word import
-   - No Markdown import
-   - (Packages installed: docx, jspdf, html2canvas, mammoth -- zero imports)
-
-2. **Markdown Source View** -- NONE
-   - No CodeMirror integration
-   - No Cmd+/ toggle
-   - No source editing
-   - (Packages installed: @uiw/react-codemirror, @codemirror/* -- zero imports)
-
-3. **Version History** -- NONE
-   - Database tables exist (schema), but no UI
-   - No auto-snapshots
-   - No Time Machine panel
-   - No version restore
-
-4. **Comments** -- NONE
-   - Database table exists (schema), but no UI
-   - No comment creation
-   - No comment panel
-   - No thread/reply system
-
-5. **Focus Mode / Typewriter Mode** -- NONE
-   - No focus mode
-   - No typewriter scrolling
-   - No distraction-free mode
-
-6. **Outline Panel** -- NONE
-   - No document outline / table of contents
-   - No heading navigation panel
-
-7. **Callout Blocks** -- NONE
-   - Extension removed in this branch
-
-8. **Column Layouts** -- NONE
-   - ColumnSection/Column extensions removed
-
-9. **Text Float / Wrapping** -- NONE
-   - Float CSS removed
-
-10. **Line Numbers** -- NONE
-    - Extension removed
-
-11. **Paragraph Numbering** -- NONE
-    - Extension removed
-
-12. **AI Integration** -- NONE
-    - @tiptap-pro/extension-ai installed but not imported
-    - Rust keyring commands commented out
-    - No UI
-
-13. **Image Management** -- PARTIAL
-    - No custom ResizableImage extension
-    - No image resize handles
-    - No image float/positioning
-    - Basic image insertion works via TipTap
-
-14. **Multi-Selection** -- DISABLED
-    - Extension exists but commented out for debugging
-
-15. **Format Painter** -- DISABLED
-    - State exists in styleStore
-    - Button disabled, needs refinement
-
-### Known Bugs
-
-| # | Issue | Severity | Location |
-|---|-------|----------|----------|
-| 1 | Block indicator edge detection at page boundaries | Medium | block-indicator.ts |
-| 2 | Char spacing field doesn't reflect cursor value | Low | toolbar |
-| 3 | Heading style divider takes text color not default | Low | style system |
+This is the open bug. Text selection still flickers during drag, particularly when crossing element boundaries.
 
 ---
 
-## Architecture v4.0
+## OPEN BUG: Text Selection During Block Drag
 
-**Master Reference:** `.claude/STYLING-HIERARCHY-ARCHITECTURE.md`
+### The Problem
 
-### 5-Level Style Cascade
-```
-PROJECT (root defaults)
-  +-- DOCUMENT (per-doc overrides)
-       +-- PAGE (section styles)
-            +-- BLOCK (paragraph/heading level)
-                 +-- CHARACTER (inline marks)
-```
+When long-press-dragging a block, text gets selected as the cursor moves over content. The selection flickers -- it appears, then clears after crossing element boundaries. It does NOT affect drop functionality, but it's visually jarring.
+
+### What Was Tried (5 approaches, none fully solved it)
+
+**Attempt 1: CSS `user-select: none` via `.block-dragging` class**
+- The class IS added in `startDrag()` and the CSS rule uses `!important` on `body.block-dragging *`
+- DOESN'T WORK because the class is applied AFTER the browser/ProseMirror already entered selection-drag mode during the 400ms long press
+- File: `src/components/BlockIndicator/BlockIndicator.css` lines 59-68
+
+**Attempt 2: Inline `user-select: none` on body**
+- Added `suppressTextSelection()` / `restoreTextSelection()` helpers that set `document.body.style.userSelect = 'none'` directly
+- Called in `startDrag()`, cleared in `cancelDrag()` and `handleMouseUp()`
+- PARTIALLY WORKS but selection still appears intermittently -- inline styles applied after selection started don't fully stop WebKit's active selection drag
+- File: `plugin.ts` around line 95-105
+
+**Attempt 3: `selectstart` event handler**
+- Added `document.addEventListener('selectstart', handler)` that calls `preventDefault()` when `isDragging` is true
+- Registered in plugin view setup, cleaned up in destroy
+- DOESN'T FULLY WORK because `selectstart` only fires for NEW selections, not for extension of existing ones
+- IMPORTANT: Initially also blocked during `isLongPressing` -- this BROKE cursor placement because ProseMirror creates TextSelection on normal clicks which fires `selectstart`. Had to revert to `isDragging` only.
+- File: `plugin.ts` around line 1290
+
+**Attempt 4: `removeAllRanges()` on every mousemove**
+- Both editor-scoped and global mousemove handlers call `window.getSelection()?.removeAllRanges()` during drag
+- DOESN'T WORK because ProseMirror re-applies its own selection from internal state on every view update, immediately recreating the selection after we clear it
+
+**Attempt 5: Synthetic mouseup before startDrag**
+- Dispatches a synthetic `MouseEvent('mouseup')` to `editorView.dom` right before `startDrag()` runs
+- Idea: tells ProseMirror the text-selection gesture is over, so it stops extending on mousemove
+- MOSTLY WORKS -- significantly reduced the flickering, but edge cases remain where selection still appears briefly
+- File: `plugin.ts` around line 1166
+
+### Root Cause Analysis
+
+The fundamental problem has TWO layers:
+
+**Layer 1 -- Browser native selection:** The mousedown in `handleMouseDown` is intentionally NOT prevented (`event.preventDefault()` is not called) because ProseMirror needs the mousedown to place the cursor. This means the browser enters its native selection-drag state. This state persists until a real mouseup.
+
+**Layer 2 -- ProseMirror's selection:** ProseMirror has its OWN selection tracking separate from the browser. When it receives mousedown, it stores internal state (`lastMouseDown`) and on every subsequent mousemove, extends a TextSelection. ProseMirror then applies this to the editor state, which re-renders as a browser selection. This is INDEPENDENT of CSS `user-select`, `selectstart` events, and `removeAllRanges()`.
+
+The synthetic mouseup partially fixes Layer 2 by telling ProseMirror the gesture is done. But edge cases remain -- possibly because ProseMirror's internal handlers process events in a specific order, or because the synthetic event doesn't fully clear all internal tracking state.
+
+### Approaches NOT Yet Tried
+
+1. **Prevent mousedown + manual cursor placement:** Call `event.preventDefault()` on the mousedown in `handleMouseDown`, then manually place the ProseMirror cursor via `editorView.dispatch()` with a `TextSelection`. This would prevent BOTH the browser and ProseMirror from entering selection-drag mode. The risk: getting cursor placement right for all cases (inside text, at block edges, etc.).
+
+2. **`editorView.dom.contentEditable = 'false'` during drag:** Temporarily make the editor non-editable when drag starts, restore when drag ends. ContentEditable=false completely prevents selection. Risk: might cause ProseMirror to lose state or throw errors.
+
+3. **Full-screen overlay with `pointer-events: all`:** The `dragOverlay` already exists with `pointer-events: none`. Changing to `pointer-events: all` would intercept ALL mouse events, preventing both browser and ProseMirror from seeing them. The drag logic would need to use `editorView.posAtCoords()` for position detection, but that internally uses `document.elementFromPoint()` which would return the overlay. Workaround: temporarily set overlay to `pointer-events: none` during `posAtCoords` calls.
+
+4. **ProseMirror plugin with `handleDOMEvents`:** Create a ProseMirror plugin that intercepts `mousemove` during drag and returns `true` (preventing ProseMirror's default handling). This is the most architecturally clean approach -- it works within ProseMirror's own event system.
+
+5. **`editorView.dispatch` with `setMeta` to flag drag state + custom selection handling in plugin `apply`:** Have the plugin's state `apply` method reject selection changes when a drag meta flag is set. This prevents ProseMirror from updating its selection during drag.
+
+### Jacques's Instruction
+
+Jacques says: "Think again. The solution should disable text select at the core, not paper over it. Consult specialists (CSS, React, TipTap/ProseMirror) to find the proper architectural solution."
+
+The most promising architectural approach is #4 (ProseMirror plugin `handleDOMEvents`) because it stops the selection at ProseMirror's own event processing level -- before it ever creates a TextSelection. This is the "core" fix rather than fighting the effects downstream.
 
 ---
 
-## Key Files
+## Uncommitted Files Modified
+
+| File | Changes |
+|------|---------|
+| `src/extensions/columns/ColumnBlockView.tsx` | Dynamic max gutter via `computeMaxGutter()`, `containerWidth` in resizeState, removed `MAX_GUTTER` constant |
+| `src/extensions/columns/column-block.ts` | parseHTML gutter: min clamp only (removed max) |
+| `src/extensions/columns/columns.css` | Divider visibility on hover/focus, pointer-events gating |
+| `src/extensions/block-indicator/types.ts` | Added `columnContentDrop`, `horizontalDropGapX` to BlockIndicatorState |
+| `src/extensions/block-indicator/state.ts` | Added defaults for new state fields |
+| `src/extensions/block-indicator/plugin.ts` | Column content drop detection + execution, gap X tracking, selectstart handler, inline user-select, synthetic mouseup, suppressTextSelection helpers |
+| `src/components/BlockIndicator/BlockIndicator.tsx` | Added new state field defaults, gap X indicator positioning |
+
+---
+
+## Key Files Reference
 
 | File | Purpose |
 |------|---------|
-| `src/App.tsx` | Main app shell |
-| `src/components/Editor/EditorCore.tsx` | TipTap editor setup |
-| `src/components/unified-toolbar/` | Main toolbar |
-| `src/components/StylePanel/` | Style presets panel |
-| `src/components/CommandPalette/` | Cmd+P command palette |
-| `src/components/BlockIndicator/` | Block selection visual |
-| `src/extensions/block-indicator.ts` | Block hover/selection/drag (1200+ LOC) |
-| `src/extensions/font-size.ts` | Custom font size extension |
-| `src/extensions/font-weight.ts` | Custom font weight extension |
-| `src/extensions/line-height.ts` | Custom line height extension |
-| `src/extensions/letter-spacing.ts` | Custom letter spacing extension |
-| `src/extensions/virtual-cursor.ts` | Cursor fix for pagination |
-| `src/stores/editorStore.ts` | Document state, pagination, zoom |
-| `src/stores/styleStore.ts` | Style presets, per-heading config |
-| `src/lib/style-system/` | StyleResolver, types |
-| `src/lib/command-registry/` | Command definitions and registry |
-| `src/lib/database/` | SQLite schema and connection |
-| `src/styles/pagination.css` | Pagination mode styling |
-| `src/styles/themes.css` | Light/dark theme variables |
-| `.claude/STYLING-HIERARCHY-ARCHITECTURE.md` | Architecture reference |
+| `src/extensions/block-indicator/plugin.ts` | Block hover/select/drag -- ALL drag logic lives here (~1350 lines) |
+| `src/extensions/block-indicator/types.ts` | `BlockIndicatorState` type definition |
+| `src/extensions/block-indicator/state.ts` | Store, defaults, subscriptions, public API |
+| `src/components/BlockIndicator/BlockIndicator.tsx` | React rendering of all indicators |
+| `src/components/BlockIndicator/BlockIndicator.css` | Indicator + drag cursor styling (`.block-dragging` rules) |
+| `src/extensions/columns/ColumnBlockView.tsx` | Column resize/gutter drag (React NodeView) |
+| `src/extensions/columns/column-block.ts` | ColumnBlock TipTap node definition |
+| `src/extensions/columns/columns.css` | All column styling including dividers |
+
+---
+
+## Critical Code Locations for Text Select Bug
+
+- `plugin.ts ~1095-1100`: `handleMouseDown` -- mousedown NOT prevented (allows ProseMirror cursor placement)
+- `plugin.ts ~1158-1190`: Long press timer callback -- synthetic mouseup + startDrag
+- `plugin.ts ~95-105`: `suppressTextSelection()` / `restoreTextSelection()` helpers
+- `plugin.ts ~109-165`: `startDrag()` and `cancelDrag()` -- where drag state begins/ends
+- `plugin.ts ~1290-1296`: `handleSelectStart` -- selectstart prevention during isDragging
+- `plugin.ts ~1225-1235`: `handleGlobalMouseMove` -- removeAllRanges during drag
+- `BlockIndicator.css ~59-68`: `.block-dragging` CSS rules with user-select:none
 
 ---
 
@@ -267,23 +171,11 @@ PROJECT (root defaults)
 
 ```bash
 npm run tauri dev          # ALWAYS use this - desktop app
-npm run build              # TypeScript check (passes clean)
+npm run build              # TypeScript check + Vite build
 ./scripts/read-log.sh      # Read debug log
 ./scripts/screenshot.sh    # Capture window
 ```
 
 ---
 
-## Planning Docs Note
-
-The `.planning/` directory contains phase plans and summaries from BOTH the
-old version (phases 1-8 GSD) and the TIPTAP-NATIVE-REBUILD-PLAN.md. Many of
-those summaries describe work that was done in the previous version and does
-NOT exist in this branch. The phase PLANS are still useful as future work
-reference, but their SUMMARIES should not be treated as current status.
-
-The accurate status is THIS document's feature inventory above.
-
----
-
-*Updated: 2026-02-05*
+*Updated: 2026-02-06*

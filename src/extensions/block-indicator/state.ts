@@ -26,6 +26,12 @@ const defaultState: BlockIndicatorState = {
   selectedBlocks: [],
   lastSelectedPos: null,
   paginationEnabled: false,
+  horizontalDropSide: null,
+  horizontalDropBlockPos: null,
+  horizontalDropRect: null,
+  horizontalDropColumnIndex: null,
+  horizontalDropGapX: null,
+  columnContentDrop: null,
 }
 
 // Get persisted state from HMR or use defaults

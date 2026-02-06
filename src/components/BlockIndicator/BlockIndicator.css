@@ -56,14 +56,12 @@
   box-shadow: 0 0 8px var(--block-indicator-color, var(--color-brand, #3b82f6));
 }
 
-/* Body class during drag */
+/* Body class during drag -- cursor + hide caret.
+ * Text selection is prevented by setting contentEditable=false on the editor
+ * DOM during drag (see plugin.ts startDrag/cancelDrag). */
 body.block-dragging,
 body.block-dragging * {
   cursor: grabbing !important;
-  -webkit-user-select: none !important;
-  -moz-user-select: none !important;
-  -ms-user-select: none !important;
-  user-select: none !important;
   caret-color: transparent !important;
 }
 
@@ -147,4 +145,14 @@ body.block-animating [data-virtual-cursor] {
 /* Growing animation - vertical line grows from top to bottom */
 .block-indicator-line[data-growing="true"] {
   transition: height 400ms ease-out;
+}
+
+/* Vertical drop indicator (for column creation via horizontal drag) */
+.block-drop-indicator-vertical {
+  background-color: var(--block-indicator-color, var(--color-brand, #3b82f6));
+  border-radius: 1.5px;
+  pointer-events: none;
+  z-index: 1001;
+  opacity: 0.8;
+  box-shadow: 0 0 8px var(--block-indicator-color, var(--color-brand, #3b82f6));
 }

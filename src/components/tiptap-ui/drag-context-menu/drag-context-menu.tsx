@@ -73,6 +73,7 @@ import type {
 import { GripVerticalIcon } from "@/components/tiptap-icons/grip-vertical-icon"
 import { ChevronRightIcon } from "@/components/tiptap-icons/chevron-right-icon"
 import { Repeat2Icon } from "@/components/tiptap-icons/repeat-2-icon"
+import { ColumnsIcon } from "@/components/tiptap-icons/columns-icon"
 import "./drag-context-menu.scss"
 import { Label } from "@/components/tiptap-ui-primitive/label"
 import { useTocShowTitle } from "@/components/tiptap-node/toc-node/ui/toc-show-title-button"
@@ -315,6 +316,58 @@ const AIActionGroup: React.FC = () => {
   )
 }
 
+const ColumnsActionGroup: React.FC = () => {
+  const { editor } = useTiptapEditor()
+  if (!editor) return null
+
+  // Check if columnBlock is in the schema
+  if (!editor.schema.nodes.columnBlock) return null
+
+  // Check if we're already inside a column (don't show nested column options)
+  const { $from } = editor.state.selection
+  let insideColumn = false
+  for (let d = $from.depth; d >= 0; d--) {
+    if ($from.node(d).type.name === 'column' || $from.node(d).type.name === 'columnBlock') {
+      insideColumn = true
+      break
+    }
+  }
+
+  // If inside a columnBlock, show "Remove Columns" instead
+  if (insideColumn) {
+    return (
+      <BaseMenuItem
+        icon={ColumnsIcon}
+        label="Remove Columns"
+        onClick={() => editor.commands.unsetColumns()}
+      />
+    )
+  }
+
+  return (
+    <SubMenuTrigger icon={ColumnsIcon} label="Columns">
+      <MenuGroup>
+        <MenuGroupLabel>Columns</MenuGroupLabel>
+        <BaseMenuItem
+          icon={ColumnsIcon}
+          label="2 Columns"
+          onClick={() => editor.commands.setColumns(2)}
+        />
+        <BaseMenuItem
+          icon={ColumnsIcon}
+          label="3 Columns"
+          onClick={() => editor.commands.setColumns(3)}
+        />
+        <BaseMenuItem
+          icon={ColumnsIcon}
+          label="4 Columns"
+          onClick={() => editor.commands.setColumns(4)}
+        />
+      </MenuGroup>
+    </SubMenuTrigger>
+  )
+}
+
 const DeleteActionGroup: React.FC = () => {
   const { handleDeleteNode, canDeleteNode, label, Icon } = useDeleteNode()
 
@@ -480,6 +533,7 @@ export const DragContextMenu: React.FC<DragContextMenuProps> = ({
                   <TocShowTitle />
                   <ColorMenu />
                   <TransformActionGroup />
+                  <ColumnsActionGroup />
                   <ImageActionGroup />
                 </MenuGroup>
 

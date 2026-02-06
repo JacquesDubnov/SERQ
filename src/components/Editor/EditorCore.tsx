@@ -38,7 +38,9 @@ import { StubCommands } from '@/extensions/stub-commands';
 import { VirtualCursor } from '@/extensions/virtual-cursor';
 import { BlockIndicator } from '@/extensions/block-indicator';
 import { ZoomCoordinateFix } from '@/extensions/zoom-coordinate-fix';
+import { ColumnBlock, Column } from '@/extensions/columns';
 import { BlockIndicator as BlockIndicatorComponent } from '@/components/BlockIndicator';
+import { SlashDropdownMenu } from '@/components/tiptap-ui/slash-dropdown-menu';
 // import { MultiSelection } from '@/extensions/multi-selection'; // Disabled for debugging
 
 export interface EditorCoreRef {
@@ -115,6 +117,9 @@ export const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
         BlockIndicator,
         // Patches caretRangeFromPoint to handle transform:scale zoom correctly
         ZoomCoordinateFix,
+        // Column layout -- 2-4 independent columns with resize handles
+        ColumnBlock,
+        Column,
         // Markdown paste support - converts pasted markdown to rich text
         Markdown.configure({
           html: true, // Allow HTML in markdown
@@ -267,6 +272,7 @@ export const EditorCore = forwardRef<EditorCoreRef, EditorCoreProps>(
           editor={editor}
           className="editor-content"
         />
+        <SlashDropdownMenu editor={editor} />
         <BlockIndicatorComponent />
       </div>
     );

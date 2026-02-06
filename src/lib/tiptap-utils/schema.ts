@@ -25,7 +25,7 @@ export const isNodeInSchema = (
   editor: Editor | null
 ): boolean => {
   if (!editor?.schema) return false
-  return editor.schema.spec.nodes.get(nodeName) !== undefined
+  return nodeName in editor.schema.nodes
 }
 
 /**

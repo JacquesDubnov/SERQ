@@ -20,6 +20,7 @@ import { AtSignIcon } from "@/components/tiptap-icons/at-sign-icon"
 import { SmilePlusIcon } from "@/components/tiptap-icons/smile-plus-icon"
 import { TableIcon } from "@/components/tiptap-icons/table-icon"
 import { ListIndentedIcon } from "@/components/tiptap-icons/list-indented-icon"
+import { Columns2Icon, Columns3Icon, Columns4Icon } from "@/components/tiptap-icons/columns-icon"
 
 // --- Lib ---
 import {
@@ -161,6 +162,27 @@ const texts = {
     subtext: "Insert a table of contents",
     keywords: ["toc", "tableofcontents", "table of contents"],
     badge: ListIndentedIcon,
+    group: "Insert",
+  },
+  columns_2: {
+    title: "2 Columns",
+    subtext: "Split into two side-by-side columns",
+    keywords: ["columns", "column", "2 columns", "two columns", "side by side", "layout", "split"],
+    badge: Columns2Icon,
+    group: "Insert",
+  },
+  columns_3: {
+    title: "3 Columns",
+    subtext: "Split into three columns",
+    keywords: ["columns", "column", "3 columns", "three columns", "layout", "grid"],
+    badge: Columns3Icon,
+    group: "Insert",
+  },
+  columns_4: {
+    title: "4 Columns",
+    subtext: "Split into four columns",
+    keywords: ["columns", "column", "4 columns", "four columns", "layout", "grid"],
+    badge: Columns4Icon,
     group: "Insert",
   },
 
@@ -340,6 +362,24 @@ const getItemImplementations = () => {
             withHeaderRow: false,
           })
           .run()
+      },
+    },
+    columns_2: {
+      check: (editor: Editor) => isNodeInSchema("columnBlock", editor),
+      action: ({ editor }: { editor: Editor }) => {
+        editor.chain().focus().setColumns(2).run()
+      },
+    },
+    columns_3: {
+      check: (editor: Editor) => isNodeInSchema("columnBlock", editor),
+      action: ({ editor }: { editor: Editor }) => {
+        editor.chain().focus().setColumns(3).run()
+      },
+    },
+    columns_4: {
+      check: (editor: Editor) => isNodeInSchema("columnBlock", editor),
+      action: ({ editor }: { editor: Editor }) => {
+        editor.chain().focus().setColumns(4).run()
       },
     },
 

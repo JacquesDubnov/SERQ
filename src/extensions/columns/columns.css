@@ -1,0 +1,202 @@
+/**
+ * Column Block Styles
+ *
+ * CSS Grid layout for column blocks with configurable gutters and dividers.
+ *
+ * IMPORTANT: TipTap's ReactNodeViewRenderer injects hidden wrapper divs
+ * (contentDOMElement with data-node-view-content-react) between each
+ * NodeViewContent and its PM children. Every level of the grid chain must
+ * account for these invisible wrappers or the layout breaks.
+ *
+ * Actual DOM tree (simplified):
+ *   .column-block-wrapper          (grid container)
+ *     .column-block-content        (NodeViewContent -- subgrid)
+ *       [data-node-view-content-react]   (hidden TipTap wrapper -- subgrid)
+ *         .node-column             (ReactRenderer wrapper -- display:contents)
+ *           [data-column]          (Column NodeViewWrapper -- grid item)
+ *             .column-content      (Column NodeViewContent)
+ *               [data-node-view-content-react]  (hidden TipTap wrapper)
+ *                 <p>              (actual content)
+ */
+
+:root {
+  --column-divider-width: 1px;
+  --column-divider-color: #9ca3af;
+  --column-divider-color-active: var(--color-brand, #3b82f6);
+  --column-min-width: 80px;
+}
+
+/* Dark mode */
+[data-theme="dark"] {
+  --column-divider-color: #4b5563;
+}
+
+/* ---- Container ---- */
+
+.column-block-wrapper {
+  display: grid;
+  position: relative;
+  width: 100%;
+  min-height: 40px;
+  margin: 8px 0;
+  break-inside: avoid;
+}
+
+/*
+ * NodeViewContent for the columnBlock.
+ * Must be a subgrid so column tracks pass through.
+ */
+.column-block-content {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  column-gap: inherit;
+  white-space: normal;
+}
+
+/*
+ * TipTap's hidden contentDOMElement inside the columnBlock's NodeViewContent.
+ * This div holds all the actual ProseMirror content (the column nodes).
+ * Must also be a subgrid or columns won't be grid items.
+ */
+.column-block-content > [data-node-view-content-react] {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  column-gap: inherit;
+}
+
+/*
+ * ReactRenderer wrapper around each Column NodeView (.node-column).
+ * Remove from the box tree so the [data-column] NodeViewWrapper
+ * becomes a direct grid item of the subgrid.
+ * This div has no role in ProseMirror's position resolution for columns
+ * because the Column node is not selectable.
+ */
+.column-block-content .node-column {
+  display: contents;
+}
+
+/* Each column NodeViewWrapper -- actual CSS Grid item */
+.column-block-wrapper [data-column] {
+  min-width: 0;
+  container-type: inline-size;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+/* Column content area (NodeViewContent inside each column) */
+.column-block-wrapper .column-content {
+  padding: 4px 2px;
+}
+
+/*
+ * First/last paragraph margin reset.
+ * Must target through TipTap's hidden contentDOMElement wrapper.
+ */
+.column-block-wrapper .column-content > [data-node-view-content-react] > *:first-child,
+.column-block-wrapper .column-content > *:first-child {
+  margin-top: 0;
+}
+
+.column-block-wrapper .column-content > [data-node-view-content-react] > *:last-child,
+.column-block-wrapper .column-content > *:last-child {
+  margin-bottom: 0;
+}
+
+/* Prevent images from overflowing columns */
+.column-block-wrapper [data-column] img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* ---- Divider Handles ---- */
+
+.column-divider-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 16px;
+  cursor: col-resize;
+  z-index: 10;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+/* Allow interaction when hovered, focused, or resizing */
+.column-block-wrapper:hover .column-divider-handle,
+.column-block-wrapper[data-focused] .column-divider-handle,
+.column-block-wrapper[data-resizing] .column-divider-handle {
+  pointer-events: auto;
+}
+
+.column-divider-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: var(--column-divider-width);
+  transform: translateX(-50%);
+  background: var(--column-divider-color);
+  opacity: 0;
+  transition: opacity 150ms ease, background 150ms ease;
+  border-radius: 1px;
+}
+
+/* Show dividers on hover */
+.column-block-wrapper:hover .column-divider-handle::after {
+  opacity: 0.4;
+}
+
+/* Brighter when focused (cursor inside) */
+.column-block-wrapper[data-focused] .column-divider-handle::after {
+  opacity: 0.7;
+}
+
+/* Full visibility when actively hovering divider or resizing */
+.column-divider-handle:hover::after,
+.column-block-wrapper[data-resizing] .column-divider-handle::after {
+  opacity: 1;
+  background: var(--column-divider-color-active);
+  width: 2px;
+}
+
+/* ---- Gutter Mode Visualization ---- */
+
+/* During Option+drag, show left and right edge markers on the divider
+   to visualize the full gutter width */
+.column-block-wrapper[data-gutter-mode] .column-divider-handle::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--current-gutter, 24px);
+  height: 24px;
+  transform: translate(-50%, -50%);
+  border-left: 2px solid var(--column-divider-color-active);
+  border-right: 2px solid var(--column-divider-color-active);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+/* The center line stays visible during gutter mode */
+.column-block-wrapper[data-gutter-mode] .column-divider-handle::after {
+  opacity: 0.4;
+  border-style: dashed;
+}
+
+/* ---- Selection/Focus Styles ---- */
+
+.column-block-wrapper.ProseMirror-selectednode {
+  outline: 2px solid var(--color-brand, #3b82f6);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---- Transitions ---- */
+
+/* Smooth grid transitions for column add/remove (not during resize) */
+.column-block-wrapper:not([data-resizing]) {
+  transition: grid-template-columns 200ms ease-out;
+}

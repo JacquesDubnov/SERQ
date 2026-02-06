@@ -1,0 +1,106 @@
+## General Features
+  - Link Style menu - Presets + Custom
+  - Line numbers (Coding, Legal)
+  - Command Panel
+  - /Commands
+  - Keyboard Shortcuts modal (Search, set, conflict resolution)
+  - Theme Styles setup
+  - UI Preferences
+    - Zen / Focus mode
+    - SERQ - novel UI approach
+    - Legacy (MS Word esq.)
+  - Preferences / Settings section
+  - Security / Privacy
+    - Document Password Lock
+    - Social Encryption - Shamir
+    - Dead-Man's Switch
+    - Coersion Password
+  - Styling templates
+  - Document Structure Templates
+  - Lists - Context Menu - indent spacing, bullet color, or numbering color, full font and spacing customization
+  - Quote Blocks - context menu - Customize line, spacing, full font and spacing customization
+  - Color menu - Color picker and custom setup
+  - Color Menu - Show Color in the icon
+  - AI Features
+    - Help with research, advice, data/facts check and validation, writing tone preservation....
+    - Mark sentences that are too long.
+    - Mark sentences with bad grammar.
+    - Show outdated or inaccurate data according to research.
+    - Show claims that require validation.
+    - Define document intent.
+    - Add suggestions around Document Intent.
+    - Styling suggestions
+    - Styling analysis for auto styling assist
+    - Voice interface - AI as an intelectual sparring partner on document content and creation
+    - Auto supporting / complementing data from user's computer and/or web
+  - Calculator
+  - Block linking - source blocks and sync blocks.
+  - Voice dictation, activation, note-taking, transcripts.
+  - Journaling mode (supporting UI for this feature... calendar document opening... daily gentle push to write... maps integration...)
+	- Research mode (InBox, corkbboard, "sticky notes", general brain dump, research topics, questions that rise, data organization, citations, flow chart)
+	- Layout Templates
+  - General InBox for fast capturing data, images, links etc. to later get into documents
+  - mobile capture - mobile camera to document, mobile camera to inbox
+	- Blocks styling - background color and gradients
+	- Document styling - background oolor and gradients
+	- Font management - Google fonts full interface of choosing and adding/removing to/from  font panel
+	- Publishing calendar - Planning for documents publishing schedule / campaign
+	- Counting stuff - Word count / line count / page count / chapter count / adjectives / verbs / ... for project / document / selected text levels
+  - Performance stats - time writing, projects in parallel, per day, per week, per month.... plan vs. actual... in writing goals
+	- collect web data into object (setting objects with quesries to collect data on each OpebDoc event)
+		- Paragraph
+		- Table
+		- Columns
+    - live data insert (a text which represents live data item such as {NASDAQ:APPL} for stock ticker etc.)
+    - Live formula insert - A calculating formula with live data such as {USD/EUR exchange Rate * 1,200,000}
+	- Page numbers (full styling, presets and custom)
+	- YAML frontmatter
+	- Doc Variables - e.g. project params {fileName} {date} {version} {pages} {Chapters} {words} {Author} {Authors}
+  - Search / Replace - full UI mechanism for smart search replace
+  - Conditional Formatting - e.g. make every "hero" word in the document in BOLD
+  - Auto Chapter / Section Numbering - keeps right numbering when rearranging order in sections management panel - for long form writing
+  - Pages / Chapters / Sections Management system
+  - Canvas Sizes and layouts
+      - Normal - 80 characters per line (documents, essays, webpages)
+      - Wide - full window size (adaptive)
+      - Book - 65 characters (optimal readability)
+      - Desktop (simulated average)
+      - Tablet (Simulated average)
+      - Mobile (simulated average)
+      - Zen Mode
+      - Project mode
+      - Custom mode
+      - Long-form mode (this playbook style of consecutive pages side-by-side... Et cetera.)
+  - Image management
+    - Drag
+    - Text wrap
+    - Medicine wrap
+    - Gallery
+    - Mask
+    - Basic Edit
+    -   Blend into doc - Alpha channel gradiens
+      - Preset styling filters
+      - Match styling
+      - Remove background
+    - Crop
+    - Rotate
+  - Writing goals management
+  - Clock / alarm / pomodoro (assigned to project)
+  - Comments, notes - Tracking & Resolution
+  - Document history and restore - WYSIWYG on main canvas - time machine like
+  - Document version management - Not Old Vs. New but English/French ... or "Sent to Tom" vs. "Sent to Mike" as each version may differ
+  - Translation - multi lingual
+  - RTL support in full
+  - Track changes - inline marking and Diff views - in full
+  - Markdown, source, and render modes
+  - Markdown side-by-side (source and Render with options to cycle through render styles)
+  - Track distribution (which document version was sent to whom and when?)
+  - Automatic publish integrations (Medium, substack, X, linkedIn )
+  - Publish management (Calendar Timing Scheduling)
+  - Future-proof Backup (always preserving a copy in formats that will always be supported, even in a hundred years from now. Creating a scheduled or conditional backup in these formats. Non-related to files backup that the user has to take care of by himself.)
+    - in Markdown
+    - in txt
+
+
+
+

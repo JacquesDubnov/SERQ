@@ -1,0 +1,93 @@
+/* Column Controls - Floating bar above column block */
+
+.column-controls {
+  position: absolute;
+  top: -32px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 4px;
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+  z-index: 20;
+  white-space: nowrap;
+}
+
+/* Show on parent hover or focus-within */
+.column-block-wrapper:hover > .column-controls,
+.column-block-wrapper:focus-within > .column-controls {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Hide during resize */
+.column-block-wrapper[data-resizing] > .column-controls {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.column-controls-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-secondary, #6b7280);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 100ms ease, color 100ms ease;
+  font-family: inherit;
+}
+
+.column-controls-btn:hover {
+  background: var(--color-hover, #f3f4f6);
+  color: var(--color-text, #111827);
+}
+
+.column-controls-btn[data-active="true"] {
+  background: var(--color-brand, #3b82f6);
+  color: white;
+}
+
+.column-controls-btn-danger:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.column-controls-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--color-border, #e5e7eb);
+  margin: 0 2px;
+}
+
+/* Dark mode */
+[data-theme="dark"] .column-controls {
+  background: var(--color-surface, #1f1f1f);
+  border-color: var(--color-border, #374151);
+}
+
+[data-theme="dark"] .column-controls-btn:hover {
+  background: var(--color-hover, #374151);
+  color: var(--color-text, #f9fafb);
+}
+
+[data-theme="dark"] .column-controls-btn-danger:hover {
+  background: #450a0a;
+  color: #fca5a5;
+}
+
+[data-theme="dark"] .column-controls-sep {
+  background: var(--color-border, #374151);
+}
