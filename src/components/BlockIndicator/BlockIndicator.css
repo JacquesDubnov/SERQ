@@ -56,13 +56,16 @@
   box-shadow: 0 0 8px var(--block-indicator-color, var(--color-brand, #3b82f6));
 }
 
-/* Body class during drag -- cursor + hide caret.
- * Text selection is prevented by setting contentEditable=false on the editor
- * DOM during drag (see plugin.ts startDrag/cancelDrag). */
+/* Body class during drag -- cursor, hide caret, kill text selection.
+ * contentEditable=false alone doesn't prevent selection inside nested
+ * NodeViews (columns) because their contentDOM has contenteditable="true"
+ * which overrides the parent. user-select: none covers all cases. */
 body.block-dragging,
 body.block-dragging * {
   cursor: grabbing !important;
   caret-color: transparent !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
 }
 
 /* Hide all cursors during drag and drop animation */

@@ -2,10 +2,15 @@
  * Column Block Normalization Plugin
  *
  * appendTransaction safety net that runs after every transaction to:
- * 1. Ensure every columnBlock has 2-4 column children
- * 2. Insert paragraph into empty columns
- * 3. Unwrap nested columnBlocks found inside columns
- * 4. Validate width fractions sum to ~1.0
+ * 1. Delete empty columns (e.g., after drag-extracting content)
+ * 2. Unwrap nested columnBlocks found inside columns
+ * 3. Auto-unwrap columnBlocks with 0-1 columns remaining
+ * 4. Sync column count / width attributes
+ * 5. Validate width fractions sum to ~1.0
+ *
+ * Multi-pass: ProseMirror re-runs appendTransaction when the doc changes,
+ * so deleting an empty column (rule 1) cascades into auto-unwrap (rule 3)
+ * on the next pass if only one column remains.
  */
 
 import { Plugin } from '@tiptap/pm/state'
@@ -31,23 +36,36 @@ export function createNormalizePlugin() {
       const { schema, doc, tr } = newState
       const columnBlockType = schema.nodes.columnBlock
       const columnType = schema.nodes.column
-      const paragraphType = schema.nodes.paragraph
 
       if (!columnBlockType || !columnType) return null
 
+      const paragraphType = schema.nodes.paragraph
       let hasChanges = false
 
       doc.descendants((node, pos) => {
         if (node.type !== columnBlockType) return true
 
-        // 1. Check for empty columns -- insert paragraph
+        // 1. Delete empty columns (e.g., after dragging content out).
+        //    Collect positions in reverse order so deletions don't shift
+        //    earlier positions within the same transaction.
+        const emptyColumns: { from: number; to: number }[] = []
         node.forEach((column, offset) => {
           if (column.type === columnType && column.childCount === 0) {
-            const insertPos = pos + 1 + offset + 1 // Inside the column
-            tr.insert(insertPos, paragraphType.create())
-            hasChanges = true
+            const colPos = pos + 1 + offset
+            emptyColumns.push({ from: colPos, to: colPos + column.nodeSize })
           }
         })
+        // Only delete if at least one non-empty column would remain
+        const nonEmptyCount = node.childCount - emptyColumns.length
+        if (emptyColumns.length > 0 && nonEmptyCount >= 1) {
+          for (let i = emptyColumns.length - 1; i >= 0; i--) {
+            tr.delete(emptyColumns[i].from, emptyColumns[i].to)
+          }
+          hasChanges = true
+          // Don't process further rules on this node -- positions shifted.
+          // Next appendTransaction pass will handle unwrap/attr sync.
+          return false
+        }
 
         // 2. Unwrap nested columnBlocks inside columns
         node.forEach((column, columnOffset) => {

@@ -48,7 +48,6 @@ export const BlockIndicator: React.FC = () => {
     horizontalDropRect: null,
     horizontalDropColumnIndex: null,
     horizontalDropGapX: null,
-    columnContentDrop: null,
   })
 
   const hasEverShown = useRef(false)

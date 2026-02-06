@@ -31,7 +31,6 @@ const defaultState: BlockIndicatorState = {
   horizontalDropRect: null,
   horizontalDropColumnIndex: null,
   horizontalDropGapX: null,
-  columnContentDrop: null,
 }
 
 // Get persisted state from HMR or use defaults

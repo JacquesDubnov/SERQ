@@ -68,17 +68,6 @@ export interface BlockIndicatorState {
   horizontalDropColumnIndex: number | null
   /** X position (relative to editor) for the vertical indicator when dropping between columns */
   horizontalDropGapX: number | null
-
-  // Column content drop (dropping a block INTO a column as content)
-  /** When dragging a block over a column's content area, drop info for inserting inside the column */
-  columnContentDrop: {
-    columnBlockPos: number    // pos of the columnBlock
-    columnIndex: number       // which column (0-indexed)
-    insertPos: number         // ProseMirror position to insert at
-    indicatorTop: number      // visual position of horizontal indicator
-    indicatorLeft: number     // left edge of column
-    indicatorWidth: number    // width of column
-  } | null
 }
 
 export const blockIndicatorKey = new PluginKey<{ isDragging: boolean }>("blockIndicator")

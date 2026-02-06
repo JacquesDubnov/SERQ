@@ -17,10 +17,55 @@
  * 4. CSS transitions handle the animation
  */
 
-import type { Node as PMNode } from "@tiptap/pm/model"
+import type { Node as PMNode, ResolvedPos } from "@tiptap/pm/model"
 import { Plugin, TextSelection } from "@tiptap/pm/state"
 
 import { blockIndicatorKey } from './types'
+
+// --- Node classification for depth-aware drag ---
+// Structural wrappers: skip over them, never draggable themselves
+const STRUCTURAL_WRAPPERS = new Set(['column'])
+// Drag units: the draggable entity itself (Phase 2: add 'listItem')
+const DRAG_UNITS = new Set<string>()
+
+/**
+ * Resolve the deepest draggable block at a given document position.
+ *
+ * Walks from the deepest depth up to 1, classifying each node:
+ * - Structural wrapper (column): skip, look deeper
+ * - Drag unit (Phase 2: listItem): return immediately
+ * - Content block at depth 1: always return
+ * - Content block whose parent is a structural wrapper or doc: return
+ *
+ * Returns null if no draggable block found (cursor in doc root or invalid).
+ */
+function resolveDeepestDraggableBlock($pos: ResolvedPos): {
+  pos: number
+  node: PMNode
+  depth: number
+} | null {
+  for (let d = $pos.depth; d >= 1; d--) {
+    const node = $pos.node(d)
+
+    if (STRUCTURAL_WRAPPERS.has(node.type.name)) continue
+
+    if (DRAG_UNITS.has(node.type.name)) {
+      return { pos: $pos.before(d), node, depth: d }
+    }
+
+    // At depth 1, always return (top-level block)
+    if (d === 1) {
+      return { pos: $pos.before(d), node, depth: d }
+    }
+
+    // Check parent: if parent is a structural wrapper or doc, this is the block
+    const parent = $pos.node(d - 1)
+    if (STRUCTURAL_WRAPPERS.has(parent.type.name) || parent.type.name === 'doc') {
+      return { pos: $pos.before(d), node, depth: d }
+    }
+  }
+  return null
+}
 import { store, notifyListeners, notifySelectionListeners, clearSelections } from './state'
 import { isNonContentArea, isPointInForbiddenZone, clipIndicatorToCurrentPage } from './pagination'
 import { getPositionReferenceRect, isPaginationEnabled, getZoomFactor, getPageNumberForElement } from './dom-utils'
@@ -66,7 +111,6 @@ export function createBlockIndicatorPlugin() {
       horizontalDropRect: null,
       horizontalDropColumnIndex: null,
       horizontalDropGapX: null,
-      columnContentDrop: null,
     }
   }
 
@@ -76,6 +120,10 @@ export function createBlockIndicatorPlugin() {
       longPressTimer = null
     }
     longPressStartPos = null
+    // Restore editability if we disabled it during long press (but not if drag took over)
+    if (!isDragging && editorViewRef && editorViewRef.dom.contentEditable === 'false') {
+      editorViewRef.dom.contentEditable = 'true'
+    }
     if (store.currentState.isLongPressing) {
       store.currentState = { ...store.currentState, isLongPressing: false }
       notifyListeners()
@@ -177,7 +225,6 @@ export function createBlockIndicatorPlugin() {
       isDragging: false,
       dropIndicatorTop: null,
       sourceOverlay: null,
-      columnContentDrop: null,
     }
     notifyListeners()
 
@@ -286,24 +333,42 @@ export function createBlockIndicatorPlugin() {
         }
       }
 
-      const findDropPosition = (clientY: number): {
-        pos: number
-        top: number
-        index: number
-        pageNumber: number
-      } | null => {
-        const { doc } = editorView.state
+      /**
+       * Find gaps between children of a given container node.
+       * When containerPos is null, child offsets are doc-absolute (top-level).
+       * When non-null, positions are containerPos + 1 + childOffset.
+       */
+      const findGapsInNode = (
+        node: PMNode,
+        containerPos: number | null,
+        clientY: number,
+      ): { pos: number; top: number; index: number; pageNumber: number } | null => {
         const editorRect = getPositionReferenceRect(editorView.dom)
         const isPaginated = isPaginationEnabled(editorView.dom)
 
-        // Collect all block boundaries (gaps between blocks)
         const gaps: { pos: number; top: number; index: number; pageNumber: number }[] = []
         let blockIndex = 0
         let lastBottom = 0
         let lastPageNumber = 1
 
-        doc.forEach((_node, offset) => {
-          const dom = editorView.nodeDOM(offset)
+        // Handle empty container (e.g., empty column) -- single gap at content start
+        if (node.childCount === 0 && containerPos !== null) {
+          const containerDom = editorView.nodeDOM(containerPos)
+          if (containerDom instanceof HTMLElement) {
+            const containerRect = containerDom.getBoundingClientRect()
+            const gapTop = containerRect.top + containerRect.height / 2 - editorRect.top
+            gaps.push({
+              pos: containerPos + 1, // inside the container (after opening tag)
+              top: gapTop,
+              index: 0,
+              pageNumber: isPaginated ? getPageNumberForElement(containerDom) : 1,
+            })
+          }
+        }
+
+        node.forEach((_child, offset) => {
+          const absPos = containerPos !== null ? containerPos + 1 + offset : offset
+          const dom = editorView.nodeDOM(absPos)
           if (!(dom instanceof HTMLElement)) return
 
           // Skip headers/footers
@@ -314,39 +379,38 @@ export function createBlockIndicatorPlugin() {
           const blockBottom = blockTop + rect.height
           const pageNumber = isPaginated ? getPageNumberForElement(dom) : 1
 
-          // Gap before this block
           let gapTop: number
           if (blockIndex === 0) {
             gapTop = blockTop
           } else if (pageNumber !== lastPageNumber) {
-            // Page boundary - gap is at the start of new page's first block
             gapTop = blockTop
           } else {
-            // Normal gap - midpoint between last bottom and this top
             gapTop = (lastBottom + blockTop) / 2
           }
 
-          gaps.push({ pos: offset, top: gapTop, index: blockIndex, pageNumber })
+          gaps.push({ pos: absPos, top: gapTop, index: blockIndex, pageNumber })
 
           lastBottom = blockBottom
           lastPageNumber = pageNumber
           blockIndex++
         })
 
-        // Add gap after last block
+        // Gap after last child
         if (blockIndex > 0) {
+          const afterLastPos = containerPos !== null
+            ? containerPos + 1 + node.content.size
+            : node.content.size
           gaps.push({
-            pos: doc.content.size,
+            pos: afterLastPos,
             top: lastBottom,
             index: blockIndex,
             pageNumber: lastPageNumber,
           })
         }
 
-        // Find closest gap to cursor
+        // Find closest gap
         let closest = gaps[0]
         let closestDistance = Infinity
-
         for (const gap of gaps) {
           const dist = Math.abs(clientY - (gap.top + editorRect.top))
           if (dist < closestDistance) {
@@ -356,6 +420,33 @@ export function createBlockIndicatorPlugin() {
         }
 
         return closest || null
+      }
+
+      const findDropPosition = (clientX: number, clientY: number): {
+        pos: number
+        top: number
+        index: number
+        pageNumber: number
+      } | null => {
+        // Try to determine which container the cursor is inside
+        const coords = editorView.posAtCoords({ left: clientX, top: clientY })
+        if (coords) {
+          const $pos = editorView.state.doc.resolve(coords.pos)
+          // Walk up to find the innermost structural wrapper or doc
+          for (let d = $pos.depth; d >= 0; d--) {
+            const node = $pos.node(d)
+            if (STRUCTURAL_WRAPPERS.has(node.type.name)) {
+              const containerPos = $pos.before(d)
+              return findGapsInNode(node, containerPos, clientY)
+            }
+            if (d === 0) {
+              // doc level -- top-level gaps
+              return findGapsInNode(node, null, clientY)
+            }
+          }
+        }
+        // Fallback: top-level gaps
+        return findGapsInNode(editorView.state.doc, null, clientY)
       }
 
       // Selection helper: select range of blocks between two positions
@@ -477,6 +568,76 @@ export function createBlockIndicatorPlugin() {
       }
 
       /**
+       * Clean up the source column after a block is extracted from it.
+       * If only 1 non-empty column remains, unwraps the entire columnBlock.
+       * Otherwise deletes just the empty column.
+       * Returns the (possibly modified) transaction.
+       */
+      const cleanupSourceColumn = (tr: any, sourcePos: number): any => {
+        // Find the column that contained the source block (before deletion)
+        const $src = editorView.state.doc.resolve(sourcePos)
+        let sourceColumnPos: number | null = null
+        for (let d = $src.depth; d >= 1; d--) {
+          if (STRUCTURAL_WRAPPERS.has($src.node(d).type.name)) {
+            sourceColumnPos = $src.before(d)
+            break
+          }
+        }
+        if (sourceColumnPos === null) return tr
+
+        const mappedColPos = tr.mapping.map(sourceColumnPos)
+        const colNode = tr.doc.nodeAt(mappedColPos)
+        if (!colNode || colNode.type.name !== 'column') return tr
+
+        const isEmpty = colNode.childCount === 0 ||
+          (colNode.childCount === 1 &&
+           colNode.child(0).type.name === 'paragraph' &&
+           colNode.child(0).childCount === 0)
+        if (!isEmpty) return tr
+
+        // Find the parent columnBlock
+        const $col = tr.doc.resolve(mappedColPos)
+        let columnBlockPos: number | null = null
+        let columnBlockNode: PMNode | null = null
+        for (let d = $col.depth; d >= 1; d--) {
+          if ($col.node(d).type.name === 'columnBlock') {
+            columnBlockPos = $col.before(d)
+            columnBlockNode = $col.node(d)
+            break
+          }
+        }
+        if (!columnBlockNode || columnBlockPos === null) return tr
+
+        // Count non-empty columns
+        let nonEmptyColumns = 0
+        const contentNodes: PMNode[] = []
+        columnBlockNode.forEach((child) => {
+          if (child.type.name === 'column') {
+            const childEmpty = child.childCount === 0 ||
+              (child.childCount === 1 &&
+               child.child(0).type.name === 'paragraph' &&
+               child.child(0).childCount === 0)
+            if (!childEmpty) {
+              nonEmptyColumns++
+              child.forEach((block) => contentNodes.push(block))
+            }
+          }
+        })
+
+        if (nonEmptyColumns <= 1) {
+          // Unwrap: replace the entire columnBlock with its content
+          if (contentNodes.length === 0) {
+            contentNodes.push(editorView.state.schema.nodes.paragraph.create())
+          }
+          tr = tr.replaceWith(columnBlockPos, columnBlockPos + columnBlockNode.nodeSize, contentNodes)
+        } else {
+          // More than 1 non-empty column remains -- just delete the empty one
+          tr = tr.delete(mappedColPos, mappedColPos + colNode.nodeSize)
+        }
+        return tr
+      }
+
+      /**
        * Execute a horizontal drop: wrap source + target blocks into a columnBlock.
        * If target is already a columnBlock with room, add a new column instead.
        */
@@ -498,19 +659,21 @@ export function createBlockIndicatorPlugin() {
         let tr = state.tr
 
         const columnIndex = store.currentState.horizontalDropColumnIndex
+        const sourcePos = dragSourcePos
+        const sourceNodeSize = dragSourceNode.nodeSize
 
         // Case 1: target is already a columnBlock with < 4 columns
         if (targetNode.type.name === 'columnBlock' && targetNode.childCount < 4) {
           const newColumn = columnType.create(null, dragSourceNode)
 
           // Delete source first
-          tr = tr.delete(dragSourcePos, dragSourcePos + dragSourceNode.nodeSize)
+          tr = tr.delete(sourcePos, sourcePos + sourceNodeSize)
+
+          // Clean up empty source column (if source was inside a column)
+          tr = cleanupSourceColumn(tr, sourcePos)
 
           // Adjust target position after source deletion
-          let adjTargetPos = targetPos
-          if (targetPos > dragSourcePos) {
-            adjTargetPos -= dragSourceNode.nodeSize
-          }
+          const adjTargetPos = tr.mapping.map(targetPos)
 
           // Insert new column at the right position
           if (columnIndex !== null) {
@@ -535,13 +698,14 @@ export function createBlockIndicatorPlugin() {
           }
 
           // Update column count and widths
-          const updatedNode = tr.doc.nodeAt(adjTargetPos)
+          const finalTargetPos = tr.mapping.map(targetPos)
+          const updatedNode = tr.doc.nodeAt(finalTargetPos)
           if (updatedNode) {
             const newCount = updatedNode.childCount
             const base = Math.floor((1 / newCount) * 10000) / 10000
             const widths = Array(newCount).fill(base)
             widths[newCount - 1] = +(1 - base * (newCount - 1)).toFixed(4)
-            tr = tr.setNodeMarkup(adjTargetPos, undefined, {
+            tr = tr.setNodeMarkup(finalTargetPos, undefined, {
               ...updatedNode.attrs,
               columns: newCount,
               columnWidths: widths,
@@ -554,7 +718,6 @@ export function createBlockIndicatorPlugin() {
           let col1Content = side === 'left' ? dragSourceNode : targetNode
           let col2Content = side === 'left' ? targetNode : dragSourceNode
 
-          // Wrap block-level content in a column (column expects block children)
           const col1 = columnType.create(null, col1Content)
           const col2 = columnType.create(null, col2Content)
 
@@ -563,20 +726,22 @@ export function createBlockIndicatorPlugin() {
             [col1, col2],
           )
 
-          // We need to delete both blocks and insert the columnBlock.
-          // Order: delete higher position first to avoid offset shifts.
-          const sourcePos = dragSourcePos
-          const sourceEnd = sourcePos + dragSourceNode.nodeSize
+          // Delete source and replace target, higher position first
+          const sourceEnd = sourcePos + sourceNodeSize
           const targetEnd = targetPos + targetNode.nodeSize
 
           if (sourcePos > targetPos) {
-            // Source is after target
             tr = tr.delete(sourcePos, sourceEnd)
-            tr = tr.replaceWith(targetPos, targetEnd, columnBlock)
+            // Clean up empty source column before replacing target
+            tr = cleanupSourceColumn(tr, sourcePos)
+            const adjTargetEnd = tr.mapping.map(targetEnd)
+            const adjTargetPos = tr.mapping.map(targetPos)
+            tr = tr.replaceWith(adjTargetPos, adjTargetEnd, columnBlock)
           } else {
-            // Source is before target
             tr = tr.replaceWith(targetPos, targetEnd, columnBlock)
             tr = tr.delete(sourcePos, sourceEnd)
+            // Clean up empty source column after deletion
+            tr = cleanupSourceColumn(tr, sourcePos)
           }
         }
 
@@ -590,70 +755,14 @@ export function createBlockIndicatorPlugin() {
           horizontalDropRect: null,
           horizontalDropColumnIndex: null,
           horizontalDropGapX: null,
-          columnContentDrop: null,
         }
         notifyListeners()
 
         tr = tr.setMeta(blockIndicatorKey, { isDragging: false })
-        editorView.dispatch(tr)
-      }
-
-      /**
-       * Execute a column content drop: insert the dragged block INTO a column as content.
-       */
-      const executeColumnContentDrop = () => {
-        if (!dragSourceNode || dragSourcePos === null) return
-        const dropInfo = store.currentState.columnContentDrop
-        if (!dropInfo) return
-
-        const { state } = editorView
-        let tr = state.tr
-
-        const sourceNodeSize = dragSourceNode.nodeSize
-        const sourcePos = dragSourcePos
-        let insertPos = dropInfo.insertPos
-
-        // Delete source block first
-        tr = tr.delete(sourcePos, sourcePos + sourceNodeSize)
-
-        // Adjust insert position if source was before the insert point
-        if (sourcePos < insertPos) {
-          insertPos -= sourceNodeSize
-        }
-
-        // Insert the block at the target position inside the column
-        tr = tr.insert(insertPos, dragSourceNode)
-
-        // Place cursor at start of moved block
-        const $pos = tr.doc.resolve(insertPos + 1)
-        tr = tr.setSelection(TextSelection.near($pos))
-
-        tr = tr.setMeta(blockIndicatorKey, { isDragging: false })
-
-        // Clear state
-        store.currentState = {
-          ...store.currentState,
-          isDragging: false,
-          sourceOverlay: null,
-          columnContentDrop: null,
-          horizontalDropSide: null,
-          horizontalDropBlockPos: null,
-          horizontalDropRect: null,
-          horizontalDropColumnIndex: null,
-          horizontalDropGapX: null,
-        }
-        notifyListeners()
-
         editorView.dispatch(tr)
       }
 
       const executeMove = () => {
-        // Check for column content drop first (dropping INTO a column)
-        if (store.currentState.columnContentDrop) {
-          executeColumnContentDrop()
-          return
-        }
-
         // Check for horizontal drop (column creation)
         if (store.currentState.horizontalDropSide && store.currentState.horizontalDropBlockPos !== null) {
           executeHorizontalDrop()
@@ -683,6 +792,10 @@ export function createBlockIndicatorPlugin() {
 
         // Insert at new position
         tr = tr.insert(adjustedPos, dragSourceNode)
+
+        // Clean up empty source column and unwrap columnBlock if needed
+        tr = cleanupSourceColumn(tr, sourcePos)
+        adjustedPos = tr.mapping.map(adjustedPos)
 
         // Place cursor at start of moved block (not select entire block)
         const $pos = tr.doc.resolve(adjustedPos + 1)
@@ -810,217 +923,152 @@ export function createBlockIndicatorPlugin() {
         if (isDragging) {
           event.preventDefault()
 
-          const dropInfo = findDropPosition(event.clientY)
+          // Temporarily restore contentEditable for posAtCoords calls below.
+          // PM uses elementFromPoint internally which needs editable DOM for
+          // accurate hit-testing into text nodes and nested NodeViews.
+          // This is synchronous -- no selection can form in a single JS turn.
+          if (editorViewRef) editorViewRef.dom.contentEditable = 'true'
+
+          const dropInfo = findDropPosition(event.clientX, event.clientY)
           if (dropInfo) {
             dropTargetPos = dropInfo.pos
             store.dropTargetIndex = dropInfo.index
           }
 
-          // Track which block the cursor is over for indicator width
+          // Resolve which block the cursor is over (depth-aware)
           const coords = editorView.posAtCoords({
             left: event.clientX,
             top: event.clientY,
           })
 
+          if (editorViewRef) editorViewRef.dom.contentEditable = 'false'
+
           if (coords) {
             const $pos = editorView.state.doc.resolve(coords.pos)
-            let blockPos: number | null = null
+            const resolved = resolveDeepestDraggableBlock($pos)
 
-            for (let d = $pos.depth; d >= 1; d--) {
-              if (d === 1) {
-                blockPos = $pos.before(d)
-                break
-              }
-            }
+            if (resolved) {
+              const { pos: blockPos } = resolved
 
-            if (blockPos !== null) {
               try {
                 const dom = editorView.nodeDOM(blockPos)
-                if (dom instanceof HTMLElement) {
-                  // Skip headers/footers during drag
-                  if (isNonContentArea(dom)) return
+                if (!(dom instanceof HTMLElement)) return
+                // Skip headers/footers during drag
+                if (isNonContentArea(dom)) return
 
-                  const refRect = getPositionReferenceRect(editorView.dom)
-                  const blockRect = dom.getBoundingClientRect()
-                  const isPaginated = isPaginationEnabled(editorView.dom)
-                  const zoom = getZoomFactor(editorView.dom)
-                  const blockLeft = (blockRect.left - refRect.left) / zoom
+                const refRect = getPositionReferenceRect(editorView.dom)
+                const blockRect = dom.getBoundingClientRect()
+                const isPaginated = isPaginationEnabled(editorView.dom)
+                const zoom = getZoomFactor(editorView.dom)
 
-                  // In pagination mode, clip block reference to current page
-                  const blockWidth = blockRect.width / zoom
-                  if (isPaginated) {
-                    const clipped = clipIndicatorToCurrentPage(event.clientY, blockRect.top, blockRect.bottom)
-                    if (!clipped) {
-                      // Mouse is in a forbidden zone during drag -- keep last known state
-                      return
-                    }
-                  }
+                // In pagination mode, clip block reference to current page
+                if (isPaginated) {
+                  const clipped = clipIndicatorToCurrentPage(event.clientY, blockRect.top, blockRect.bottom)
+                  if (!clipped) return // Mouse in forbidden zone -- keep last known state
+                }
 
-                  // --- Edge zone detection for horizontal drop (column creation) ---
-                  const EDGE_ZONE = 30 // px from block edge
-                  const relativeX = event.clientX - blockRect.left
-                  const blockNode = editorView.state.doc.nodeAt(blockPos)
-                  // Don't allow horizontal drop on self or when target is already a columnBlock
-                  // that has 4 columns
-                  const isTargetColumnBlock = blockNode?.type.name === 'columnBlock'
-                  const targetColumnCount = isTargetColumnBlock ? blockNode.childCount : 0
-                  const canDropHorizontal = blockPos !== dragSourcePos && !(isTargetColumnBlock && targetColumnCount >= 4)
+                // --- Vertical drop indicator dimensions ---
+                // Default to the resolved (deep) block's rect. If the cursor
+                // is inside a column, narrow the indicator to column width.
+                let indicatorLeft = (blockRect.left - refRect.left) / zoom
+                let indicatorWidth = blockRect.width / zoom
 
-                  let horizontalDropSide: 'left' | 'right' | null = null
-                  let horizontalDropColumnIndex: number | null = null
-                  let horizontalDropGapX: number | null = null
-                  if (canDropHorizontal) {
-                    if (relativeX <= EDGE_ZONE) {
-                      horizontalDropSide = 'left'
-                    } else if (relativeX >= blockRect.width - EDGE_ZONE) {
-                      horizontalDropSide = 'right'
-                    }
+                const hitEl = document.elementFromPoint(event.clientX, event.clientY)
+                const cursorColumnEl = hitEl?.closest?.('[data-column]')
+                if (cursorColumnEl instanceof HTMLElement) {
+                  const colRect = cursorColumnEl.getBoundingClientRect()
+                  indicatorLeft = (colRect.left - refRect.left) / zoom
+                  indicatorWidth = colRect.width / zoom
+                }
 
-                    // For existing columnBlocks with room: also detect drops on divider gaps
-                    if (!horizontalDropSide && isTargetColumnBlock && targetColumnCount < 4) {
-                      const columnEl = (event.target as HTMLElement).closest?.('[data-column-block]')
-                      if (columnEl) {
-                        const columnChildren = columnEl.querySelectorAll<HTMLElement>('[data-column]')
-                        // Check if mouse is in a gap between columns
+                // --- Edge zone detection (horizontal drop / column creation) ---
+                // ARCHITECTURAL RULE: edge zones always operate on the TOP-LEVEL
+                // (depth 1) block, independent of resolveDeepestDraggableBlock.
+                // This avoids flickering when posAtCoords oscillates between
+                // depth 1 (columnBlock) and depth 3 (block inside column).
+                let horizontalDropSide: 'left' | 'right' | null = null
+                let horizontalDropColumnIndex: number | null = null
+                let horizontalDropGapX: number | null = null
+                let horizontalDropBlockPos: number | null = null
+                let horizontalDropRect: { left: number; top: number; width: number; height: number } | null = null
+
+                if ($pos.depth >= 1) {
+                  const topPos = $pos.before(1)
+                  const topNode = $pos.node(1)
+                  const topDom = editorView.nodeDOM(topPos)
+
+                  if (topDom instanceof HTMLElement) {
+                    const topRect = topDom.getBoundingClientRect()
+                    const EDGE_ZONE = 30
+                    const relativeX = event.clientX - topRect.left
+
+                    const isTargetColumnBlock = topNode.type.name === 'columnBlock'
+                    const targetColumnCount = isTargetColumnBlock ? topNode.childCount : 0
+                    const canDropHorizontal = topPos !== dragSourcePos
+                      && !(isTargetColumnBlock && targetColumnCount >= 4)
+
+                    if (canDropHorizontal) {
+                      if (relativeX <= EDGE_ZONE) {
+                        horizontalDropSide = 'left'
+                      } else if (relativeX >= topRect.width - EDGE_ZONE) {
+                        horizontalDropSide = 'right'
+                      }
+
+                      // Divider gap detection for columnBlocks with room
+                      if (!horizontalDropSide && isTargetColumnBlock && targetColumnCount < 4) {
+                        const columnChildren = topDom.querySelectorAll<HTMLElement>(':scope [data-column]')
                         for (let ci = 0; ci < columnChildren.length - 1; ci++) {
                           const colRect = columnChildren[ci].getBoundingClientRect()
                           const nextColRect = columnChildren[ci + 1].getBoundingClientRect()
                           const gapLeft = colRect.right
                           const gapRight = nextColRect.left
                           if (event.clientX >= gapLeft - 8 && event.clientX <= gapRight + 8) {
-                            horizontalDropSide = 'right' // visual: show indicator between
-                            horizontalDropColumnIndex = ci + 1 // insert at this column index
-                            // Store exact gap center X for vertical indicator positioning
+                            horizontalDropSide = 'right'
+                            horizontalDropColumnIndex = ci + 1
                             horizontalDropGapX = ((gapLeft + gapRight) / 2 - refRect.left) / zoom
                             break
                           }
                         }
                       }
                     }
-                  }
 
-                  // --- Column content drop detection ---
-                  // If no horizontal drop triggered, check if cursor is inside a column's content area
-                  let columnContentDrop: typeof store.currentState.columnContentDrop = null
-                  if (!horizontalDropSide && isTargetColumnBlock && blockNode && dragSourceNode) {
-                    // Don't allow dropping a columnBlock into a column (nesting prevention)
-                    if (dragSourceNode.type.name !== 'columnBlock') {
-                      const columnEl = (event.target as HTMLElement).closest?.('[data-column-block]')
-                      if (columnEl) {
-                        const columnChildren = columnEl.querySelectorAll<HTMLElement>('[data-column]')
-                        for (let ci = 0; ci < columnChildren.length; ci++) {
-                          const colRect = columnChildren[ci].getBoundingClientRect()
-                          if (event.clientX >= colRect.left && event.clientX <= colRect.right &&
-                              event.clientY >= colRect.top && event.clientY <= colRect.bottom) {
-                            // Found the column -- walk its child blocks to find nearest gap
-                            // Resolve ProseMirror position for this column
-                            let columnNodePos = blockPos + 1 // after columnBlock opening
-                            for (let k = 0; k < ci; k++) {
-                              columnNodePos += blockNode.child(k).nodeSize
-                            }
-                            const columnNode = blockNode.child(ci)
-                            // columnNodePos is start of the column node
-                            // Content starts at columnNodePos + 1 (after column opening tag)
-                            const contentStart = columnNodePos + 1
-
-                            // Collect gaps between child blocks in this column
-                            const childGaps: { insertPos: number; yPos: number }[] = []
-                            let childOffset = 0
-                            for (let ch = 0; ch < columnNode.childCount; ch++) {
-                              const child = columnNode.child(ch)
-                              const childPos = contentStart + childOffset
-                              // Gap before this child
-                              try {
-                                const childDom = editorView.nodeDOM(childPos)
-                                if (childDom instanceof HTMLElement) {
-                                  const childRect = childDom.getBoundingClientRect()
-                                  childGaps.push({
-                                    insertPos: childPos,
-                                    yPos: childRect.top,
-                                  })
-                                  // After last child, add gap at bottom
-                                  if (ch === columnNode.childCount - 1) {
-                                    childGaps.push({
-                                      insertPos: childPos + child.nodeSize,
-                                      yPos: childRect.bottom,
-                                    })
-                                  }
-                                }
-                              } catch { /* skip */ }
-                              childOffset += child.nodeSize
-                            }
-
-                            // If column is empty, insert at content start
-                            if (childGaps.length === 0) {
-                              childGaps.push({
-                                insertPos: contentStart,
-                                yPos: colRect.top + colRect.height / 2,
-                              })
-                            }
-
-                            // Find closest gap to cursor Y
-                            let closestGap = childGaps[0]
-                            let closestDist = Infinity
-                            for (const gap of childGaps) {
-                              const dist = Math.abs(event.clientY - gap.yPos)
-                              if (dist < closestDist) {
-                                closestDist = dist
-                                closestGap = gap
-                              }
-                            }
-
-                            if (closestGap) {
-                              columnContentDrop = {
-                                columnBlockPos: blockPos,
-                                columnIndex: ci,
-                                insertPos: closestGap.insertPos,
-                                indicatorTop: (closestGap.yPos - refRect.top) / zoom,
-                                indicatorLeft: (colRect.left - refRect.left) / zoom,
-                                indicatorWidth: colRect.width / zoom,
-                              }
-                            }
-                            break
-                          }
-                        }
+                    if (horizontalDropSide) {
+                      horizontalDropBlockPos = topPos
+                      horizontalDropRect = {
+                        left: (topRect.left - refRect.left) / zoom,
+                        top: (topRect.top - refRect.top) / zoom,
+                        width: topRect.width / zoom,
+                        height: topRect.height / zoom,
                       }
                     }
                   }
-
-                  // dropInfo.top is a BCR diff from findDropPosition -- divide by zoom
-                  let indicatorTop: number
-                  if (columnContentDrop) {
-                    indicatorTop = columnContentDrop.indicatorTop
-                  } else if (dropInfo) {
-                    indicatorTop = dropInfo.top / zoom
-                  } else if (store.currentState.dropIndicatorTop != null) {
-                    indicatorTop = store.currentState.dropIndicatorTop
-                  } else {
-                    indicatorTop = (blockRect.top - refRect.top) / zoom
-                  }
-
-                  store.currentState = {
-                    ...store.currentState,
-                    visible: true,
-                    top: indicatorTop,
-                    height: 2,  // Horizontal line height
-                    blockLeft: columnContentDrop ? columnContentDrop.indicatorLeft : blockLeft,
-                    blockWidth: columnContentDrop ? columnContentDrop.indicatorWidth : blockWidth,
-                    dropIndicatorTop: indicatorTop,
-                    // Horizontal drop state
-                    horizontalDropSide: columnContentDrop ? null : horizontalDropSide,
-                    horizontalDropBlockPos: horizontalDropSide && !columnContentDrop ? blockPos : null,
-                    horizontalDropRect: horizontalDropSide && !columnContentDrop ? {
-                      left: blockLeft,
-                      top: (blockRect.top - refRect.top) / zoom,
-                      width: blockWidth,
-                      height: blockRect.height / zoom,
-                    } : null,
-                    horizontalDropColumnIndex: columnContentDrop ? null : horizontalDropColumnIndex,
-                    horizontalDropGapX: columnContentDrop ? null : horizontalDropGapX,
-                    columnContentDrop,
-                  }
-                  notifyListeners()
                 }
+
+                // --- Drop indicator Y position ---
+                let indicatorTop: number
+                if (dropInfo) {
+                  indicatorTop = dropInfo.top / zoom
+                } else if (store.currentState.dropIndicatorTop != null) {
+                  indicatorTop = store.currentState.dropIndicatorTop
+                } else {
+                  indicatorTop = (blockRect.top - refRect.top) / zoom
+                }
+
+                store.currentState = {
+                  ...store.currentState,
+                  visible: true,
+                  top: indicatorTop,
+                  height: 2,
+                  blockLeft: indicatorLeft,
+                  blockWidth: indicatorWidth,
+                  dropIndicatorTop: indicatorTop,
+                  horizontalDropSide,
+                  horizontalDropBlockPos,
+                  horizontalDropRect,
+                  horizontalDropColumnIndex,
+                  horizontalDropGapX,
+                }
+                notifyListeners()
               } catch {
                 // Position invalid
               }
@@ -1037,14 +1085,8 @@ export function createBlockIndicatorPlugin() {
         if (!coords) return
 
         const $pos = editorView.state.doc.resolve(coords.pos)
-        let blockPos: number | null = null
-
-        for (let d = $pos.depth; d >= 1; d--) {
-          if (d === 1) {
-            blockPos = $pos.before(d)
-            break
-          }
-        }
+        const resolved = resolveDeepestDraggableBlock($pos)
+        const blockPos = resolved ? resolved.pos : null
 
         // Re-evaluate when entering a new block OR when returning to content
         // from a forbidden zone (indicator hidden but mouse now on valid block)
@@ -1168,22 +1210,21 @@ export function createBlockIndicatorPlugin() {
         const capturedBlockPos = currentBlockPos
         const capturedDom = dom
 
+        // Disable contentEditable on next frame to prevent browser native selection
+        // during the 400ms long press wait. Must be rAF (not synchronous) so PM's
+        // mousedown handler places the cursor first. The callback checks longPressTimer
+        // so quick clicks (mouseup before next frame) are unaffected.
+        requestAnimationFrame(() => {
+          if (longPressTimer !== null && editorViewRef) {
+            editorViewRef.dom.contentEditable = 'false'
+            window.getSelection()?.removeAllRanges()
+          }
+        })
+
         longPressTimer = setTimeout(() => {
           // Long press completed - start drag
           const node = editorView.state.doc.nodeAt(capturedBlockPos)
           if (!node) return
-
-          // Clear any selection that formed during the 400ms long press wait
-          window.getSelection()?.removeAllRanges()
-
-          // Break ProseMirror's internal drag-to-select state machine.
-          // PM tracks mousedown and extends selection on every mousemove until mouseup.
-          // A synthetic mouseup tells PM the text selection cycle is over.
-          const syntheticUp = new MouseEvent('mouseup', {
-            bubbles: true,
-            cancelable: true,
-          })
-          editorView.dom.dispatchEvent(syntheticUp)
 
           // Create overlay for cursor styling only (pointer-events: none lets events through)
           dragOverlay = document.createElement('div')
