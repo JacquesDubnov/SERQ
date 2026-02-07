@@ -3,6 +3,10 @@
  *
  * TipTap commands for creating, modifying, and removing column layouts.
  * All commands use the standard TipTap command pattern with { tr, dispatch }.
+ *
+ * Column widths are stored on Column children (Column.attrs.width),
+ * NOT on the ColumnBlock parent. Commands that change column count
+ * distribute equal widths across all children.
  */
 
 import { type Editor } from '@tiptap/core'
@@ -12,38 +16,18 @@ import { TextSelection } from '@tiptap/pm/state'
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
     columnBlock: {
-      /**
-       * Create a columnBlock at the current cursor position.
-       * Wraps the current block content into the first column.
-       */
       setColumns: (count: 2 | 3 | 4) => ReturnType
-      /**
-       * Unwrap a columnBlock, concatenating all column content back to doc flow.
-       */
       unsetColumns: () => ReturnType
-      /**
-       * Add a column to the current columnBlock (max 4).
-       */
       addColumn: () => ReturnType
-      /**
-       * Remove a column by index (min 2). Content moves to adjacent column.
-       */
       removeColumn: (index: number) => ReturnType
-      /**
-       * Set column width fractions directly.
-       */
       setColumnWidths: (widths: number[]) => ReturnType
-      /**
-       * Set gutter width in pixels.
-       */
-      setColumnGutter: (gutter: number) => ReturnType
     }
   }
 }
 
 /**
  * Find the nearest columnBlock ancestor from the current selection.
- * Returns { pos, node, depth } or null if not inside a columnBlock.
+ * Walks up the depth tree dynamically -- no hardcoded depth assumptions.
  */
 function findColumnBlock(editor: Editor): { pos: number; node: PMNode; depth: number } | null {
   const { selection } = editor.state
@@ -61,14 +45,29 @@ function findColumnBlock(editor: Editor): { pos: number; node: PMNode; depth: nu
 
 /**
  * Generate equal width fractions for N columns.
- * e.g. 3 columns -> [0.3333, 0.3333, 0.3334] (sums to 1.0)
  */
 function equalWidths(count: number): number[] {
   const base = Math.floor((1 / count) * 10000) / 10000
   const widths = Array(count).fill(base)
-  // Fix rounding: last column gets the remainder
   widths[count - 1] = +(1 - base * (count - 1)).toFixed(4)
   return widths
+}
+
+/**
+ * Find the depth of the nearest block-accepting parent.
+ * With sections: doc(0) > section(1) > block(2).
+ * Without sections (migration): doc(0) > block(1).
+ */
+function findBlockDepthFromTransaction(tr: any): number {
+  const $from = tr.selection.$from
+  for (let d = $from.depth; d >= 1; d--) {
+    const parent = $from.node(d - 1)
+    // The parent that accepts blocks/containers is either 'section' or 'doc'
+    if (parent.type.name === 'section' || parent.type.name === 'doc') {
+      return d
+    }
+  }
+  return 1 // fallback
 }
 
 export function addColumnCommands(/* _extension: any */) {
@@ -78,8 +77,6 @@ export function addColumnCommands(/* _extension: any */) {
       ({ tr, dispatch, editor }: { tr: any; dispatch: any; editor: Editor }) => {
         const schema = editor.state.schema
 
-        // Read position from the transaction (not editor.state) since
-        // the slash menu may have already modified the doc in this tr
         const $from = tr.selection.$from
 
         // Don't allow creating columns inside existing columns
@@ -89,58 +86,42 @@ export function addColumnCommands(/* _extension: any */) {
           }
         }
 
-        // Find the top-level block the cursor is in (depth 1 = direct child of doc)
-        let blockPos: number | null = null
-        let blockNode: PMNode | null = null
-        for (let d = $from.depth; d >= 1; d--) {
-          if (d === 1) {
-            blockPos = $from.before(d)
-            blockNode = $from.node(d)
-            break
-          }
-        }
+        // Find the block the cursor is in (dynamically, not hardcoded d===1)
+        const blockDepth = findBlockDepthFromTransaction(tr)
+        const blockPos = $from.before(blockDepth)
+        const blockNode = $from.node(blockDepth)
 
-        // Build the column content
+        // Build columns with width attrs
         const columns: PMNode[] = []
         const columnType = schema.nodes.column
         const paragraphType = schema.nodes.paragraph
+        const widths = equalWidths(count)
 
         // First column gets the current block content (or an empty paragraph)
         if (blockNode && blockNode.content.size > 0) {
-          columns.push(columnType.create(null, blockNode))
+          columns.push(columnType.create({ width: widths[0] }, blockNode))
         } else {
-          columns.push(columnType.create(null, paragraphType.create()))
+          columns.push(columnType.create({ width: widths[0] }, paragraphType.create()))
         }
 
         // Remaining columns get empty paragraphs
         for (let i = 1; i < count; i++) {
-          columns.push(columnType.create(null, paragraphType.create()))
+          columns.push(columnType.create({ width: widths[i] }, paragraphType.create()))
         }
 
         const columnBlockNode = schema.nodes.columnBlock.create(
-          {
-            columns: count,
-            columnWidths: equalWidths(count),
-            gutter: 24,
-          },
+          { columns: count },
           columns,
         )
 
-        if (!dispatch) return true // Can-run check
+        if (!dispatch) return true
 
-        if (blockPos !== null && blockNode) {
-          tr.replaceWith(blockPos, blockPos + blockNode.nodeSize, columnBlockNode)
-        } else {
-          tr.replaceSelectionWith(columnBlockNode)
-        }
+        tr.replaceWith(blockPos, blockPos + blockNode.nodeSize, columnBlockNode)
 
         // Place cursor at the first valid text position inside the columnBlock
-        // (first paragraph of first column). Use findFrom to search forward
-        // rather than hardcoding offsets that break across NodeView wrappers.
         try {
-          const insertPos = blockPos !== null ? blockPos : tr.selection.from
-          const $start = tr.doc.resolve(insertPos + 1) // Just inside columnBlock
-          const sel = TextSelection.findFrom($start, 1) // Search forward
+          const $start = tr.doc.resolve(blockPos + 1)
+          const sel = TextSelection.findFrom($start, 1)
           if (sel) tr.setSelection(sel)
         } catch {
           // Let ProseMirror auto-resolve if position math fails
@@ -158,7 +139,6 @@ export function addColumnCommands(/* _extension: any */) {
 
         const { pos, node } = result
 
-        // Collect all content from all columns
         const contentNodes: PMNode[] = []
         node.forEach((column) => {
           column.forEach((child) => {
@@ -186,19 +166,43 @@ export function addColumnCommands(/* _extension: any */) {
         if (!dispatch) return true
 
         const schema = editor.state.schema
-        const newColumn = schema.nodes.column.create(null, schema.nodes.paragraph.create())
-
         const newCount = currentCount + 1
         const newWidths = equalWidths(newCount)
 
-        // Insert the new column at the end of the columnBlock
-        const insertPos = pos + node.nodeSize - 1 // Before closing tag
+        // Create new column with its width
+        const newColumn = schema.nodes.column.create(
+          { width: newWidths[newCount - 1] },
+          schema.nodes.paragraph.create(),
+        )
+
+        // Insert the new column at the end
+        const insertPos = pos + node.nodeSize - 1
         tr.insert(insertPos, newColumn)
-          .setNodeMarkup(pos, undefined, {
-            ...node.attrs,
-            columns: newCount,
-            columnWidths: newWidths,
+
+        // Update parent column count
+        tr.setNodeMarkup(tr.mapping.map(pos), undefined, {
+          ...node.attrs,
+          columns: newCount,
+        })
+
+        // Update all existing columns to new equal widths
+        const updatedBlock = tr.doc.nodeAt(tr.mapping.map(pos)) as PMNode | null
+        if (updatedBlock) {
+          const blockPos = tr.mapping.map(pos)
+          updatedBlock.forEach((column: PMNode, offset: number, index: number) => {
+            if (column.type.name === 'column') {
+              const colPos = blockPos + 1 + offset
+              const mappedPos = tr.mapping.map(colPos)
+              const mappedCol = tr.doc.nodeAt(mappedPos) as PMNode | null
+              if (mappedCol) {
+                tr.setNodeMarkup(mappedPos, undefined, {
+                  ...mappedCol.attrs,
+                  width: newWidths[index],
+                })
+              }
+            }
           })
+        }
 
         dispatch(tr)
         return true
@@ -213,7 +217,6 @@ export function addColumnCommands(/* _extension: any */) {
         const { pos, node } = result
         const currentCount = node.childCount
         if (currentCount <= 2) {
-          // At minimum columns -- unwrap instead
           return editor.commands.unsetColumns()
         }
 
@@ -222,8 +225,8 @@ export function addColumnCommands(/* _extension: any */) {
 
         const tr = editor.state.tr
 
-        // Find the column to remove and its position
-        let columnStart = pos + 1 // After columnBlock opening
+        // Find the column to remove
+        let columnStart = pos + 1
         for (let i = 0; i < index; i++) {
           columnStart += node.child(i).nodeSize
         }
@@ -236,9 +239,8 @@ export function addColumnCommands(/* _extension: any */) {
         for (let i = 0; i <= targetIndex; i++) {
           targetEnd += node.child(i).nodeSize
         }
-        targetEnd -= 1 // Before target column's closing tag
+        targetEnd -= 1
 
-        // Collect content from the removed column
         const contentNodes: PMNode[] = []
         removedColumn.forEach((child) => {
           contentNodes.push(child)
@@ -247,32 +249,46 @@ export function addColumnCommands(/* _extension: any */) {
         const newCount = currentCount - 1
         const newWidths = equalWidths(newCount)
 
-        // First insert content into target, then delete the column
-        // Order matters: insert first (higher pos), then delete (lower pos changes)
         if (index <= targetIndex) {
-          // Removing before target -- adjust positions after delete
           tr.delete(columnStart, columnEnd)
-          // Position shifted after delete
           const adjustedTargetEnd = targetEnd - (columnEnd - columnStart) - 1
           if (contentNodes.length > 0) {
             tr.insert(adjustedTargetEnd, contentNodes)
           }
         } else {
-          // Removing after target -- insert first
           if (contentNodes.length > 0) {
             tr.insert(targetEnd, contentNodes)
           }
-          // Position shifted after insert
           const contentSize = contentNodes.reduce((sum, n) => sum + n.nodeSize, 0)
           tr.delete(columnStart + contentSize, columnEnd + contentSize)
         }
 
-        // Update attributes
+        // Update parent column count
         tr.setNodeMarkup(tr.mapping.map(pos), undefined, {
           ...node.attrs,
           columns: newCount,
-          columnWidths: newWidths,
         })
+
+        // Update remaining column widths
+        const updatedBlock = tr.doc.nodeAt(tr.mapping.map(pos)) as PMNode | null
+        if (updatedBlock) {
+          const blockPos = tr.mapping.map(pos)
+          let childIdx = 0
+          updatedBlock.forEach((column: PMNode, offset: number) => {
+            if (column.type.name === 'column') {
+              const colPos = blockPos + 1 + offset
+              const mappedPos = tr.mapping.map(colPos)
+              const mappedCol = tr.doc.nodeAt(mappedPos) as PMNode | null
+              if (mappedCol) {
+                tr.setNodeMarkup(mappedPos, undefined, {
+                  ...mappedCol.attrs,
+                  width: newWidths[childIdx],
+                })
+              }
+              childIdx++
+            }
+          })
+        }
 
         editor.view.dispatch(tr)
         return true
@@ -284,31 +300,27 @@ export function addColumnCommands(/* _extension: any */) {
         const result = findColumnBlock(editor)
         if (!result) return false
 
-        if (!dispatch) return true
-
         const { pos, node } = result
-        tr.setNodeMarkup(pos, undefined, {
-          ...node.attrs,
-          columnWidths: widths,
-        })
-
-        dispatch(tr)
-        return true
-      },
-
-    setColumnGutter:
-      (gutter: number) =>
-      ({ tr, dispatch, editor }: { tr: any; dispatch: any; editor: Editor }) => {
-        const result = findColumnBlock(editor)
-        if (!result) return false
+        if (widths.length !== node.childCount) return false
 
         if (!dispatch) return true
 
-        const { pos, node } = result
-        tr.setNodeMarkup(pos, undefined, {
-          ...node.attrs,
-          gutter,
+        // Write widths to each column child using position mapping
+        const childPositions: number[] = []
+        node.forEach((_child, childOffset) => {
+          childPositions.push(pos + 1 + childOffset)
         })
+
+        for (let i = 0; i < childPositions.length; i++) {
+          const mappedPos = tr.mapping.map(childPositions[i])
+          const col = tr.doc.nodeAt(mappedPos)
+          if (col && col.type.name === 'column') {
+            tr.setNodeMarkup(mappedPos, undefined, {
+              ...col.attrs,
+              width: widths[i],
+            })
+          }
+        }
 
         dispatch(tr)
         return true

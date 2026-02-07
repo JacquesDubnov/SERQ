@@ -85,27 +85,10 @@ body.block-animating [data-virtual-cursor] {
   visibility: hidden !important;
 }
 
-/* Source overlay - covers original block during drag, fades in to hide text */
-.block-source-overlay {
-  pointer-events: none;
-  z-index: 999;
-  /* Match page/editor background */
-  background: white;
-  /* Start invisible */
-  opacity: 0;
-  /* Transition for fade in effect - 1.5s as specified */
+/* Source block fade during drag - applied directly to the DOM element */
+.block-drag-source {
   transition: opacity 1500ms ease-in-out;
-}
-
-/* Visible state - text completely hidden */
-.block-source-overlay[data-visible="true"] {
-  opacity: 1;
-}
-
-/* Dark mode source overlay */
-[data-theme="dark"] .block-source-overlay,
-.theme-dark .block-source-overlay {
-  background: #1f1f1f;
+  opacity: 0;
 }
 
 

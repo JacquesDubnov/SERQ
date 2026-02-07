@@ -28,6 +28,27 @@ The handover file MUST include:
 7. **What Didn't Work** - Failed approaches and WHY
 8. **Next Steps** - Exactly what we planned to do next
 
+### Project Debug Log (MANDATORY)
+
+**File:** `.claude/PROJECT-DEBUG-LOG.md`
+
+This file is the persistent record of ALL bugs, debugging steps, and resolutions. It survives across sessions.
+
+**Session Start Protocol (EVERY session, NO exceptions):**
+1. Read `.claude/SESSION-HANDOVER.md` -- understand where we left off
+2. Read `.claude/PROJECT-DEBUG-LOG.md` -- understand all active bugs, what was tried, what failed
+3. Only THEN start working
+
+**Session Work Protocol:**
+- After EVERY code change: update the debug log with what was changed and why
+- After EVERY debugging iteration: log the hypothesis, what was tested, and the result
+- After EVERY bug resolution: move the bug to RESOLVED with commit hash and root cause
+
+**Handover Protocol:**
+- Update SESSION-HANDOVER.md (current state)
+- Update PROJECT-DEBUG-LOG.md (all bug states current)
+- Both files must be consistent with each other
+
 ### Fresh Context Rule
 
 **Always start complex tasks with a fresh context window.** Context rot is real and destroys output quality. Better to reset early than produce degraded work.
@@ -144,6 +165,8 @@ src-tauri/                # Rust backend (Tauri)
 
 - **Rebuild Plan**: `.planning/TIPTAP-NATIVE-REBUILD-PLAN.md`
 - **Session Handover**: `.claude/SESSION-HANDOVER.md`
+- **Project Debug Log**: `.claude/PROJECT-DEBUG-LOG.md` -- READ THIS AT SESSION START
+- **Boardroom Spec**: `.planning/boardroom/round4-final-specification.md`
 - **PRD Foundation**: In Obsidian vault at `PROJECTS/SERQ/SERQ - PRD Foundation.xml`
 
 ---

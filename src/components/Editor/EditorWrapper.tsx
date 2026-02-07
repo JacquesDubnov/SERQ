@@ -35,12 +35,11 @@ export function EditorWrapper({ editor, children, minHeight = 800, zoom = 100 }:
     e.preventDefault();
     e.stopPropagation();
 
-    // Calculate click position (adjusted for zoom)
+    // Calculate click position relative to wrapper.
+    // With CSS zoom, getBoundingClientRect() and event coords are in the same space.
+    // No zoom adjustment needed.
     const wrapperRect = wrapperRef.current.getBoundingClientRect();
-    const clickY = e.clientY - wrapperRect.top;
-    // Adjust for zoom: screen coordinates / zoom factor = content coordinates
-    const zoomFactor = zoom / 100;
-    const adjustedClickY = clickY / zoomFactor;
+    const adjustedClickY = e.clientY - wrapperRect.top;
 
     // Calculate target line from Y position (in content coordinates)
     const targetLine = Math.max(0, Math.floor(adjustedClickY / PARAGRAPH_HEIGHT));

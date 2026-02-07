@@ -1,181 +1,173 @@
 # SERQ Session Handover
 
-**Date:** 2026-02-06
-**Branch:** `main` (uncommitted changes)
-**Build status:** `npm run build` passes clean (tsc + vite)
+**Date:** 2026-02-08 (night session)
+**Branch:** `main`
+**Last commit:** `de5322a` -- NO new commits (all changes uncommitted)
+**Next session:** Fix block drag-and-drop at non-100% zoom
+
+---
+
+## MANDATORY: Read These Files First
+
+1. **This file** -- full context of what was tried, what works, what doesn't
+2. **`.claude/PROJECT-DEBUG-LOG.md`** -- all bug states
 
 ---
 
 ## Project Overview
 
-SERQ is a Tauri-based desktop rich text editor:
-- **Frontend:** React + TypeScript + TipTap (ProseMirror)
-- **Desktop:** Tauri 2.x (Rust backend, WebKit/WKWebView on macOS)
-- **State:** Zustand
-- **License:** TipTap Teams ($149/mo)
+SERQ: Tauri 2 desktop rich text editor. React + TypeScript + TipTap (ProseMirror) + Zustand.
 
 ---
 
-## What Was Done This Session (ALL COMPLETE EXCEPT TEXT SELECT BUG)
+## ZOOM IS FIXED
 
-### 1. Gutter Min/Max Clamping (COMPLETE)
+### The Three-Part Solution
 
-- `ColumnBlockView.tsx` -- mouseUp commit and live drag now clamp to dynamic max
-- `column-block.ts` -- parseHTML clamps to MIN_GUTTER (10) floor only (no max at parse time since container width unknown)
-- Removed fixed `MAX_GUTTER = 80` constant
-- Added `computeMaxGutter(containerWidth, columnCount)` helper: `(containerWidth - N * 30) / (N - 1)`
-- Added `containerWidth` field to `resizeState` ref, stored at drag start
-- Columns cannot shrink below 30px during gutter resize
+The block indicator zoom issue had THREE separate coordinate problems, each requiring a different fix:
 
-### 2. Block Drag INTO Column Content (COMPLETE)
+#### 1. CSS Positioning (indicator placement)
+**Problem:** `getBoundingClientRect()` deltas were used for CSS `position: absolute; top/left` values. With the WebKit CSS zoom bug, both sides return un-zoomed values, but CSS absolute positioning inside the zoom wrapper operates in content space. The values happened to match (diagnostic confirmed offset and rect give identical numbers), so this wasn't actually the root cause -- but offset-based is cleaner.
 
-- Added `columnContentDrop` state field to `BlockIndicatorState` in `types.ts`:
-  ```
-  { columnBlockPos, columnIndex, insertPos, indicatorTop, indicatorLeft, indicatorWidth } | null
-  ```
-- Detection in `plugin.ts` drag mousemove: when cursor is over a columnBlock but NOT in edge/gap zone, finds which `[data-column]` element contains cursor, walks child blocks to find nearest Y gap, resolves ProseMirror insert position
-- `executeColumnContentDrop()` function: deletes source, adjusts position for deletion offset, inserts at column target position
-- Wired into `executeMove()` as first priority check (before horizontal drop and normal vertical drop)
-- Nesting prevention: won't drop a columnBlock into a column
-- Existing horizontal drag indicator renders correctly (blockLeft/blockWidth set to column dimensions in state)
+**Fix:** `getOffsetRelativeTo(element, ancestor)` walks the `offsetParent` chain to compute content-space positions. Used for all CSS positioning values (`top`, `left`, `width`, `height` on the indicator).
 
-### 3. Between-Column Gap Drop Indicator Position (COMPLETE)
+#### 2. Block Finding (which block is the mouse over)
+**Problem:** `event.clientY` (screen space) was compared against `getBoundingClientRect().top/bottom` (un-zoomed due to WebKit bug). At zoom 1.5, a block at content y=500 has `rect.top=500` but the mouse at that position has `clientY=750`. The comparison picked the WRONG block.
 
-- Added `horizontalDropGapX: number | null` to `BlockIndicatorState`
-- Gap detection computes midpoint: `((gapLeft + gapRight) / 2 - refRect.left) / zoom`
-- `BlockIndicator.tsx` vertical indicator uses `horizontalDropGapX` when set, falls back to left/right edge calculation
-- All cleanup paths clear the field
+**Fix:** Replaced the entire block-finding loop with `document.elementFromPoint(event.clientX, event.clientY)` which works in screen space and correctly handles CSS zoom. Falls back to `posAtCoords` for padding/gap areas.
 
-### 4. Divider Visibility (COMPLETE)
+#### 3. Bounds Checking (when to show/hide indicator)
+**Problem:** `handleGlobalMouseMove` compared `event.clientY` against `getBoundingClientRect().bottom + 50`. At high zoom, the visual bottom extends far beyond the un-zoomed rect value, so the indicator was hidden for the bottom ~4 paragraphs.
 
-- `columns.css`: Divider `::after` opacity now `0` by default (was always `0.4`)
-- Shows at `opacity: 0.4` on `.column-block-wrapper:hover`
-- Shows at `opacity: 0.7` when `[data-focused]` (cursor/caret inside columnBlock)
-- `opacity: 1` with active color on divider `:hover` or `[data-resizing]`
-- `pointer-events` on `.column-divider-handle`: `none` by default, `auto` when wrapper is `:hover`, `[data-focused]`, or `[data-resizing]`
+**Fix:** Replaced rect-based bounds check with `elementFromPoint` + `contains()` checks against the zoom wrapper, ancestor, and editor DOM.
 
-### 5. Text Selection During Block Drag (PARTIALLY FIXED -- BUG REMAINS)
+### Key Insight: WebKit CSS Zoom Bug
 
-This is the open bug. Text selection still flickers during drag, particularly when crossing element boundaries.
+`isCSSZoomCoordinateFixed()` returns `false` in this WKWebView. This means:
+- `getBoundingClientRect()` returns UN-ZOOMED values for elements inside a CSS zoom container
+- `event.clientX/Y` is in SCREEN space (zoomed)
+- `elementFromPoint()` works correctly in screen space (handles zoom)
+- `posAtCoords()` works correctly for caret placement
+- `offsetTop/offsetLeft/offsetWidth/offsetHeight` return content-space values
+- CSS `position: absolute; top: X` uses content-space values
+
+The bug is tracked as WebKit #300474 and was fixed in Safari Technology Preview 232, but NOT in production WKWebView.
 
 ---
 
-## OPEN BUG: Text Selection During Block Drag
+## CURRENT STATE: What Works
 
-### The Problem
+- Block indicator at ALL zoom levels (80-150%) -- FIXED this session
+- Caret placement at high zoom (120%+) -- verified by Jacques
+- Text selection at 100% zoom
+- Editor rendering at all zoom levels
+- Zoom slider: 80-150% in 5% steps
 
-When long-press-dragging a block, text gets selected as the cursor moves over content. The selection flickers -- it appears, then clears after crossing element boundaries. It does NOT affect drop functionality, but it's visually jarring.
+## WHAT'S NEXT: Broken
 
-### What Was Tried (5 approaches, none fully solved it)
+1. **Block drag-and-drop at non-100% zoom** -- Jacques's next priority
+   - The drag indicator positioning uses offset-based values (should be correct)
+   - But `findDropPosition()` and the drag's `posAtCoords` calls might have coordinate issues
+   - Edge zone detection uses `getBoundingClientRect` for mouse comparison (needs elementFromPoint)
+   - The `clipIndicatorToCurrentPage` pagination clipping still uses getBoundingClientRect vs mouse coords
 
-**Attempt 1: CSS `user-select: none` via `.block-dragging` class**
-- The class IS added in `startDrag()` and the CSS rule uses `!important` on `body.block-dragging *`
-- DOESN'T WORK because the class is applied AFTER the browser/ProseMirror already entered selection-drag mode during the 400ms long press
-- File: `src/components/BlockIndicator/BlockIndicator.css` lines 59-68
-
-**Attempt 2: Inline `user-select: none` on body**
-- Added `suppressTextSelection()` / `restoreTextSelection()` helpers that set `document.body.style.userSelect = 'none'` directly
-- Called in `startDrag()`, cleared in `cancelDrag()` and `handleMouseUp()`
-- PARTIALLY WORKS but selection still appears intermittently -- inline styles applied after selection started don't fully stop WebKit's active selection drag
-- File: `plugin.ts` around line 95-105
-
-**Attempt 3: `selectstart` event handler**
-- Added `document.addEventListener('selectstart', handler)` that calls `preventDefault()` when `isDragging` is true
-- Registered in plugin view setup, cleaned up in destroy
-- DOESN'T FULLY WORK because `selectstart` only fires for NEW selections, not for extension of existing ones
-- IMPORTANT: Initially also blocked during `isLongPressing` -- this BROKE cursor placement because ProseMirror creates TextSelection on normal clicks which fires `selectstart`. Had to revert to `isDragging` only.
-- File: `plugin.ts` around line 1290
-
-**Attempt 4: `removeAllRanges()` on every mousemove**
-- Both editor-scoped and global mousemove handlers call `window.getSelection()?.removeAllRanges()` during drag
-- DOESN'T WORK because ProseMirror re-applies its own selection from internal state on every view update, immediately recreating the selection after we clear it
-
-**Attempt 5: Synthetic mouseup before startDrag**
-- Dispatches a synthetic `MouseEvent('mouseup')` to `editorView.dom` right before `startDrag()` runs
-- Idea: tells ProseMirror the text-selection gesture is over, so it stops extending on mousemove
-- MOSTLY WORKS -- significantly reduced the flickering, but edge cases remain where selection still appears briefly
-- File: `plugin.ts` around line 1166
-
-### Root Cause Analysis
-
-The fundamental problem has TWO layers:
-
-**Layer 1 -- Browser native selection:** The mousedown in `handleMouseDown` is intentionally NOT prevented (`event.preventDefault()` is not called) because ProseMirror needs the mousedown to place the cursor. This means the browser enters its native selection-drag state. This state persists until a real mouseup.
-
-**Layer 2 -- ProseMirror's selection:** ProseMirror has its OWN selection tracking separate from the browser. When it receives mousedown, it stores internal state (`lastMouseDown`) and on every subsequent mousemove, extends a TextSelection. ProseMirror then applies this to the editor state, which re-renders as a browser selection. This is INDEPENDENT of CSS `user-select`, `selectstart` events, and `removeAllRanges()`.
-
-The synthetic mouseup partially fixes Layer 2 by telling ProseMirror the gesture is done. But edge cases remain -- possibly because ProseMirror's internal handlers process events in a specific order, or because the synthetic event doesn't fully clear all internal tracking state.
-
-### Approaches NOT Yet Tried
-
-1. **Prevent mousedown + manual cursor placement:** Call `event.preventDefault()` on the mousedown in `handleMouseDown`, then manually place the ProseMirror cursor via `editorView.dispatch()` with a `TextSelection`. This would prevent BOTH the browser and ProseMirror from entering selection-drag mode. The risk: getting cursor placement right for all cases (inside text, at block edges, etc.).
-
-2. **`editorView.dom.contentEditable = 'false'` during drag:** Temporarily make the editor non-editable when drag starts, restore when drag ends. ContentEditable=false completely prevents selection. Risk: might cause ProseMirror to lose state or throw errors.
-
-3. **Full-screen overlay with `pointer-events: all`:** The `dragOverlay` already exists with `pointer-events: none`. Changing to `pointer-events: all` would intercept ALL mouse events, preventing both browser and ProseMirror from seeing them. The drag logic would need to use `editorView.posAtCoords()` for position detection, but that internally uses `document.elementFromPoint()` which would return the overlay. Workaround: temporarily set overlay to `pointer-events: none` during `posAtCoords` calls.
-
-4. **ProseMirror plugin with `handleDOMEvents`:** Create a ProseMirror plugin that intercepts `mousemove` during drag and returns `true` (preventing ProseMirror's default handling). This is the most architecturally clean approach -- it works within ProseMirror's own event system.
-
-5. **`editorView.dispatch` with `setMeta` to flag drag state + custom selection handling in plugin `apply`:** Have the plugin's state `apply` method reject selection changes when a drag meta flag is set. This prevents ProseMirror from updating its selection during drag.
-
-### Jacques's Instruction
-
-Jacques says: "Think again. The solution should disable text select at the core, not paper over it. Consult specialists (CSS, React, TipTap/ProseMirror) to find the proper architectural solution."
-
-The most promising architectural approach is #4 (ProseMirror plugin `handleDOMEvents`) because it stops the selection at ProseMirror's own event processing level -- before it ever creates a TextSelection. This is the "core" fix rather than fighting the effects downstream.
+2. **Caret at low zoom (<100%)** -- less investigated, Jacques reports issues
 
 ---
 
-## Uncommitted Files Modified
+## FILES STATE (Uncommitted)
 
-| File | Changes |
-|------|---------|
-| `src/extensions/columns/ColumnBlockView.tsx` | Dynamic max gutter via `computeMaxGutter()`, `containerWidth` in resizeState, removed `MAX_GUTTER` constant |
-| `src/extensions/columns/column-block.ts` | parseHTML gutter: min clamp only (removed max) |
-| `src/extensions/columns/columns.css` | Divider visibility on hover/focus, pointer-events gating |
-| `src/extensions/block-indicator/types.ts` | Added `columnContentDrop`, `horizontalDropGapX` to BlockIndicatorState |
-| `src/extensions/block-indicator/state.ts` | Added defaults for new state fields |
-| `src/extensions/block-indicator/plugin.ts` | Column content drop detection + execution, gap X tracking, selectstart handler, inline user-select, synthetic mouseup, suppressTextSelection helpers |
-| `src/components/BlockIndicator/BlockIndicator.tsx` | Added new state field defaults, gap X indicator positioning |
+### Files CREATED (new)
+- `src/lib/zoom/prosemirror-zoom-patch.ts` -- no-op module (CSS zoom doesn't need patching)
+
+### Files DELETED
+- `src/extensions/zoom-coordinate-fix.ts` -- abandoned
+
+### Files MODIFIED
+
+- **`src/extensions/block-indicator/dom-utils.ts`** -- MAJOR CHANGES:
+  - Added `getPositionAncestor()` -- finds `.editor-content-wrapper`
+  - Added `getOffsetRelativeTo()` -- walks offsetParent chain for content-space coordinates
+  - Removed `getEffectiveZoom()` and `screenToUnzoomed()` (unused, approach didn't work)
+  - Updated doc comment explaining the three-part coordinate strategy
+
+- **`src/extensions/block-indicator/plugin.ts`** -- MAJOR CHANGES:
+  - `updateBlockRect()`: uses `getOffsetRelativeTo` for positioning instead of rect deltas
+  - `findGapsInNode()`: uses `getOffsetRelativeTo` for gap positions
+  - `updateSelectedBlocksState()`: uses `getOffsetRelativeTo` for selected block positions
+  - `startDrag()`: uses `getOffsetRelativeTo` for initial drop indicator
+  - `handleMouseMove` (hover): uses `elementFromPoint` + `posAtDOM` for block finding
+  - `handleMouseMove` (drag): uses `getOffsetRelativeTo` for indicator positioning
+  - `handleMouseMove` (bounds check): uses `elementFromPoint` + `contains()`
+  - `handleGlobalMouseMove`: uses `elementFromPoint` + `contains()` instead of rect comparison
+  - `executeMove` animation: uses `getOffsetRelativeTo` for landing position
+  - All stale `transform: scale()` comments updated
+  - All diagnostic code removed
+
+- **`src/components/BlockIndicator/BlockIndicator.tsx`**:
+  - Removed `[BI-DIAG]` diagnostic log
+  - Updated comments (no more transform: scale references)
+  - `v()` function is identity (no zoom conversion needed)
+  - Removed `usePresentationStore` import (no zoom factor needed)
+
+- **`src/components/Editor/EditorCore.tsx`**:
+  - Removed zoom plugin extension
+  - Removed `Extension` and `createZoomPlugin` imports
+
+- **`src/components/Editor/EditorWrapper.tsx`**:
+  - Removed zoom division from click-anywhere handler
+
+- **`src/App.tsx`**:
+  - CSS zoom wrapper instead of transform: scale wrapper
+  - Zoom slider: 80-150% in 5% steps
+
+- **`src/lib/zoom/prosemirror-zoom-patch.ts`**:
+  - Removed `[ZOOM]` diagnostic log
+  - `installZoomPatch()` is pure no-op
 
 ---
 
-## Key Files Reference
+## APPROACHES TRIED AND RESULTS (This Session)
 
-| File | Purpose |
-|------|---------|
-| `src/extensions/block-indicator/plugin.ts` | Block hover/select/drag -- ALL drag logic lives here (~1350 lines) |
-| `src/extensions/block-indicator/types.ts` | `BlockIndicatorState` type definition |
-| `src/extensions/block-indicator/state.ts` | Store, defaults, subscriptions, public API |
-| `src/components/BlockIndicator/BlockIndicator.tsx` | React rendering of all indicators |
-| `src/components/BlockIndicator/BlockIndicator.css` | Indicator + drag cursor styling (`.block-dragging` rules) |
-| `src/extensions/columns/ColumnBlockView.tsx` | Column resize/gutter drag (React NodeView) |
-| `src/extensions/columns/column-block.ts` | ColumnBlock TipTap node definition |
-| `src/extensions/columns/columns.css` | All column styling including dividers |
+### 1. offsetTop/offsetLeft chain for CSS positioning
+**WORKS** but wasn't the root cause. Both offset and rect approaches give identical values (confirmed by diagnostic). The positioning was always correct -- the block FINDING was wrong.
 
----
+### 2. screenToUnzoomed coordinate conversion
+**FAILED.** Assumed `wrapperRect.top` from getBoundingClientRect is in screen space. Diagnostic proved the wrapper's OWN rect is also un-zoomed (width=720 at zoom 1.5, should be 1080).
 
-## Critical Code Locations for Text Select Bug
+### 3. elementFromPoint for block finding
+**WORKS.** `elementFromPoint` handles CSS zoom correctly in screen space. Combined with `posAtDOM` to get PM positions. Fallback to `posAtCoords` for padding areas.
 
-- `plugin.ts ~1095-1100`: `handleMouseDown` -- mousedown NOT prevented (allows ProseMirror cursor placement)
-- `plugin.ts ~1158-1190`: Long press timer callback -- synthetic mouseup + startDrag
-- `plugin.ts ~95-105`: `suppressTextSelection()` / `restoreTextSelection()` helpers
-- `plugin.ts ~109-165`: `startDrag()` and `cancelDrag()` -- where drag state begins/ends
-- `plugin.ts ~1290-1296`: `handleSelectStart` -- selectstart prevention during isDragging
-- `plugin.ts ~1225-1235`: `handleGlobalMouseMove` -- removeAllRanges during drag
-- `BlockIndicator.css ~59-68`: `.block-dragging` CSS rules with user-select:none
+### 4. elementFromPoint for bounds checking
+**WORKS.** Replaces getBoundingClientRect comparisons with containment checks.
 
 ---
 
-## Commands
+## KEY TECHNICAL INSIGHTS
+
+### The WebKit CSS Zoom Bug Affects EVERYTHING Inside the Zoom Container
+- Every element's `getBoundingClientRect()` returns un-zoomed values
+- The zoom wrapper's OWN `getBoundingClientRect()` is also un-zoomed
+- `event.clientX/Y` is in screen space (NOT affected by the bug)
+- `elementFromPoint(x, y)` handles zoom correctly
+- `posAtCoords({left, top})` handles zoom correctly for caret placement
+- `offsetTop/offsetLeft` are in content space (same as CSS absolute positioning)
+
+### Never Compare event.clientX/Y Against getBoundingClientRect
+This is THE rule for this WKWebView. Use `elementFromPoint` + `contains()` for hit testing, and offset chain for positioning.
+
+---
+
+## COMMANDS
 
 ```bash
-npm run tauri dev          # ALWAYS use this - desktop app
-npm run build              # TypeScript check + Vite build
-./scripts/read-log.sh      # Read debug log
-./scripts/screenshot.sh    # Capture window
+npm run tauri dev          # Desktop app (ALWAYS use this)
+npm run build              # TypeScript + Vite build
+./scripts/read-log.sh      # Debug log
+cat ~/.serq-debug.log      # Direct log read
+./scripts/screenshot.sh    # Capture SERQ window
 ```
 
 ---
 
-*Updated: 2026-02-06*
+*Updated: 2026-02-08 -- CSS zoom block indicator FIXED. Three-part solution: offset positioning + elementFromPoint block finding + elementFromPoint bounds checking.*

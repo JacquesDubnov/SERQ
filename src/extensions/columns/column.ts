@@ -18,14 +18,29 @@ export const Column = Node.create({
   // Own group -- only valid as child of columnBlock's content expression
   group: 'column',
 
-  // All block content types registered in the schema, excluding columnBlock to prevent nesting.
-  // Uses 'block+' for maximum compatibility -- any block node added later works automatically.
-  // Nesting prevention is enforced by normalize-plugin.ts (unwraps nested columnBlocks).
-  content: 'block+',
+  // All block and container content types. Nesting prevention (no columnBlock
+  // inside columns) is enforced by normalize-plugin.ts.
+  content: '(block | container)+',
 
   isolating: true,
   selectable: false,
   defining: false,
+
+  addAttributes() {
+    return {
+      width: {
+        default: 0.5,
+        parseHTML: (el: HTMLElement) => {
+          const v = el.getAttribute('data-col-width')
+          return v ? parseFloat(v) : 0.5
+        },
+        renderHTML: (attrs) => ({
+          'data-col-width': String(attrs.width),
+          style: `flex: 0 0 ${(attrs.width as number) * 100}%`,
+        }),
+      },
+    }
+  },
 
   parseHTML() {
     return [{ tag: 'div[data-column]' }]

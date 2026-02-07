@@ -3,27 +3,22 @@
  *
  * Renders columns in a CSS Grid with draggable dividers between them.
  * Direct DOM mutation during resize for performance, commits on mouseUp.
+ *
+ * Column widths are read from Column children (Column.attrs.width),
+ * NOT from parent attributes. On resize commit, widths are written
+ * to BOTH adjacent column children in a single transaction using
+ * position mapping (per spec R4-1).
  */
 
 import { NodeViewWrapper, NodeViewContent } from '@tiptap/react'
 import type { NodeViewProps } from '@tiptap/react'
 import { useRef, useCallback, useEffect } from 'react'
-import { getZoomFactor } from '@/extensions/block-indicator/dom-utils'
 import './columns.css'
 
 const MIN_COLUMN_WIDTH = 80 // px
+const DEFAULT_GUTTER = 24 // px
 const MIN_GUTTER = 10 // px
-const MIN_COLUMN_FOR_GUTTER = 30 // px - columns can shrink to this during gutter resize
-
-/**
- * Compute the maximum gutter that keeps every column at least MIN_COLUMN_FOR_GUTTER px wide.
- * containerWidth = N * columnWidth + (N-1) * gutter
- * => maxGutter = (containerWidth - N * MIN_COLUMN_FOR_GUTTER) / (N - 1)
- */
-function computeMaxGutter(containerWidth: number, columnCount: number): number {
-  if (columnCount <= 1) return containerWidth // no gutters with 1 column
-  return Math.floor((containerWidth - columnCount * MIN_COLUMN_FOR_GUTTER) / (columnCount - 1))
-}
+const MAX_GUTTER = 80 // px
 
 /**
  * Compute the CSS `left` value for a divider centered in the gap between columns.
@@ -39,31 +34,42 @@ function computeDividerLeft(fractions: number[], dividerIndex: number, gutter: n
   return `calc(${fractionSum * 100}% + ${pxOffset}px)`
 }
 
-export function ColumnBlockView({ node, getPos, updateAttributes, editor }: NodeViewProps) {
+/**
+ * Read width fractions from Column children.
+ */
+function getChildWidths(node: NodeViewProps['node']): number[] {
+  const widths: number[] = []
+  node.forEach((child) => {
+    widths.push((child.attrs.width as number) || 1 / node.childCount)
+  })
+  return widths
+}
+
+export function ColumnBlockView({ node, getPos, editor }: NodeViewProps) {
   const wrapperRef = useRef<HTMLDivElement>(null)
   const resizeState = useRef<{
     active: boolean
     dividerIndex: number
     startX: number
     startWidths: number[]
-    isGutterMode: boolean
-    startGutter: number
     containerWidth: number
     rafId: number | null
+    gutterMode: boolean
+    startGutter: number
   }>({
     active: false,
     dividerIndex: -1,
     startX: 0,
     startWidths: [],
-    isGutterMode: false,
-    startGutter: 24,
     containerWidth: 0,
     rafId: null,
+    gutterMode: false,
+    startGutter: DEFAULT_GUTTER,
   })
 
   const columnCount = node.childCount
-  const columnWidths: number[] = node.attrs.columnWidths || Array(columnCount).fill(1 / columnCount)
-  const gutter: number = node.attrs.gutter || 24
+  const columnWidths = getChildWidths(node)
+  const gutter = (node.attrs.gutter as number) || DEFAULT_GUTTER
 
   // Build grid-template-columns from widths
   const gridTemplateColumns = columnWidths.map((w: number) => `${w}fr`).join(' ')
@@ -72,8 +78,6 @@ export function ColumnBlockView({ node, getPos, updateAttributes, editor }: Node
   const dividerCount = columnCount - 1
 
   // --- Focus tracking ---
-  // Set data-focused when editor selection is inside this columnBlock.
-  // ProseMirror keeps focus on the root editor DOM, so :focus-within doesn't work.
   useEffect(() => {
     const wrapper = wrapperRef.current
     if (!wrapper) return
@@ -92,7 +96,7 @@ export function ColumnBlockView({ node, getPos, updateAttributes, editor }: Node
     }
 
     editor.on('selectionUpdate', checkFocus)
-    checkFocus() // Initial check
+    checkFocus()
     return () => {
       editor.off('selectionUpdate', checkFocus)
     }
@@ -108,36 +112,33 @@ export function ColumnBlockView({ node, getPos, updateAttributes, editor }: Node
       const wrapper = wrapperRef.current
       if (!wrapper) return
 
-      const zoom = getZoomFactor(editor.view.dom)
+      const isGutterMode = event.altKey
       const wrapperRect = wrapper.getBoundingClientRect()
-      const totalWidth = wrapperRect.width / zoom
+      const totalWidth = wrapperRect.width
       const totalGutter = gutter * (columnCount - 1)
       const contentWidth = totalWidth - totalGutter
 
       // Calculate current pixel widths from fractions
       const currentWidths = columnWidths.map((w: number) => w * contentWidth)
 
-      const isGutterMode = event.altKey
-
       resizeState.current = {
         active: true,
         dividerIndex,
         startX: event.clientX,
         startWidths: currentWidths,
-        isGutterMode,
-        startGutter: gutter,
         containerWidth: totalWidth,
         rafId: null,
+        gutterMode: isGutterMode,
+        startGutter: gutter,
       }
 
       wrapper.setAttribute('data-resizing', 'true')
       if (isGutterMode) {
-        wrapper.setAttribute('data-gutter-mode', 'true')
-        wrapper.style.setProperty('--current-gutter', `${gutter}px`)
+        wrapper.dataset.gutterMode = 'true'
       }
       document.body.style.cursor = 'col-resize'
 
-      // Prevent text selection in both the document and ProseMirror editor
+      // Prevent text selection
       document.body.style.userSelect = 'none'
       const style = document.body.style as any
       style.webkitUserSelect = 'none'
@@ -153,17 +154,24 @@ export function ColumnBlockView({ node, getPos, updateAttributes, editor }: Node
           resizeState.current.rafId = null
           if (!resizeState.current.active || !wrapper) return
 
-          const currentZoom = getZoomFactor(editor.view.dom)
-          const delta = (e.clientX - resizeState.current.startX) / currentZoom
+          const delta = e.clientX - resizeState.current.startX
 
-          if (resizeState.current.isGutterMode) {
-            // Option+drag: adjust gutter width
-            const maxGutter = computeMaxGutter(resizeState.current.containerWidth, columnCount)
-            const newGutter = Math.max(MIN_GUTTER, Math.min(maxGutter, resizeState.current.startGutter + delta))
+          if (resizeState.current.gutterMode) {
+            // Gutter mode: adjust spacing between ALL columns uniformly
+            const newGutter = Math.round(
+              Math.min(MAX_GUTTER, Math.max(MIN_GUTTER, resizeState.current.startGutter + delta))
+            )
             wrapper.style.columnGap = `${newGutter}px`
-            wrapper.style.setProperty('--current-gutter', `${newGutter}px`)
+
+            // Reposition all divider handles for the new gutter
+            const dividerEls = wrapper.querySelectorAll<HTMLElement>('[data-divider-index]')
+            const currentFractions = columnWidths // Fractions unchanged in gutter mode
+            dividerEls.forEach((el) => {
+              const di = parseInt(el.dataset.dividerIndex ?? '0', 10)
+              el.style.left = computeDividerLeft(currentFractions, di, newGutter)
+            })
           } else {
-            // Normal drag: resize adjacent columns
+            // Column width mode: adjust widths of adjacent columns
             const idx = resizeState.current.dividerIndex
             const widths = [...resizeState.current.startWidths]
 
@@ -191,9 +199,10 @@ export function ColumnBlockView({ node, getPos, updateAttributes, editor }: Node
             wrapper.style.gridTemplateColumns = fractions.map((f) => `${f}fr`).join(' ')
 
             // Also move the active divider handle to match the new grid
+            const currentGutter = resizeState.current.startGutter
             const dividerEl = wrapper.querySelector<HTMLElement>(`[data-divider-index="${idx}"]`)
             if (dividerEl) {
-              dividerEl.style.left = computeDividerLeft(fractions, idx, gutter)
+              dividerEl.style.left = computeDividerLeft(fractions, idx, currentGutter)
             }
           }
         })
@@ -206,10 +215,10 @@ export function ColumnBlockView({ node, getPos, updateAttributes, editor }: Node
           cancelAnimationFrame(resizeState.current.rafId)
         }
 
+        const wasGutterMode = resizeState.current.gutterMode
         resizeState.current.active = false
         wrapper.removeAttribute('data-resizing')
-        wrapper.removeAttribute('data-gutter-mode')
-        wrapper.style.removeProperty('--current-gutter')
+        delete wrapper.dataset.gutterMode
         document.body.style.cursor = ''
         document.body.style.userSelect = ''
         ;(document.body.style as any).webkitUserSelect = ''
@@ -219,27 +228,63 @@ export function ColumnBlockView({ node, getPos, updateAttributes, editor }: Node
         document.removeEventListener('mousemove', handleMouseMove)
         document.removeEventListener('mouseup', handleMouseUp)
 
-        if (resizeState.current.isGutterMode) {
-          // Read final gutter from DOM and commit
-          const computedGap = parseFloat(wrapper.style.columnGap) || gutter
-          const maxGutter = computeMaxGutter(resizeState.current.containerWidth, columnCount)
-          updateAttributes({ gutter: Math.max(MIN_GUTTER, Math.min(maxGutter, Math.round(computedGap))) })
+        const blockPos = getPos()
+        if (blockPos === undefined) return
+
+        if (wasGutterMode) {
+          // Commit gutter change to ColumnBlock node attribute
+          const computedGap = wrapper.style.columnGap
+          const newGutter = computedGap ? parseInt(computedGap, 10) : DEFAULT_GUTTER
+          const clamped = Math.min(MAX_GUTTER, Math.max(MIN_GUTTER, newGutter))
+
+          const { tr } = editor.state
+          const columnBlock = editor.state.doc.nodeAt(blockPos)
+          if (!columnBlock) return
+
+          tr.setNodeMarkup(blockPos, undefined, {
+            ...columnBlock.attrs,
+            gutter: clamped,
+          })
+          editor.view.dispatch(tr)
         } else {
-          // Read final widths from DOM and commit as fractions
-          const currentZoom = getZoomFactor(editor.view.dom)
+          // Read final widths from DOM and commit to Column children
           const columns = wrapper.querySelectorAll<HTMLElement>('[data-column]')
           const pixelWidths: number[] = []
           columns.forEach((col) => {
-            pixelWidths.push(col.getBoundingClientRect().width / currentZoom)
+            pixelWidths.push(col.getBoundingClientRect().width)
           })
 
           const total = pixelWidths.reduce((a, b) => a + b, 0)
           if (total > 0) {
             const fractions = pixelWidths.map((w) => +(w / total).toFixed(4))
-            // Fix rounding
+            // Fix rounding on last element
             const sum = fractions.reduce((a, b) => a + b, 0)
             fractions[fractions.length - 1] = +(fractions[fractions.length - 1] + (1 - sum)).toFixed(4)
-            updateAttributes({ columnWidths: fractions })
+
+            // Write widths to Column children using position mapping (R4-1 pattern).
+            // Each setNodeMarkup shifts subsequent positions, so we map through
+            // the transaction's mapping for correctness.
+            const { tr } = editor.state
+            const columnBlock = editor.state.doc.nodeAt(blockPos)
+            if (!columnBlock) return
+
+            const childPositions: number[] = []
+            columnBlock.forEach((_child, childOffset) => {
+              childPositions.push(blockPos + 1 + childOffset)
+            })
+
+            for (let i = 0; i < childPositions.length; i++) {
+              const mappedPos = tr.mapping.map(childPositions[i])
+              const col = tr.doc.nodeAt(mappedPos)
+              if (col && col.type.name === 'column') {
+                tr.setNodeMarkup(mappedPos, undefined, {
+                  ...col.attrs,
+                  width: fractions[i],
+                })
+              }
+            }
+
+            editor.view.dispatch(tr)
           }
         }
       }
@@ -247,7 +292,7 @@ export function ColumnBlockView({ node, getPos, updateAttributes, editor }: Node
       document.addEventListener('mousemove', handleMouseMove)
       document.addEventListener('mouseup', handleMouseUp)
     },
-    [columnWidths, gutter, columnCount, editor, updateAttributes],
+    [columnWidths, gutter, columnCount, editor, getPos],
   )
 
   // Cleanup on unmount

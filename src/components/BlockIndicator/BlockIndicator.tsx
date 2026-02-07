@@ -16,7 +16,6 @@ import {
   finishAnimation,
   type BlockIndicatorState,
 } from "@/extensions/block-indicator"
-
 import "./BlockIndicator.css"
 
 // Read CSS variable value, with fallback
@@ -36,7 +35,6 @@ export const BlockIndicator: React.FC = () => {
     isLongPressing: false,
     isDragging: false,
     dropIndicatorTop: null,
-    sourceOverlay: null,
     isAnimating: false,
     indicatorTransition: null,
     dropAnimation: 'none',
@@ -52,10 +50,6 @@ export const BlockIndicator: React.FC = () => {
 
   const hasEverShown = useRef(false)
   const lastPosition = useRef({ top: 0, height: 0, blockLeft: 0, blockWidth: 0 })
-
-  // Source overlay animation
-  const [sourceOverlayVisible, setSourceOverlayVisible] = useState(false)
-  const sourceOverlayMounted = useRef(false)
 
   useEffect(() => {
     const unsubscribe = subscribeToBlockIndicator((newState) => {
@@ -73,22 +67,6 @@ export const BlockIndicator: React.FC = () => {
 
     return unsubscribe
   }, [])
-
-  // Handle source overlay animation
-  useEffect(() => {
-    if (state.sourceOverlay && !sourceOverlayMounted.current) {
-      sourceOverlayMounted.current = true
-      setSourceOverlayVisible(false)
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setSourceOverlayVisible(true)
-        })
-      })
-    } else if (!state.sourceOverlay && sourceOverlayMounted.current) {
-      sourceOverlayMounted.current = false
-      setSourceOverlayVisible(false)
-    }
-  }, [state.sourceOverlay])
 
   // Handle animation completion
   useEffect(() => {
@@ -188,50 +166,52 @@ export const BlockIndicator: React.FC = () => {
     return groups
   }, [state.selectedBlocks, state.paginationEnabled])
 
-  // Calculate indicator style based on mode
+  // Calculate indicator style based on mode.
+  // All state.* position values are in content space (via offsetTop/offsetLeft chain).
+  // CSS absolute positioning inside .editor-content-wrapper uses the same space.
+  // No zoom conversion needed -- CSS zoom scales everything uniformly.
   const isDragMode = state.isDragging && state.dropAnimation !== 'shrinking'
+  const v = (px: number) => px
 
   let indicatorStyle: React.CSSProperties
   if (state.dropAnimation === 'shrinking') {
-    // Horizontal line shrinking to a dot at top-left
     indicatorStyle = {
       position: "absolute",
-      left: state.blockLeft - offset,
-      top: state.top,
+      left: v(state.blockLeft) - offset,
+      top: v(state.top),
       height: 2,
-      width: 2,  // Shrink to dot
+      width: 2,
     }
   } else if (state.dropAnimation === 'growing') {
-    // Vertical line growing from dot - height comes from state (animates via CSS)
     indicatorStyle = {
       position: "absolute",
-      left: state.blockLeft - offset,
-      top: state.top,
-      height: state.height,
-      width: undefined,  // Back to default width (2px)
+      left: v(state.blockLeft) - offset,
+      top: v(state.top),
+      height: v(state.height),
+      width: undefined,
     }
   } else if (isDragMode) {
     indicatorStyle = {
       position: "absolute",
-      left: state.blockLeft - offset,
-      top: state.dropIndicatorTop ?? state.top,
+      left: v(state.blockLeft) - offset,
+      top: v(state.dropIndicatorTop ?? state.top),
       height: 2,
-      width: state.blockWidth + offset * 2,
+      width: v(state.blockWidth) + offset * 2,
     }
   } else if (state.commandHeld) {
     indicatorStyle = {
       position: "absolute",
-      left: state.blockLeft - offset,
-      top: state.top,
-      height: state.height || 24,
-      width: state.blockWidth + offset * 2,
+      left: v(state.blockLeft) - offset,
+      top: v(state.top),
+      height: v(state.height) || 24,
+      width: v(state.blockWidth) + offset * 2,
     }
   } else {
     indicatorStyle = {
       position: "absolute",
-      left: state.blockLeft - offset,
-      top: state.top,
-      height: state.height || 24,
+      left: v(state.blockLeft) - offset,
+      top: v(state.top),
+      height: v(state.height) || 24,
       width: undefined,
     }
   }
@@ -246,21 +226,6 @@ export const BlockIndicator: React.FC = () => {
 
   return (
     <>
-      {/* Source overlay - covers original block, fades in to hide text */}
-      {state.sourceOverlay && (
-        <div
-          className="block-source-overlay"
-          style={{
-            position: "absolute",
-            left: state.sourceOverlay.left,
-            top: state.sourceOverlay.top,
-            width: state.sourceOverlay.width,
-            height: state.sourceOverlay.height,
-          }}
-          data-visible={sourceOverlayVisible ? "true" : "false"}
-        />
-      )}
-
       {/* Selection indicators - one per contiguous group (NO animation) */}
       {groupedSelections.map((group) => (
         <div
@@ -268,10 +233,10 @@ export const BlockIndicator: React.FC = () => {
           className="block-indicator-line"
           style={{
             position: "absolute",
-            left: group.blockLeft - offset,
-            top: group.top,
-            height: group.height,
-            width: group.blockWidth + offset * 2,
+            left: v(group.blockLeft) - offset,
+            top: v(group.top),
+            height: v(group.height),
+            width: v(group.blockWidth) + offset * 2,
           }}
           data-visible="true"
           data-frame="true"
@@ -301,13 +266,13 @@ export const BlockIndicator: React.FC = () => {
           style={{
             position: "absolute",
             left: state.horizontalDropGapX != null
-              ? state.horizontalDropGapX
+              ? v(state.horizontalDropGapX)
               : state.horizontalDropSide === 'left'
-                ? state.horizontalDropRect.left - offset - 2
-                : state.horizontalDropRect.left + state.horizontalDropRect.width + offset,
-            top: state.horizontalDropRect.top,
+                ? v(state.horizontalDropRect.left) - offset - 2
+                : v(state.horizontalDropRect.left + state.horizontalDropRect.width) + offset,
+            top: v(state.horizontalDropRect.top),
             width: 3,
-            height: state.horizontalDropRect.height,
+            height: v(state.horizontalDropRect.height),
           }}
           data-visible="true"
         />

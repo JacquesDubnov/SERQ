@@ -2,58 +2,90 @@
  * Block Indicator - DOM Utility Functions
  *
  * Pure functions for DOM measurements and queries used by the block indicator.
+ * Updated for presentation-agnostic architecture (no TipTap Pages dependency).
+ *
+ * CSS zoom coordinate strategy:
+ * - For CSS positioning (absolute top/left): use offsetTop/offsetLeft chain
+ *   via getOffsetRelativeTo(). These match CSS absolute positioning.
+ * - For block finding (which block is under cursor): use elementFromPoint()
+ *   which handles CSS zoom correctly in screen space.
+ * - For bounds checking: use elementFromPoint + contains() instead of
+ *   comparing mouse coords against getBoundingClientRect (broken by
+ *   WebKit CSS zoom bug where getBoundingClientRect returns un-zoomed values).
  */
+
+import { usePresentationStore } from '@/stores/presentationStore';
 
 /**
  * Get the reference rect for positioning.
  * Always use the editor-content-wrapper since that's where BlockIndicator renders.
+ * NOTE: Returns un-zoomed values in WebKit with CSS zoom bug.
+ * Only use for screen-space hit testing where both sides are in the same space.
  */
 export const getPositionReferenceRect = (editorDom: HTMLElement): DOMRect => {
-  // Find the wrapper - BlockIndicator component is a sibling of editor-content inside this wrapper
-  const wrapper = editorDom.closest('.editor-content-wrapper') as HTMLElement | null
+  const wrapper = editorDom.closest('.editor-content-wrapper') as HTMLElement | null;
   if (wrapper) {
-    return wrapper.getBoundingClientRect()
+    return wrapper.getBoundingClientRect();
+  }
+  return editorDom.getBoundingClientRect();
+};
+
+/**
+ * Get the positioned ancestor (.editor-content-wrapper) for offset calculations.
+ */
+export const getPositionAncestor = (editorDom: HTMLElement): HTMLElement | null => {
+  return editorDom.closest('.editor-content-wrapper') as HTMLElement | null;
+};
+
+/**
+ * Calculate an element's offset position relative to a specific ancestor
+ * by walking the offsetParent chain. Returns { top, left } in the
+ * content coordinate space -- exactly what CSS absolute positioning uses.
+ *
+ * This bypasses getBoundingClientRect entirely, avoiding the WebKit CSS zoom
+ * bug where getBoundingClientRect returns un-zoomed values.
+ */
+export const getOffsetRelativeTo = (
+  element: HTMLElement,
+  ancestor: HTMLElement,
+): { top: number; left: number } => {
+  let top = 0;
+  let left = 0;
+  let current: HTMLElement | null = element;
+
+  while (current && current !== ancestor) {
+    top += current.offsetTop;
+    left += current.offsetLeft;
+    current = current.offsetParent as HTMLElement | null;
   }
 
-  // Fallback to editor dom
-  return editorDom.getBoundingClientRect()
-}
+  return { top, left };
+};
 
 /**
- * Check if pagination mode is enabled by looking for the pagination container
+ * Check if pagination mode is enabled.
+ * Reads from presentationStore instead of checking for TipTap Pages DOM elements.
  */
-export const isPaginationEnabled = (editorDom: HTMLElement): boolean => {
-  // Pagination container is a CHILD of the ProseMirror element, not a parent
-  return editorDom.querySelector('[data-tiptap-pagination]') !== null
-}
+export const isPaginationEnabled = (_editorDom: HTMLElement): boolean => {
+  return usePresentationStore.getState().activeMode === 'paginated';
+};
 
 /**
- * Get the effective zoom/scale factor from an ancestor transform:scale().
- * Compares getBoundingClientRect (scaled viewport px) to offsetWidth (unscaled CSS px).
- * With transform:scale(0.5): BCR.width=360, offsetWidth=720, ratio=0.5
- * Without transform: ratio=1.0
- */
-export const getZoomFactor = (editorDom: HTMLElement): number => {
-  if (editorDom.offsetWidth === 0) return 1
-  return editorDom.getBoundingClientRect().width / editorDom.offsetWidth
-}
-
-/**
- * Get the page number for a given DOM element (1-indexed)
- * Uses DOM hierarchy to find which .page element contains the block
+ * Get the page number for a given DOM element (1-indexed).
+ * Uses section boundaries: in paginated mode, each section IS a page.
  */
 export const getPageNumberForElement = (element: HTMLElement): number => {
-  // Find the closest .page ancestor
-  const pageElement = element.closest('.page')
-  if (!pageElement) return 1
+  // Find the closest section ancestor (SectionView renders with data-section-id)
+  const sectionElement = element.closest('[data-section-id]');
+  if (!sectionElement) return 1;
 
-  // Find the pagination container
-  const paginationContainer = element.closest('[data-tiptap-pagination]')
-  if (!paginationContainer) return 1
+  // Find the editor container (tiptap root)
+  const editor = element.closest('.tiptap');
+  if (!editor) return 1;
 
-  // Get all page elements and find index
-  const pages = paginationContainer.querySelectorAll('.page')
-  const pageIndex = Array.from(pages).indexOf(pageElement)
+  // Count section elements before this one
+  const sections = editor.querySelectorAll('[data-section-id]');
+  const sectionIndex = Array.from(sections).indexOf(sectionElement);
 
-  return pageIndex >= 0 ? pageIndex + 1 : 1
-}
+  return sectionIndex >= 0 ? sectionIndex + 1 : 1;
+};

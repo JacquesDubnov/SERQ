@@ -14,7 +14,7 @@ export interface BlockIndicatorState {
   blockLeft: number
   /** Width of the block */
   blockWidth: number
-  /** Whether Option is held (shows full frame instead of left line) */
+  /** Whether Ctrl is held (shows full frame instead of left line) */
   commandHeld: boolean
   /** Long press state */
   isLongPressing: boolean
@@ -22,13 +22,6 @@ export interface BlockIndicatorState {
   isDragging: boolean
   /** Drop indicator Y position (relative to editor container) */
   dropIndicatorTop: number | null
-  /** Source block overlay (for fade out effect) - React renders this */
-  sourceOverlay: {
-    left: number
-    top: number
-    width: number
-    height: number
-  } | null
   /** Animation state after drop */
   isAnimating: boolean
   /** Indicator should animate from source to landing position after drop */

@@ -19,7 +19,6 @@ const defaultState: BlockIndicatorState = {
   isLongPressing: false,
   isDragging: false,
   dropIndicatorTop: null,
-  sourceOverlay: null,
   isAnimating: false,
   indicatorTransition: null,
   dropAnimation: 'none',
@@ -50,6 +49,8 @@ export const store = {
   enabledListeners: hmrData?.enabledListeners ?? [] as ((enabled: boolean) => void)[],
   lastMouseY: 0,
   selectionListeners: [] as ((positions: Set<number>) => void)[],
+  // Source block DOM element reference (for fade class cleanup)
+  dragSourceElement: null as HTMLElement | null,
   // FLIP animation tracking
   preDropPositions: new Map<number, DOMRect>(),
   dropTargetIndex: 0,

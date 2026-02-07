@@ -21,7 +21,7 @@ import { Card, CardBody, CardGroupLabel, CardItemGroup } from '@/components/tipt
 import { Separator } from '@/components/tiptap-ui-primitive/separator';
 
 // Store types
-import type { PageSize } from '@/stores/editorStore';
+import type { PageSize } from '@/stores/presentationStore';
 
 // Page size options
 const PAGE_SIZES: { value: PageSize; label: string; description: string }[] = [

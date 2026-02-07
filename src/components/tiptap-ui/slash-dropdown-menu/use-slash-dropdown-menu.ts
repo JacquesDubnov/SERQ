@@ -353,15 +353,12 @@ const getItemImplementations = () => {
     table: {
       check: (editor: Editor) => isNodeInSchema("table", editor),
       action: ({ editor }: { editor: Editor }) => {
-        editor
-          .chain()
-          .focus()
-          .insertTable({
+        // Table extension removed -- this action only runs if table is in schema
+        (editor.chain().focus() as any).insertTable({
             rows: 3,
             cols: 3,
             withHeaderRow: false,
-          })
-          .run()
+          }).run()
       },
     },
     columns_2: {

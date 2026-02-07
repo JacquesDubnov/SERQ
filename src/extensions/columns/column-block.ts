@@ -3,6 +3,10 @@
  *
  * Container node that holds 2-4 Column children in a CSS Grid layout.
  * Rendered via ReactNodeViewRenderer for resize handles and dividers.
+ *
+ * Column widths are stored on Column children (Column.attrs.width),
+ * NOT on this parent node. The `columns` attr is synced by the
+ * normalize plugin to match actual child count.
  */
 
 import { Node, mergeAttributes } from '@tiptap/core'
@@ -11,14 +15,13 @@ import { ColumnBlockView } from './ColumnBlockView'
 
 export interface ColumnBlockAttributes {
   columns: number
-  columnWidths: number[] | null
   gutter: number
 }
 
 export const ColumnBlock = Node.create({
   name: 'columnBlock',
 
-  group: 'block',
+  group: 'block container',
 
   // Enforces 2-4 column children at schema level
   content: 'column{2,4}',
@@ -40,24 +43,7 @@ export const ColumnBlock = Node.create({
           'data-columns': attributes.columns,
         }),
       },
-      columnWidths: {
-        default: null,
-        parseHTML: (element) => {
-          const val = element.getAttribute('data-column-widths')
-          if (!val) return null
-          try {
-            return JSON.parse(val)
-          } catch {
-            return null
-          }
-        },
-        renderHTML: (attributes) => {
-          if (!attributes.columnWidths) return {}
-          return {
-            'data-column-widths': JSON.stringify(attributes.columnWidths),
-          }
-        },
-      },
+      // Gutter stays on ColumnBlock until PresentationConfig (Phase 2)
       gutter: {
         default: 24,
         parseHTML: (element) => {

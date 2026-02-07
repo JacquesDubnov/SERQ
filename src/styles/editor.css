@@ -5,9 +5,54 @@
  * Variables prefixed with --color- come from color presets.
  */
 
-/* Editor wrapper - positioning context for block indicator */
+/* ===== EDITOR WRAPPER =====
+ * Positioning context for block indicator.
+ * In continuous mode, acts as the Canvas (background, shadow, width constraint).
+ * In paginated mode, minimal -- sections handle their own page styling.
+ */
 .editor-content-wrapper {
   position: relative;
+}
+
+/* Continuous mode: wrapper IS the canvas */
+.editor-content-wrapper[data-mode="continuous"] {
+  margin: 0 auto;
+  padding: 74px;
+  min-height: calc(100vh - 220px);
+  overflow: hidden;
+  background: var(--canvas-bg-color, var(--color-bg-canvas, #ffffff));
+  background-image: var(--canvas-bg-image, none);
+  background-size: var(--canvas-bg-size, auto);
+  background-position: var(--canvas-bg-position, center);
+  background-repeat: var(--canvas-bg-repeat, no-repeat);
+  border-radius: var(--canvas-border-radius, 12px);
+  box-shadow: var(--canvas-shadow, var(--tt-shadow-canvas));
+  color: var(--color-text-primary, #1a1a1a);
+}
+
+/* Content width variants for continuous mode.
+   Uses explicit width (not max-width) so the canvas has a definite size
+   even when content is empty. The zoom wrapper uses fit-content,
+   so it needs a child with a definite width. */
+.editor-content-wrapper[data-mode="continuous"][data-content-width="narrow"] {
+  width: 600px;
+}
+.editor-content-wrapper[data-mode="continuous"][data-content-width="normal"] {
+  width: 720px;
+}
+.editor-content-wrapper[data-mode="continuous"][data-content-width="wide"] {
+  width: 900px;
+}
+.editor-content-wrapper[data-mode="continuous"][data-content-width="full"] {
+  width: 100%;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Paginated mode: wrapper is minimal, sections handle page styling */
+.editor-content-wrapper[data-mode="paginated"] {
+  width: fit-content;
+  margin: 0 auto;
 }
 
 /* Editor container */
@@ -20,8 +65,45 @@
   outline: none;
 }
 
-/* Placeholder styling */
-.editor-content .tiptap p.is-editor-empty:first-child::before {
+/* ===== SECTION PRESENTATION MODES =====
+ * SectionView (React NodeView) applies .section-continuous or .section-page
+ * based on presentationStore.activeMode.
+ */
+
+/* Base section styles -- shared by all modes */
+.editor-content .tiptap [data-section-id] {
+  display: block;
+  min-height: 0;
+}
+
+/* Continuous mode -- sections are invisible structural wrappers.
+   Canvas styling is on the parent .editor-content-wrapper. */
+.section-continuous {
+  /* No visual styling -- just structural */
+}
+
+/* Paginated mode -- each section renders as a page */
+.section-page {
+  width: var(--page-width, 794px);
+  min-height: var(--page-height, 1123px);
+  margin: 0 auto 24px auto;
+  padding: var(--page-margin-top, 72px) var(--page-margin-right, 72px)
+           var(--page-margin-bottom, 72px) var(--page-margin-left, 72px);
+  background: var(--color-bg-canvas, #ffffff);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.06);
+  box-sizing: border-box;
+}
+
+/* Dark mode page styling */
+.dark .section-page {
+  background: var(--color-bg-canvas, #1f1f1f);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Placeholder styling
+   With SectionView NodeView, the paragraph is nested inside NodeViewWrapper divs,
+   so :first-child no longer matches. Use .is-editor-empty directly. */
+.editor-content .tiptap p.is-editor-empty::before {
   content: attr(data-placeholder);
   float: left;
   color: var(--color-text-muted, #9ca3af);

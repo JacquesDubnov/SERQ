@@ -1,15 +1,18 @@
 /**
- * SERQ App - Phase 3: Style System Integration
+ * SERQ App - Presentation-Agnostic Architecture
+ *
+ * ONE code path for all presentation modes. The editor is never destroyed/recreated.
+ * Mode switching is a config change in presentationStore -- SectionView reads
+ * the store and applies different CSS classes. Content is untouched.
  */
 
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { EditorCore, EditorWrapper, type EditorCoreRef } from './components/Editor';
 import { UnifiedToolbar } from './components/unified-toolbar';
-import { Canvas } from './components/Layout';
 import { StylePanel } from './components/StylePanel';
-// TODO: Re-enable Format Painter in final polish phase
-// import { FormatPainterButton } from './components/FormatPainter';
 import { useEditorStore } from './stores/editorStore';
+import { usePresentationStore } from './stores/presentationStore';
+import type { PageSize } from './stores/presentationStore';
 import { useStyleStore } from './stores/styleStore';
 import { useKeyboardShortcuts, useAutoSave, useSystemTheme } from './hooks';
 import { PaginationModeSelector } from './components/tiptap-ui-custom/pagination-mode-selector';
@@ -80,10 +83,6 @@ function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // Preserve content across pagination mode changes
-  const contentRef = useRef<string>('<p></p>');
-  const [editorKey, setEditorKey] = useState(0);
-
   // System theme detection with Tauri integration
   const { effectiveTheme, toggleTheme: toggleSystemTheme } = useSystemTheme();
 
@@ -108,31 +107,24 @@ function App() {
   // Computed dark mode flag
   const isDark = effectiveTheme === 'dark';
 
-  // Zustand store - must be declared before any effects that reference its values
+  // Editor store -- document metadata only
   const {
     document: docMeta,
-    canvasWidth,
-    zoom,
-    pagination,
     markDirty,
-    setCanvasWidth,
-    setZoom,
-    togglePagination,
-    setPageSize,
   } = useEditorStore();
 
-  // Force editor recreation when theme changes in pagination mode (for gap color)
-  const prevThemeRef = useRef(isDark);
-  useEffect(() => {
-    if (prevThemeRef.current !== isDark && pagination.enabled) {
-      // Theme changed while in pagination mode - need to recreate editor for new gap color
-      if (editorRef.current) {
-        contentRef.current = editorRef.current.getHTML();
-      }
-      setEditorKey((k) => k + 1);
-    }
-    prevThemeRef.current = isDark;
-  }, [isDark, pagination.enabled]);
+  // Presentation store -- zoom, mode, width
+  const {
+    activeMode,
+    zoom,
+    contentWidth,
+    pageFormat,
+    setActiveMode,
+    setContentWidth,
+    setZoom,
+    setPageSize,
+    toggleMode,
+  } = usePresentationStore();
 
   // Add .dark class to document for TipTap components
   useEffect(() => {
@@ -143,32 +135,7 @@ function App() {
     }
   }, [isDark]);
 
-  // Track viewport width for zoom constraints
-  const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
   const mainContentRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleResize = () => {
-      if (mainContentRef.current) {
-        setViewportWidth(mainContentRef.current.clientWidth);
-      } else {
-        setViewportWidth(window.innerWidth);
-      }
-    };
-
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [isStylePanelOpen]);
-
-  // Calculate max zoom that won't cause horizontal scroll
-  const canvasWidthPx: Record<typeof canvasWidth, number> = {
-    narrow: 600,
-    normal: 720,
-    wide: 900,
-    full: viewportWidth - 40, // Account for padding
-  };
-  const currentCanvasWidth = canvasWidthPx[canvasWidth];
 
   // Register keyboard shortcuts for file operations
   useKeyboardShortcuts(editorRef);
@@ -176,7 +143,7 @@ function App() {
   // Enable auto-save (30-second debounce, only for saved documents)
   useAutoSave(editorRef);
 
-  // Get editor instance after mount (poll until ready, re-run when editorKey changes)
+  // Get editor instance after mount (poll until ready)
   useEffect(() => {
     let cancelled = false;
 
@@ -187,18 +154,16 @@ function App() {
       if (editorInstance && editorInstance.isEditable) {
         setEditor(editorInstance);
       } else {
-        // Poll every 50ms until editor is ready
         setTimeout(checkForEditor, 50);
       }
     };
 
-    // Start checking after a brief delay
     setTimeout(checkForEditor, 50);
 
     return () => {
       cancelled = true;
     };
-  }, [editorKey]);
+  }, []);
 
   // Update window title to reflect document state
   useEffect(() => {
@@ -214,25 +179,19 @@ function App() {
     setIsStylePanelOpen((prev) => !prev);
   }, []);
 
-  // Handle pagination toggle - preserve content across editor recreation
+  // Mode toggle -- NO editor recreation, NO content serialization
   const handleTogglePagination = useCallback(() => {
-    // Save current content before toggling
-    if (editorRef.current) {
-      contentRef.current = editorRef.current.getHTML();
-    }
-    togglePagination();
-    // Force editor recreation with new extensions
-    setEditorKey((k) => k + 1);
-  }, [togglePagination]);
+    toggleMode();
+  }, [toggleMode]);
 
-  // Handle page size change - preserve content
-  const handlePageSizeChange = useCallback((size: Parameters<typeof setPageSize>[0]) => {
-    if (editorRef.current) {
-      contentRef.current = editorRef.current.getHTML();
-    }
+  // Page size change -- NO editor recreation
+  const handlePageSizeChange = useCallback((size: PageSize) => {
     setPageSize(size);
-    setEditorKey((k) => k + 1);
-  }, [setPageSize]);
+    // If not already in paginated mode, switch to it
+    if (activeMode !== 'paginated') {
+      setActiveMode('paginated');
+    }
+  }, [setPageSize, activeMode, setActiveMode]);
 
   // Theme colors
   const bg = isDark ? '#1a1a1a' : '#ffffff';
@@ -279,6 +238,8 @@ function App() {
     );
   }
 
+  const isPaginated = activeMode === 'paginated';
+
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', backgroundColor: bgSurface, overflow: 'hidden' }}>
       {/* Header with document title */}
@@ -311,31 +272,28 @@ function App() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* Format painter button - TODO: Fix and re-enable in final polish phase */}
-          {/* {editor && <FormatPainterButton editor={editor} isDark={isDark} />} */}
-
           {/* Pagination mode selector */}
           <PaginationModeSelector
-            paginationEnabled={pagination.enabled}
-            pageSize={pagination.pageSize}
+            paginationEnabled={isPaginated}
+            pageSize={pageFormat.size}
             onTogglePagination={handleTogglePagination}
             onPageSizeChange={handlePageSizeChange}
           />
 
           {/* Canvas width selector (disabled in pagination mode) */}
           <select
-            value={canvasWidth}
-            onChange={(e) => setCanvasWidth(e.target.value as typeof canvasWidth)}
-            disabled={pagination.enabled}
+            value={contentWidth}
+            onChange={(e) => setContentWidth(e.target.value as typeof contentWidth)}
+            disabled={isPaginated}
             style={{
               fontSize: '12px',
               padding: '4px 8px',
               borderRadius: '4px',
               border: `1px solid ${border}`,
               backgroundColor: bg,
-              color: pagination.enabled ? (isDark ? '#52525b' : '#d1d5db') : textSecondary,
-              cursor: pagination.enabled ? 'not-allowed' : 'pointer',
-              opacity: pagination.enabled ? 0.5 : 1,
+              color: isPaginated ? (isDark ? '#52525b' : '#d1d5db') : textSecondary,
+              cursor: isPaginated ? 'not-allowed' : 'pointer',
+              opacity: isPaginated ? 0.5 : 1,
             }}
           >
             <option value="narrow">Narrow</option>
@@ -394,14 +352,17 @@ function App() {
             right: isStylePanelOpen ? '320px' : 0,
             zIndex: 20,
             transition: 'right 200ms ease-out',
-            backgroundColor: bg, // Solid background so content clips behind
+            backgroundColor: bg,
           }}
         >
           <UnifiedToolbar editor={editor} />
         </div>
       )}
 
-      {/* Main content area - ONLY scrollable region */}
+      {/* Main content area - ONLY scrollable region
+          ONE code path for all modes. Wrapper handles Canvas styling,
+          sections handle page styling. Zoom wrapper sizes to content
+          (NOT width: 100%) so zoom never causes text reflow. */}
       <main
         ref={mainContentRef}
         style={{
@@ -409,77 +370,34 @@ function App() {
           top: 0,
           left: 0,
           right: isStylePanelOpen ? '320px' : 0,
-          bottom: '40px', // Leave room for footer
-          paddingTop: editor ? '210px' : '110px', // Push content below header/toolbar + 75px gap
+          bottom: '40px',
+          paddingTop: editor ? '210px' : '110px',
           paddingLeft: '20px',
           paddingRight: '20px',
           paddingBottom: '40px',
-          display: 'flex',
-          justifyContent: 'center',
           transition: 'right 200ms ease-out',
           overflowY: 'auto',
-          overflowX: 'hidden',
-          zIndex: 1, // Below toolbar (20) and header (30) - content clips under them
+          overflowX: 'auto',
+          zIndex: 1,
         }}
       >
-        {pagination.enabled ? (
-          /* Paginated mode - TipTap Pages extension handles layout */
-          <div style={{ width: `${100 * (zoom / 100)}%`, maxWidth: '100%' }}>
-            <div
-              data-zoom-wrapper
-              style={{
-                width: '100%',
-                transform: `scale(${zoom / 100})`,
-                transformOrigin: 'top left',
-              }}
-            >
-              <EditorWrapper editor={editor} zoom={zoom}>
-                <EditorCore
-                  key={`editor-${editorKey}`}
-                  ref={editorRef}
-                  initialContent={contentRef.current}
-                  placeholder="Start writing..."
-                  onUpdate={handleUpdate}
-                  paginationEnabled={pagination.enabled}
-                  pageSize={pagination.pageSize}
-                  isDark={isDark}
-                />
-              </EditorWrapper>
-            </div>
-          </div>
-        ) : (
-          /* Continuous mode - use Canvas wrapper */
-          <div
-            style={{
-              width: canvasWidth === 'full' ? '100%' : `${currentCanvasWidth * (zoom / 100)}px`,
-              maxWidth: '100%',
-            }}
-          >
-            <div
-              data-zoom-wrapper
-              style={{
-                width: canvasWidth === 'full' ? '100%' : `${currentCanvasWidth}px`,
-                transform: `scale(${zoom / 100})`,
-                transformOrigin: 'top left',
-              }}
-            >
-              <Canvas width={canvasWidth}>
-                <EditorWrapper editor={editor} zoom={zoom}>
-                  <EditorCore
-                    key={`editor-${editorKey}`}
-                    ref={editorRef}
-                    initialContent={contentRef.current}
-                    placeholder="Start writing..."
-                    onUpdate={handleUpdate}
-                    paginationEnabled={false}
-                    pageSize={pagination.pageSize}
-                    isDark={isDark}
-                  />
-                </EditorWrapper>
-              </Canvas>
-            </div>
-          </div>
-        )}
+        {/* Zoom wrapper -- CSS zoom for visual scaling.
+            CSS zoom is a rendering-level operation: the browser handles all
+            coordinate APIs transparently. No posAtCoords patching needed.
+            width: 100% prevents flex children from collapsing. */}
+        <div data-zoom-wrapper style={{
+          margin: '0 auto',
+          width: (!isPaginated && contentWidth === 'full') ? '100%' : 'fit-content',
+          ...(zoom !== 100 ? { zoom: zoom / 100 } : {}),
+        }}>
+          <EditorWrapper editor={editor} zoom={zoom}>
+            <EditorCore
+              ref={editorRef}
+              placeholder="Start writing..."
+              onUpdate={handleUpdate}
+            />
+          </EditorWrapper>
+        </div>
       </main>
 
       {/* Footer */}
@@ -489,7 +407,7 @@ function App() {
           bottom: 0,
           left: 0,
           right: isStylePanelOpen ? '320px' : 0,
-          zIndex: 20, // Above main content (z-index: 1)
+          zIndex: 20,
           backgroundColor: bg,
           borderTop: `1px solid ${border}`,
           padding: '8px 20px',
@@ -503,20 +421,21 @@ function App() {
       >
         <span>{editor?.storage.characterCount?.characters?.() ?? 0} characters</span>
 
-        {/* Zoom slider - double-click to reset to 100% */}
+        {/* Zoom slider - 80% to 150% in 5% steps, double-click to reset */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span style={{ fontSize: '11px', color: textSecondary }}>{zoom}%</span>
           <input
             type="range"
             className="zoom-slider"
-            min={20}
-            max={200}
-            value={Math.min(zoom, 200)}
+            min={80}
+            max={150}
+            step={5}
+            value={Math.min(Math.max(zoom, 80), 150)}
             onChange={(e) => setZoom(Number(e.target.value))}
             onDoubleClick={() => setZoom(100)}
             title={`Zoom: ${zoom}% (double-click to reset)`}
           />
-          <span style={{ fontSize: '11px', color: textSecondary }}>200%</span>
+          <span style={{ fontSize: '11px', color: textSecondary }}>150%</span>
         </div>
 
         <span>

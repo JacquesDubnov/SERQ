@@ -18,13 +18,14 @@
  */
 
 import type { Node as PMNode, ResolvedPos } from "@tiptap/pm/model"
+import { findTopBlockDepth } from "@/lib/tiptap/depth-utils"
 import { Plugin, TextSelection } from "@tiptap/pm/state"
 
 import { blockIndicatorKey } from './types'
 
 // --- Node classification for depth-aware drag ---
 // Structural wrappers: skip over them, never draggable themselves
-const STRUCTURAL_WRAPPERS = new Set(['column'])
+const STRUCTURAL_WRAPPERS = new Set(['column', 'section'])
 // Drag units: the draggable entity itself (Phase 2: add 'listItem')
 const DRAG_UNITS = new Set<string>()
 
@@ -53,14 +54,10 @@ function resolveDeepestDraggableBlock($pos: ResolvedPos): {
       return { pos: $pos.before(d), node, depth: d }
     }
 
-    // At depth 1, always return (top-level block)
-    if (d === 1) {
-      return { pos: $pos.before(d), node, depth: d }
-    }
-
-    // Check parent: if parent is a structural wrapper or doc, this is the block
-    const parent = $pos.node(d - 1)
-    if (STRUCTURAL_WRAPPERS.has(parent.type.name) || parent.type.name === 'doc') {
+    // Check parent: if parent is a structural wrapper (section, column) or doc,
+    // this node is the block-level draggable unit.
+    const parent = d > 0 ? $pos.node(d - 1) : null
+    if (!parent || parent.type.name === 'doc' || STRUCTURAL_WRAPPERS.has(parent.type.name)) {
       return { pos: $pos.before(d), node, depth: d }
     }
   }
@@ -68,7 +65,14 @@ function resolveDeepestDraggableBlock($pos: ResolvedPos): {
 }
 import { store, notifyListeners, notifySelectionListeners, clearSelections } from './state'
 import { isNonContentArea, isPointInForbiddenZone, clipIndicatorToCurrentPage } from './pagination'
-import { getPositionReferenceRect, isPaginationEnabled, getZoomFactor, getPageNumberForElement } from './dom-utils'
+import { getPositionReferenceRect, getPositionAncestor, getOffsetRelativeTo, isPaginationEnabled, getPageNumberForElement } from './dom-utils'
+
+import type { EditorView } from "@tiptap/pm/view"
+
+// Module-level active view: TipTap/React creates multiple plugin instances.
+// Only the instance whose editorView matches this reference should process events.
+// Updated in view() when the DOM is connected; handlers bail if they don't match.
+let _activeEditorView: EditorView | null = null
 
 export function createBlockIndicatorPlugin() {
   let currentBlockPos: number | null = null
@@ -84,9 +88,8 @@ export function createBlockIndicatorPlugin() {
   let dragSourcePos: number | null = null
   let dragSourceNode: PMNode | null = null
   let dropTargetPos: number | null = null
-
-  // Editor view reference for contentEditable toggling during drag
-  let editorViewRef: { dom: HTMLElement } | null = null
+  // Editor DOM reference for user-select restoration (set in view())
+  let editorDom: HTMLElement | null = null
 
   const resetState = () => {
     store.currentState = {
@@ -99,7 +102,6 @@ export function createBlockIndicatorPlugin() {
       isLongPressing: false,
       isDragging: false,
       dropIndicatorTop: null,
-      sourceOverlay: null,
       isAnimating: false,
       indicatorTransition: null,
       dropAnimation: 'none',
@@ -120,13 +122,14 @@ export function createBlockIndicatorPlugin() {
       longPressTimer = null
     }
     longPressStartPos = null
-    // Restore editability if we disabled it during long press (but not if drag took over)
-    if (!isDragging && editorViewRef && editorViewRef.dom.contentEditable === 'false') {
-      editorViewRef.dom.contentEditable = 'true'
-    }
     if (store.currentState.isLongPressing) {
       store.currentState = { ...store.currentState, isLongPressing: false }
       notifyListeners()
+      // Restore user-select if long press was cancelled (not transitioning to drag)
+      if (!isDragging && editorDom) {
+        editorDom.style.userSelect = ''
+        ;(editorDom.style as any).webkitUserSelect = ''
+      }
     }
   }
 
@@ -162,50 +165,54 @@ export function createBlockIndicatorPlugin() {
     dragSourceNode = node
     dropTargetPos = pos
 
-    const blockRect = dom.getBoundingClientRect()
     const isPaginated = isPaginationEnabled(editorView.dom)
-    const zoom = getZoomFactor(editorView.dom)
+    const ancestor = getPositionAncestor(editorView.dom)
 
-    // Clip source overlay to current page in pagination mode
-    let overlayTop = blockRect.top
-    let overlayHeight = blockRect.height
+    // Use offset-based positioning for the initial drop indicator
+    let indicatorY: number
+    if (ancestor) {
+      const offset = getOffsetRelativeTo(dom, ancestor)
+      indicatorY = offset.top
+    } else {
+      const blockRect = dom.getBoundingClientRect()
+      indicatorY = blockRect.top - editorRect.top
+    }
 
     if (isPaginated) {
+      const blockRect = dom.getBoundingClientRect()
       const clipped = clipIndicatorToCurrentPage(store.lastMouseY, blockRect.top, blockRect.bottom)
       if (clipped) {
-        overlayTop = clipped.clippedTop
-        overlayHeight = clipped.clippedHeight
+        // Adjust offset-based position by the clip delta
+        const clipDelta = clipped.clippedTop - blockRect.top
+        if (ancestor) {
+          indicatorY = getOffsetRelativeTo(dom, ancestor).top + clipDelta
+        } else {
+          indicatorY = clipped.clippedTop - editorRect.top
+        }
       }
-      // If null (mouse in forbidden zone), use raw rect as fallback -- drag already started
     }
 
-    // Source overlay position (relative to editor container for React)
-    // Divide by zoom: BCR is scaled, CSS absolute positioning is unscaled
-    const sourceOverlayRect = {
-      left: (blockRect.left - editorRect.left) / zoom,
-      top: (overlayTop - editorRect.top) / zoom,
-      width: blockRect.width / zoom,
-      height: overlayHeight / zoom,
-    }
+    // Fade the source block via CSS class (no overlay needed)
+    dom.classList.add('block-drag-source')
+    // Store reference so we can remove the class later
+    store.dragSourceElement = dom
 
     store.currentState = {
       ...store.currentState,
       visible: true,  // Keep indicator visible during drag (becomes drop indicator)
       isLongPressing: false,
       isDragging: true,
-      dropIndicatorTop: (overlayTop - editorRect.top) / zoom,
-      sourceOverlay: sourceOverlayRect,
+      dropIndicatorTop: indicatorY,
     }
     notifyListeners()
 
-    // Add body class for grabbing cursor, disable editability to prevent
-    // text selection during drag (contentEditable=false is the only approach
-    // that fully stops WebKit's native selection engine)
+    // Add body class for grabbing cursor and user-select:none
     document.body.classList.add("block-dragging")
+    // Also set user-select directly on the editor DOM -- contenteditable="true"
+    // can override the body-level user-select:none in WebKit
+    editorView.dom.style.userSelect = 'none'
+    ;(editorView.dom.style as any).webkitUserSelect = 'none'
     window.getSelection()?.removeAllRanges()
-    if (editorViewRef) {
-      editorViewRef.dom.contentEditable = 'false'
-    }
   }
 
   const cancelDrag = () => {
@@ -213,6 +220,12 @@ export function createBlockIndicatorPlugin() {
     if (dragOverlay) {
       dragOverlay.remove()
       dragOverlay = null
+    }
+
+    // Remove source block fade
+    if (store.dragSourceElement) {
+      store.dragSourceElement.classList.remove('block-drag-source')
+      store.dragSourceElement = null
     }
 
     isDragging = false
@@ -224,13 +237,14 @@ export function createBlockIndicatorPlugin() {
       ...store.currentState,
       isDragging: false,
       dropIndicatorTop: null,
-      sourceOverlay: null,
     }
     notifyListeners()
 
     document.body.classList.remove("block-dragging")
-    if (editorViewRef) {
-      editorViewRef.dom.contentEditable = 'true'
+    // Restore user-select on editor DOM
+    if (editorDom) {
+      editorDom.style.userSelect = ''
+      ;(editorDom.style as any).webkitUserSelect = ''
     }
   }
 
@@ -273,7 +287,11 @@ export function createBlockIndicatorPlugin() {
     },
 
     view: (editorView) => {
-      editorViewRef = editorView
+      editorDom = editorView.dom
+      // Claim active view when our DOM is connected
+      if (editorView.dom.isConnected) {
+        _activeEditorView = editorView
+      }
 
       const updateBlockRect = () => {
         if (currentBlockPos === null || isDragging) return
@@ -284,34 +302,35 @@ export function createBlockIndicatorPlugin() {
             // Skip headers/footers
             if (isNonContentArea(dom)) return
 
-            const refRect = getPositionReferenceRect(editorView.dom)
-            const blockRect = dom.getBoundingClientRect()
+            const ancestor = getPositionAncestor(editorView.dom)
+            if (!ancestor) return
             const isPaginated = isPaginationEnabled(editorView.dom)
-            const zoom = getZoomFactor(editorView.dom)
 
-            let top = blockRect.top
-            let height = blockRect.height
+            // Use offset chain for CSS positioning (zoom-invariant)
+            const offset = getOffsetRelativeTo(dom, ancestor)
+            let top = offset.top
+            let height = dom.offsetHeight
             let shouldShow = true
+
 
             // Clip to current page in pagination mode
             if (isPaginated) {
+              const blockRect = dom.getBoundingClientRect()
               const clipped = clipIndicatorToCurrentPage(store.lastMouseY, blockRect.top, blockRect.bottom)
               if (clipped) {
-                top = clipped.clippedTop
+                // For pagination clipping, compute the clipped portion relative to offset
+                top = offset.top + (clipped.clippedTop - blockRect.top)
                 height = clipped.clippedHeight
               } else {
                 shouldShow = false
               }
             }
 
-            // Divide by zoom: BCR returns scaled viewport px, but CSS absolute positioning
-            // inside the transform:scale container uses unscaled CSS px
-            const relativeTop = (top - refRect.top) / zoom
-            const blockLeft = (blockRect.left - refRect.left) / zoom
-            const blockWidth = blockRect.width / zoom
+            const blockLeft = offset.left
+            const blockWidth = dom.offsetWidth
 
             if (
-              store.currentState.top !== relativeTop ||
+              store.currentState.top !== top ||
               store.currentState.height !== height ||
               store.currentState.visible !== shouldShow ||
               store.currentState.paginationEnabled !== isPaginated
@@ -319,8 +338,8 @@ export function createBlockIndicatorPlugin() {
               store.currentState = {
                 ...store.currentState,
                 visible: shouldShow,
-                top: relativeTop,
-                height: height / zoom,
+                top,
+                height,
                 blockLeft,
                 blockWidth,
                 paginationEnabled: isPaginated,
@@ -343,7 +362,8 @@ export function createBlockIndicatorPlugin() {
         containerPos: number | null,
         clientY: number,
       ): { pos: number; top: number; index: number; pageNumber: number } | null => {
-        const editorRect = getPositionReferenceRect(editorView.dom)
+        const ancestor = getPositionAncestor(editorView.dom)
+        if (!ancestor) return null
         const isPaginated = isPaginationEnabled(editorView.dom)
 
         const gaps: { pos: number; top: number; index: number; pageNumber: number }[] = []
@@ -355,8 +375,8 @@ export function createBlockIndicatorPlugin() {
         if (node.childCount === 0 && containerPos !== null) {
           const containerDom = editorView.nodeDOM(containerPos)
           if (containerDom instanceof HTMLElement) {
-            const containerRect = containerDom.getBoundingClientRect()
-            const gapTop = containerRect.top + containerRect.height / 2 - editorRect.top
+            const containerOffset = getOffsetRelativeTo(containerDom, ancestor)
+            const gapTop = containerOffset.top + containerDom.offsetHeight / 2
             gaps.push({
               pos: containerPos + 1, // inside the container (after opening tag)
               top: gapTop,
@@ -374,9 +394,9 @@ export function createBlockIndicatorPlugin() {
           // Skip headers/footers
           if (isNonContentArea(dom)) return
 
-          const rect = dom.getBoundingClientRect()
-          const blockTop = rect.top - editorRect.top
-          const blockBottom = blockTop + rect.height
+          const blockOffset = getOffsetRelativeTo(dom, ancestor)
+          const blockTop = blockOffset.top
+          const blockBottom = blockTop + dom.offsetHeight
           const pageNumber = isPaginated ? getPageNumberForElement(dom) : 1
 
           let gapTop: number
@@ -408,11 +428,14 @@ export function createBlockIndicatorPlugin() {
           })
         }
 
-        // Find closest gap
+        // Find closest gap to mouse Y.
+        // Gap tops are in content space (offset-based). Convert mouse clientY
+        // to content space by subtracting the ancestor's viewport position.
+        const ancestorRect = ancestor.getBoundingClientRect()
         let closest = gaps[0]
         let closestDistance = Infinity
         for (const gap of gaps) {
-          const dist = Math.abs(clientY - (gap.top + editorRect.top))
+          const dist = Math.abs(clientY - (gap.top + ancestorRect.top))
           if (dist < closestDistance) {
             closestDistance = dist
             closest = gap
@@ -428,7 +451,8 @@ export function createBlockIndicatorPlugin() {
         index: number
         pageNumber: number
       } | null => {
-        // Try to determine which container the cursor is inside
+        // Try to determine which container the cursor is inside.
+        // posAtCoords receives screen-space coords.
         const coords = editorView.posAtCoords({ left: clientX, top: clientY })
         if (coords) {
           const $pos = editorView.state.doc.resolve(coords.pos)
@@ -490,9 +514,9 @@ export function createBlockIndicatorPlugin() {
           blockWidth: number
           pageNumber: number
         }> = []
-        const refRect = getPositionReferenceRect(editorView.dom)
+        const ancestor = getPositionAncestor(editorView.dom)
+        if (!ancestor) return
         const isPaginated = isPaginationEnabled(editorView.dom)
-        const zoom = getZoomFactor(editorView.dom)
 
         store.selectedBlockPositions.forEach((pos) => {
           try {
@@ -504,18 +528,17 @@ export function createBlockIndicatorPlugin() {
                 return
               }
 
-              const rect = dom.getBoundingClientRect()
-
-              // In pagination mode, clip each selected block to its content slice
-              let blockTop = rect.top
-              let blockHeight = rect.height
+              const offset = getOffsetRelativeTo(dom, ancestor)
+              let blockTop = offset.top
+              let blockHeight = dom.offsetHeight
 
               if (isPaginated) {
-                // Use block's vertical center as reference for which content slice it belongs to
+                // Use getBoundingClientRect for pagination clipping (screen-space comparison)
+                const rect = dom.getBoundingClientRect()
                 const blockCenter = rect.top + rect.height / 2
                 const clipped = clipIndicatorToCurrentPage(blockCenter, rect.top, rect.bottom)
                 if (clipped) {
-                  blockTop = clipped.clippedTop
+                  blockTop = offset.top + (clipped.clippedTop - rect.top)
                   blockHeight = clipped.clippedHeight
                 } else {
                   // Block is entirely in a forbidden zone, skip it
@@ -523,14 +546,12 @@ export function createBlockIndicatorPlugin() {
                 }
               }
 
-              // Divide by zoom: BCR is scaled, CSS absolute positioning is unscaled
-              const blockLeft = (rect.left - refRect.left) / zoom
               blocks.push({
                 pos,
-                top: (blockTop - refRect.top) / zoom,
-                height: blockHeight / zoom,
-                blockLeft,
-                blockWidth: rect.width / zoom,
+                top: blockTop,
+                height: blockHeight,
+                blockLeft: offset.left,
+                blockWidth: dom.offsetWidth,
                 pageNumber: isPaginated ? getPageNumberForElement(dom) : 1,
               })
             }
@@ -574,67 +595,76 @@ export function createBlockIndicatorPlugin() {
        * Returns the (possibly modified) transaction.
        */
       const cleanupSourceColumn = (tr: any, sourcePos: number): any => {
-        // Find the column that contained the source block (before deletion)
-        const $src = editorView.state.doc.resolve(sourcePos)
-        let sourceColumnPos: number | null = null
-        for (let d = $src.depth; d >= 1; d--) {
-          if (STRUCTURAL_WRAPPERS.has($src.node(d).type.name)) {
-            sourceColumnPos = $src.before(d)
-            break
-          }
-        }
-        if (sourceColumnPos === null) return tr
-
-        const mappedColPos = tr.mapping.map(sourceColumnPos)
-        const colNode = tr.doc.nodeAt(mappedColPos)
-        if (!colNode || colNode.type.name !== 'column') return tr
-
-        const isEmpty = colNode.childCount === 0 ||
-          (colNode.childCount === 1 &&
-           colNode.child(0).type.name === 'paragraph' &&
-           colNode.child(0).childCount === 0)
-        if (!isEmpty) return tr
-
-        // Find the parent columnBlock
-        const $col = tr.doc.resolve(mappedColPos)
-        let columnBlockPos: number | null = null
-        let columnBlockNode: PMNode | null = null
-        for (let d = $col.depth; d >= 1; d--) {
-          if ($col.node(d).type.name === 'columnBlock') {
-            columnBlockPos = $col.before(d)
-            columnBlockNode = $col.node(d)
-            break
-          }
-        }
-        if (!columnBlockNode || columnBlockPos === null) return tr
-
-        // Count non-empty columns
-        let nonEmptyColumns = 0
-        const contentNodes: PMNode[] = []
-        columnBlockNode.forEach((child) => {
-          if (child.type.name === 'column') {
-            const childEmpty = child.childCount === 0 ||
-              (child.childCount === 1 &&
-               child.child(0).type.name === 'paragraph' &&
-               child.child(0).childCount === 0)
-            if (!childEmpty) {
-              nonEmptyColumns++
-              child.forEach((block) => contentNodes.push(block))
+        // Find the column that contained the source block (before deletion).
+        // Resolve against the OLD doc (pre-transaction) since sourcePos is from there.
+        try {
+          const $src = editorView.state.doc.resolve(sourcePos)
+          let sourceColumnPos: number | null = null
+          let sourceColumnBlockPos: number | null = null
+          for (let d = $src.depth; d >= 1; d--) {
+            const nodeName = $src.node(d).type.name
+            if (nodeName === 'column' && sourceColumnPos === null) {
+              sourceColumnPos = $src.before(d)
+            }
+            if (nodeName === 'columnBlock' && sourceColumnBlockPos === null) {
+              sourceColumnBlockPos = $src.before(d)
+              break
             }
           }
-        })
+          // Source was not inside a column layout -- nothing to clean up
+          if (sourceColumnPos === null || sourceColumnBlockPos === null) return tr
 
-        if (nonEmptyColumns <= 1) {
-          // Unwrap: replace the entire columnBlock with its content
-          if (contentNodes.length === 0) {
-            contentNodes.push(editorView.state.schema.nodes.paragraph.create())
+          // Map both positions through the transaction's changes
+          const mappedColPos = tr.mapping.map(sourceColumnPos)
+          const mappedBlockPos = tr.mapping.map(sourceColumnBlockPos)
+
+          // Validate mapped positions
+          if (mappedColPos < 0 || mappedColPos >= tr.doc.content.size) return tr
+          if (mappedBlockPos < 0 || mappedBlockPos >= tr.doc.content.size) return tr
+
+          const colNode = tr.doc.nodeAt(mappedColPos)
+          if (!colNode || colNode.type.name !== 'column') return tr
+
+          const columnBlockNode = tr.doc.nodeAt(mappedBlockPos)
+          if (!columnBlockNode || columnBlockNode.type.name !== 'columnBlock') return tr
+
+          const isEmpty = colNode.childCount === 0 ||
+            (colNode.childCount === 1 &&
+             colNode.child(0).type.name === 'paragraph' &&
+             colNode.child(0).childCount === 0)
+          if (!isEmpty) return tr
+
+          // Count non-empty columns
+          let nonEmptyColumns = 0
+          const contentNodes: PMNode[] = []
+          columnBlockNode.forEach((child: PMNode) => {
+            if (child.type.name === 'column') {
+              const childEmpty = child.childCount === 0 ||
+                (child.childCount === 1 &&
+                 child.child(0).type.name === 'paragraph' &&
+                 child.child(0).childCount === 0)
+              if (!childEmpty) {
+                nonEmptyColumns++
+                child.forEach((block: PMNode) => contentNodes.push(block))
+              }
+            }
+          })
+
+          if (nonEmptyColumns <= 1) {
+            // Unwrap: replace the entire columnBlock with its content
+            if (contentNodes.length === 0) {
+              contentNodes.push(editorView.state.schema.nodes.paragraph.create())
+            }
+            tr = tr.replaceWith(mappedBlockPos, mappedBlockPos + columnBlockNode.nodeSize, contentNodes)
+          } else {
+            // More than 1 non-empty column remains -- just delete the empty one
+            tr = tr.delete(mappedColPos, mappedColPos + colNode.nodeSize)
           }
-          tr = tr.replaceWith(columnBlockPos, columnBlockPos + columnBlockNode.nodeSize, contentNodes)
-        } else {
-          // More than 1 non-empty column remains -- just delete the empty one
-          tr = tr.delete(mappedColPos, mappedColPos + colNode.nodeSize)
+          return tr
+        } catch {
+          // Position resolution failed -- no cleanup needed
+          return tr
         }
-        return tr
       }
 
       /**
@@ -705,10 +735,11 @@ export function createBlockIndicatorPlugin() {
             const base = Math.floor((1 / newCount) * 10000) / 10000
             const widths = Array(newCount).fill(base)
             widths[newCount - 1] = +(1 - base * (newCount - 1)).toFixed(4)
+            // Update parent column count (widths live on Column children,
+            // handled by normalize-plugin width validation)
             tr = tr.setNodeMarkup(finalTargetPos, undefined, {
               ...updatedNode.attrs,
               columns: newCount,
-              columnWidths: widths,
             })
           }
         }
@@ -722,7 +753,7 @@ export function createBlockIndicatorPlugin() {
           const col2 = columnType.create(null, col2Content)
 
           const columnBlock = columnBlockType.create(
-            { columns: 2, columnWidths: [0.5, 0.5], gutter: 24 },
+            { columns: 2 },
             [col1, col2],
           )
 
@@ -745,11 +776,16 @@ export function createBlockIndicatorPlugin() {
           }
         }
 
+        // Remove source block fade
+        if (store.dragSourceElement) {
+          store.dragSourceElement.classList.remove('block-drag-source')
+          store.dragSourceElement = null
+        }
+
         // Clear horizontal drop state
         store.currentState = {
           ...store.currentState,
           isDragging: false,
-          sourceOverlay: null,
           horizontalDropSide: null,
           horizontalDropBlockPos: null,
           horizontalDropRect: null,
@@ -804,11 +840,16 @@ export function createBlockIndicatorPlugin() {
         // Mark transaction
         tr = tr.setMeta(blockIndicatorKey, { isDragging: false, justMoved: adjustedPos })
 
+        // Remove source block fade
+        if (store.dragSourceElement) {
+          store.dragSourceElement.classList.remove('block-drag-source')
+          store.dragSourceElement = null
+        }
+
         // Set animating state
         store.currentState = {
           ...store.currentState,
           isDragging: false,
-          sourceOverlay: null,
           isAnimating: true,
         }
         notifyListeners()
@@ -817,14 +858,21 @@ export function createBlockIndicatorPlugin() {
 
         // Animate indicator: horizontal shrinks to dot, then vertical grows
         requestAnimationFrame(() => {
-          const refRect = getPositionReferenceRect(editorView.dom)
-          const zoom = getZoomFactor(editorView.dom)
+          const ancestor = getPositionAncestor(editorView.dom)
           const landedDom = editorView.nodeDOM(adjustedPos)
-          const landedRect = landedDom instanceof HTMLElement
-            ? landedDom.getBoundingClientRect()
-            : null
 
-          const finalHeight = landedRect ? landedRect.height / zoom : 24
+          let landedTop = 0
+          let landedLeft = 0
+          let landedWidth = 0
+          let finalHeight = 24
+
+          if (landedDom instanceof HTMLElement && ancestor) {
+            const landedOffset = getOffsetRelativeTo(landedDom, ancestor)
+            landedTop = landedOffset.top
+            landedLeft = landedOffset.left
+            landedWidth = landedDom.offsetWidth
+            finalHeight = landedDom.offsetHeight
+          }
 
           // Hide caret during animation
           document.body.classList.add("block-animating")
@@ -835,10 +883,10 @@ export function createBlockIndicatorPlugin() {
             visible: true,
             isDragging: true,  // Keep horizontal mode for shrinking
             commandHeld: false,
-            top: landedRect ? (landedRect.top - refRect.top) / zoom : 0,
+            top: landedTop,
             height: 2,  // Horizontal line height
-            blockLeft: landedRect ? (landedRect.left - refRect.left) / zoom : 0,
-            blockWidth: landedRect ? landedRect.width / zoom : 0,
+            blockLeft: landedLeft,
+            blockWidth: landedWidth,
             dropAnimation: 'shrinking',
           }
           notifyListeners()
@@ -879,25 +927,41 @@ export function createBlockIndicatorPlugin() {
       }
 
       const handleMouseMove = (event: MouseEvent) => {
-        // Skip if disabled
+        if (editorView !== _activeEditorView) return
         if (!store.indicatorEnabled) return
 
-        // Track mouse Y for code paths that don't have direct event access
-        store.lastMouseY = event.clientY
-
-        const target = event.target
-        if (!(target instanceof HTMLElement)) return
-
-        // Skip if hovering over header/footer/gap
-        if (isNonContentArea(target)) {
-          if (store.currentState.visible && !isDragging) {
-            store.currentState = { ...store.currentState, visible: false }
-            notifyListeners()
+        // During drag/long-press, always process (user may drag outside editor)
+        if (!isDragging && longPressTimer === null) {
+          // Quick bounds check: is the mouse anywhere near the editor?
+          // Use elementFromPoint to check if we're near the editor content,
+          // avoiding the WebKit CSS zoom bug with getBoundingClientRect.
+          const hitCheck = document.elementFromPoint(event.clientX, event.clientY)
+          const ancestor = getPositionAncestor(editorView.dom)
+          const zoomWrapper = editorView.dom.closest('[data-zoom-wrapper]')
+          const isNearEditor = hitCheck && (
+            editorView.dom.contains(hitCheck) ||
+            (ancestor && ancestor.contains(hitCheck)) ||
+            (zoomWrapper && zoomWrapper.contains(hitCheck))
+          )
+          if (!isNearEditor) {
+            if (store.currentState.visible) {
+              store.currentState = { ...store.currentState, visible: false }
+              notifyListeners()
+            }
+            return
           }
-          return
         }
 
-        // Hide indicator when mouse drifts into a pagination gap, header, or footer
+        store.lastMouseY = event.clientY
+
+        if (longPressTimer !== null || isDragging) {
+          event.preventDefault()
+          const sel = window.getSelection()
+          if (sel && sel.rangeCount > 0) {
+            sel.removeAllRanges()
+          }
+        }
+
         if (isPaginationEnabled(editorView.dom) && isPointInForbiddenZone(event.clientY)) {
           if (store.currentState.visible && !isDragging) {
             store.currentState = { ...store.currentState, visible: false }
@@ -921,13 +985,6 @@ export function createBlockIndicatorPlugin() {
 
         // Handle drag mode - update drop indicator position
         if (isDragging) {
-          event.preventDefault()
-
-          // Temporarily restore contentEditable for posAtCoords calls below.
-          // PM uses elementFromPoint internally which needs editable DOM for
-          // accurate hit-testing into text nodes and nested NodeViews.
-          // This is synchronous -- no selection can form in a single JS turn.
-          if (editorViewRef) editorViewRef.dom.contentEditable = 'true'
 
           const dropInfo = findDropPosition(event.clientX, event.clientY)
           if (dropInfo) {
@@ -935,13 +992,12 @@ export function createBlockIndicatorPlugin() {
             store.dropTargetIndex = dropInfo.index
           }
 
-          // Resolve which block the cursor is over (depth-aware)
+          // Resolve which block the cursor is over (depth-aware).
+          // posAtCoords receives screen-space coords.
           const coords = editorView.posAtCoords({
             left: event.clientX,
             top: event.clientY,
           })
-
-          if (editorViewRef) editorViewRef.dom.contentEditable = 'false'
 
           if (coords) {
             const $pos = editorView.state.doc.resolve(coords.pos)
@@ -956,48 +1012,50 @@ export function createBlockIndicatorPlugin() {
                 // Skip headers/footers during drag
                 if (isNonContentArea(dom)) return
 
-                const refRect = getPositionReferenceRect(editorView.dom)
-                const blockRect = dom.getBoundingClientRect()
+                const ancestor = getPositionAncestor(editorView.dom)
+                if (!ancestor) return
                 const isPaginated = isPaginationEnabled(editorView.dom)
-                const zoom = getZoomFactor(editorView.dom)
 
                 // In pagination mode, clip block reference to current page
                 if (isPaginated) {
+                  const blockRect = dom.getBoundingClientRect()
                   const clipped = clipIndicatorToCurrentPage(event.clientY, blockRect.top, blockRect.bottom)
                   if (!clipped) return // Mouse in forbidden zone -- keep last known state
                 }
 
                 // --- Vertical drop indicator dimensions ---
-                // Default to the resolved (deep) block's rect. If the cursor
-                // is inside a column, narrow the indicator to column width.
-                let indicatorLeft = (blockRect.left - refRect.left) / zoom
-                let indicatorWidth = blockRect.width / zoom
+                // Use offset-based positioning for CSS values
+                const blockOffset = getOffsetRelativeTo(dom, ancestor)
+                let indicatorLeft = blockOffset.left
+                let indicatorWidth = dom.offsetWidth
 
                 const hitEl = document.elementFromPoint(event.clientX, event.clientY)
                 const cursorColumnEl = hitEl?.closest?.('[data-column]')
                 if (cursorColumnEl instanceof HTMLElement) {
-                  const colRect = cursorColumnEl.getBoundingClientRect()
-                  indicatorLeft = (colRect.left - refRect.left) / zoom
-                  indicatorWidth = colRect.width / zoom
+                  const colOffset = getOffsetRelativeTo(cursorColumnEl, ancestor)
+                  indicatorLeft = colOffset.left
+                  indicatorWidth = cursorColumnEl.offsetWidth
                 }
 
                 // --- Edge zone detection (horizontal drop / column creation) ---
-                // ARCHITECTURAL RULE: edge zones always operate on the TOP-LEVEL
-                // (depth 1) block, independent of resolveDeepestDraggableBlock.
-                // This avoids flickering when posAtCoords oscillates between
-                // depth 1 (columnBlock) and depth 3 (block inside column).
+                // ARCHITECTURAL RULE: edge zones always operate on the top-level
+                // block (direct child of section/doc), independent of
+                // resolveDeepestDraggableBlock. This avoids flickering when
+                // posAtCoords oscillates between different depths.
                 let horizontalDropSide: 'left' | 'right' | null = null
                 let horizontalDropColumnIndex: number | null = null
                 let horizontalDropGapX: number | null = null
                 let horizontalDropBlockPos: number | null = null
                 let horizontalDropRect: { left: number; top: number; width: number; height: number } | null = null
 
-                if ($pos.depth >= 1) {
-                  const topPos = $pos.before(1)
-                  const topNode = $pos.node(1)
+                const topBlockDepth = findTopBlockDepth($pos)
+                if ($pos.depth >= topBlockDepth) {
+                  const topPos = $pos.before(topBlockDepth)
+                  const topNode = $pos.node(topBlockDepth)
                   const topDom = editorView.nodeDOM(topPos)
 
                   if (topDom instanceof HTMLElement) {
+                    // Use getBoundingClientRect for hit testing (mouse comparison)
                     const topRect = topDom.getBoundingClientRect()
                     const EDGE_ZONE = 30
                     const relativeX = event.clientX - topRect.left
@@ -1025,7 +1083,10 @@ export function createBlockIndicatorPlugin() {
                           if (event.clientX >= gapLeft - 8 && event.clientX <= gapRight + 8) {
                             horizontalDropSide = 'right'
                             horizontalDropColumnIndex = ci + 1
-                            horizontalDropGapX = ((gapLeft + gapRight) / 2 - refRect.left) / zoom
+                            // Gap X in content space via offsets
+                            const colOffset = getOffsetRelativeTo(columnChildren[ci], ancestor)
+                            const nextColOffset = getOffsetRelativeTo(columnChildren[ci + 1], ancestor)
+                            horizontalDropGapX = (colOffset.left + columnChildren[ci].offsetWidth + nextColOffset.left) / 2
                             break
                           }
                         }
@@ -1033,12 +1094,14 @@ export function createBlockIndicatorPlugin() {
                     }
 
                     if (horizontalDropSide) {
+                      // Use offset-based positioning for the horizontal drop rect
+                      const topOffset = getOffsetRelativeTo(topDom, ancestor)
                       horizontalDropBlockPos = topPos
                       horizontalDropRect = {
-                        left: (topRect.left - refRect.left) / zoom,
-                        top: (topRect.top - refRect.top) / zoom,
-                        width: topRect.width / zoom,
-                        height: topRect.height / zoom,
+                        left: topOffset.left,
+                        top: topOffset.top,
+                        width: topDom.offsetWidth,
+                        height: topDom.offsetHeight,
                       }
                     }
                   }
@@ -1047,11 +1110,11 @@ export function createBlockIndicatorPlugin() {
                 // --- Drop indicator Y position ---
                 let indicatorTop: number
                 if (dropInfo) {
-                  indicatorTop = dropInfo.top / zoom
+                  indicatorTop = dropInfo.top
                 } else if (store.currentState.dropIndicatorTop != null) {
                   indicatorTop = store.currentState.dropIndicatorTop
                 } else {
-                  indicatorTop = (blockRect.top - refRect.top) / zoom
+                  indicatorTop = blockOffset.top
                 }
 
                 store.currentState = {
@@ -1077,21 +1140,69 @@ export function createBlockIndicatorPlugin() {
           return
         }
 
-        const coords = editorView.posAtCoords({
-          left: event.clientX,
-          top: event.clientY,
-        })
+        // Find the block under the cursor using elementFromPoint (screen-space).
+        // This avoids the WebKit CSS zoom bug where getBoundingClientRect()
+        // returns un-zoomed values while event.clientX/Y is in screen space.
+        // elementFromPoint correctly handles CSS zoom in all browsers.
+        let blockPos: number | null = null
 
-        if (!coords) return
+        const hitEl = document.elementFromPoint(event.clientX, event.clientY)
+        if (hitEl && editorView.dom.contains(hitEl)) {
+          // Walk up from the hit element to find a ProseMirror block node
+          let el: HTMLElement | null = hitEl as HTMLElement
+          while (el && el !== editorView.dom) {
+            // Try to get PM position from this DOM element
+            const pos = editorView.posAtDOM(el, 0)
+            if (pos >= 0) {
+              try {
+                const $pos = editorView.state.doc.resolve(pos)
+                const resolved = resolveDeepestDraggableBlock($pos)
+                if (resolved && !STRUCTURAL_WRAPPERS.has(resolved.node.type.name)) {
+                  // Verify we can get DOM for this position
+                  const blockDom = editorView.nodeDOM(resolved.pos)
+                  if (blockDom instanceof HTMLElement && !isNonContentArea(blockDom)) {
+                    blockPos = resolved.pos
+                    break
+                  }
+                }
+              } catch { /* skip */ }
+            }
+            el = el.parentElement
+          }
+        }
 
-        const $pos = editorView.state.doc.resolve(coords.pos)
-        const resolved = resolveDeepestDraggableBlock($pos)
-        const blockPos = resolved ? resolved.pos : null
+        // Fallback: if elementFromPoint didn't find a block (e.g., mouse
+        // in padding area), try posAtCoords which also works in screen space
+        if (blockPos === null) {
+          const coords = editorView.posAtCoords({ left: event.clientX, top: event.clientY })
+          if (coords) {
+            try {
+              const $pos = editorView.state.doc.resolve(coords.pos)
+              const resolved = resolveDeepestDraggableBlock($pos)
+              if (resolved) {
+                const blockDom = editorView.nodeDOM(resolved.pos)
+                if (blockDom instanceof HTMLElement && !isNonContentArea(blockDom)) {
+                  blockPos = resolved.pos
+                }
+              }
+            } catch { /* skip */ }
+          }
+        }
+
+        // Hide indicator if no block found
+        if (blockPos === null) {
+          if (store.currentState.visible && !isDragging) {
+            currentBlockPos = null
+            store.currentState = { ...store.currentState, visible: false }
+            notifyListeners()
+          }
+          return
+        }
 
         // Re-evaluate when entering a new block OR when returning to content
         // from a forbidden zone (indicator hidden but mouse now on valid block)
-        const needsUpdate = blockPos !== null && (blockPos !== currentBlockPos || !store.currentState.visible)
-        if (needsUpdate && blockPos !== null) {
+        const needsUpdate = blockPos !== currentBlockPos || !store.currentState.visible
+        if (needsUpdate) {
           currentBlockPos = blockPos
 
           try {
@@ -1107,21 +1218,21 @@ export function createBlockIndicatorPlugin() {
                 return
               }
 
-              const refRect = getPositionReferenceRect(editorView.dom)
-              const blockRect = dom.getBoundingClientRect()
+              const ancestor = getPositionAncestor(editorView.dom)
+              if (!ancestor) return
               const isPaginated = isPaginationEnabled(editorView.dom)
-              const zoom = getZoomFactor(editorView.dom)
-              const blockLeft = (blockRect.left - refRect.left) / zoom
 
-              // In pagination mode, clip the indicator to the current page's content area
-              let indicatorTop = blockRect.top
-              let indicatorHeight = blockRect.height
+              // Use offset-based positioning (zoom-invariant)
+              const offset = getOffsetRelativeTo(dom, ancestor)
+              let indicatorTop = offset.top
+              let indicatorHeight = dom.offsetHeight
               let shouldShow = true
 
               if (isPaginated) {
+                const blockRect = dom.getBoundingClientRect()
                 const clipped = clipIndicatorToCurrentPage(event.clientY, blockRect.top, blockRect.bottom)
                 if (clipped) {
-                  indicatorTop = clipped.clippedTop
+                  indicatorTop = offset.top + (clipped.clippedTop - blockRect.top)
                   indicatorHeight = clipped.clippedHeight
                 } else {
                   shouldShow = false
@@ -1131,10 +1242,10 @@ export function createBlockIndicatorPlugin() {
               store.currentState = {
                 ...store.currentState,
                 visible: shouldShow,
-                top: (indicatorTop - refRect.top) / zoom,
-                height: indicatorHeight / zoom,
-                blockLeft,
-                blockWidth: blockRect.width / zoom,
+                top: indicatorTop,
+                height: indicatorHeight,
+                blockLeft: offset.left,
+                blockWidth: dom.offsetWidth,
                 commandHeld: store.commandHeld,
                 paginationEnabled: isPaginated,
               }
@@ -1147,10 +1258,15 @@ export function createBlockIndicatorPlugin() {
       }
 
       const handleMouseDown = (event: MouseEvent) => {
+        if (editorView !== _activeEditorView) return
         // Skip if disabled
         if (!store.indicatorEnabled) return
         if (currentBlockPos === null) return
         if (event.button !== 0) return // Only left click
+
+        // Containment check (listener is on document, not editorView.dom)
+        const mdTarget = event.target as HTMLElement | null
+        if (!mdTarget || !editorView.dom.contains(mdTarget)) return
 
         // Don't interfere with column resize divider handles
         if ((event.target as HTMLElement).closest('.column-divider-handle')) return
@@ -1158,8 +1274,8 @@ export function createBlockIndicatorPlugin() {
         const dom = editorView.nodeDOM(currentBlockPos)
         if (!(dom instanceof HTMLElement)) return
 
-        // Option+click selection logic
-        if (event.altKey) {
+        // Ctrl+click selection logic
+        if (event.ctrlKey) {
           event.preventDefault()
           event.stopPropagation()
 
@@ -1192,7 +1308,7 @@ export function createBlockIndicatorPlugin() {
           return  // Don't proceed to drag logic
         }
 
-        // Click without Option = deselect all selected blocks
+        // Click without Ctrl = deselect all selected blocks
         if (store.selectedBlockPositions.size > 0) {
           clearSelections()
         }
@@ -1210,16 +1326,11 @@ export function createBlockIndicatorPlugin() {
         const capturedBlockPos = currentBlockPos
         const capturedDom = dom
 
-        // Disable contentEditable on next frame to prevent browser native selection
-        // during the 400ms long press wait. Must be rAF (not synchronous) so PM's
-        // mousedown handler places the cursor first. The callback checks longPressTimer
-        // so quick clicks (mouseup before next frame) are unaffected.
-        requestAnimationFrame(() => {
-          if (longPressTimer !== null && editorViewRef) {
-            editorViewRef.dom.contentEditable = 'false'
-            window.getSelection()?.removeAllRanges()
-          }
-        })
+        // Suppress text selection during the long-press wait.
+        // We set user-select:none on the editor DOM directly because
+        // contenteditable="true" overrides body-level user-select:none in WebKit.
+        editorView.dom.style.userSelect = 'none'
+        ;(editorView.dom.style as any).webkitUserSelect = 'none'
 
         longPressTimer = setTimeout(() => {
           // Long press completed - start drag
@@ -1245,6 +1356,7 @@ export function createBlockIndicatorPlugin() {
       }
 
       const handleMouseUp = () => {
+        if (editorView !== _activeEditorView) return
         const wasDragging = isDragging
 
         cancelLongPress()
@@ -1270,19 +1382,25 @@ export function createBlockIndicatorPlugin() {
         dropTargetPos = null
 
         document.body.classList.remove("block-dragging")
-        if (editorViewRef) {
-          editorViewRef.dom.contentEditable = 'true'
+        // Restore user-select on editor DOM
+        editorView.dom.style.userSelect = ''
+        ;(editorView.dom.style as any).webkitUserSelect = ''
+
+        // Remove source block fade (if executeMove didn't already)
+        if (store.dragSourceElement) {
+          store.dragSourceElement.classList.remove('block-drag-source')
+          store.dragSourceElement = null
         }
 
         store.currentState = {
           ...store.currentState,
           isDragging: false,
-          sourceOverlay: null,
         }
         notifyListeners()
       }
 
       const handleScroll = () => {
+        if (editorView !== _activeEditorView) return
         updateBlockRect()
         // Also update selected blocks positions on scroll
         if (store.selectedBlockPositions.size > 0) {
@@ -1291,6 +1409,7 @@ export function createBlockIndicatorPlugin() {
       }
 
       const handleGlobalMouseMove = (event: MouseEvent) => {
+        if (editorView !== _activeEditorView) return
         // Skip if disabled
         if (!store.indicatorEnabled) return
         if (!store.currentState.visible && !isDragging) return
@@ -1299,25 +1418,28 @@ export function createBlockIndicatorPlugin() {
         // In that case, the indicator should stay at the caret position
         if (inputMode === 'keyboard') return
 
-        const refRect = getPositionReferenceRect(editorView.dom)
-        const padding = 50
+        // Check if mouse is outside the editor area.
+        // Use elementFromPoint to avoid the WebKit CSS zoom getBoundingClientRect bug.
+        const globalHit = document.elementFromPoint(event.clientX, event.clientY)
+        const zoomWrapperEl = editorView.dom.closest('[data-zoom-wrapper]')
+        const ancestorEl = getPositionAncestor(editorView.dom)
+        const isInsideEditor = globalHit && (
+          editorView.dom.contains(globalHit) ||
+          (ancestorEl && ancestorEl.contains(globalHit)) ||
+          (zoomWrapperEl && zoomWrapperEl.contains(globalHit))
+        )
 
-        const isOutside =
-          event.clientX < refRect.left - padding ||
-          event.clientX > refRect.right + padding ||
-          event.clientY < refRect.top - padding ||
-          event.clientY > refRect.bottom + padding
-
-        if (isOutside && !isDragging) {
+        if (!isInsideEditor && !isDragging) {
           hide()
         }
       }
 
       const handleKeyDown = (event: KeyboardEvent) => {
+        if (editorView !== _activeEditorView) return
         // Skip if disabled
         if (!store.indicatorEnabled) return
 
-        if (event.key === 'Alt') {
+        if (event.key === 'Control') {
           setCommandHeld(true)
         }
         if (event.key === 'Escape') {
@@ -1329,22 +1451,24 @@ export function createBlockIndicatorPlugin() {
       }
 
       const handleKeyUp = (event: KeyboardEvent) => {
+        if (editorView !== _activeEditorView) return
         // Skip if disabled
         if (!store.indicatorEnabled) return
 
-        if (event.key === 'Alt') {
+        if (event.key === 'Control') {
           setCommandHeld(false)
         }
       }
 
-      // Global click to deselect - anywhere without Option clears selection
+      // Global click to deselect - anywhere without Ctrl clears selection
       const handleGlobalMouseDown = (event: MouseEvent) => {
+        if (editorView !== _activeEditorView) return
         // Skip if disabled
         if (!store.indicatorEnabled) return
 
-        // Only deselect if Option is NOT held and we have selections
+        // Only deselect if Ctrl is NOT held and we have selections
         // Skip if clicking inside the editor (editor handler will manage it)
-        if (!event.altKey && store.selectedBlockPositions.size > 0) {
+        if (!event.ctrlKey && store.selectedBlockPositions.size > 0) {
           const isInsideEditor = editorView.dom.contains(event.target as Node)
           if (!isInsideEditor) {
             clearSelections()
@@ -1352,11 +1476,15 @@ export function createBlockIndicatorPlugin() {
         }
       }
 
-      editorView.dom.addEventListener("mousemove", handleMouseMove)
-      editorView.dom.addEventListener("mousedown", handleMouseDown, true)  // Capture phase
+      // Attach to window instead of editorView.dom.
+      // TipTap/React may replace the editor DOM node after ProseMirror's view()
+      // attaches listeners, leaving them on a disconnected element.
+      // Handlers check containment internally.
+      window.addEventListener("mousemove", handleMouseMove)
+      window.addEventListener("mousedown", handleMouseDown, true)  // Capture phase
       window.addEventListener("mousedown", handleGlobalMouseDown)  // Global deselect
       window.addEventListener("mouseup", handleMouseUp)
-      document.addEventListener("mousemove", handleGlobalMouseMove)
+      window.addEventListener("mousemove", handleGlobalMouseMove)
       window.addEventListener("scroll", handleScroll, true)
       window.addEventListener("keydown", handleKeyDown)
       window.addEventListener("keyup", handleKeyUp)
@@ -1364,6 +1492,7 @@ export function createBlockIndicatorPlugin() {
       // Hide indicator on keypress (user is typing)
       // But ignore modifier keys - they shouldn't hide the indicator
       const handleEditorKeyDown = (event: KeyboardEvent) => {
+        if (editorView !== _activeEditorView) return
         // Skip if disabled
         if (!store.indicatorEnabled) return
 
@@ -1380,12 +1509,18 @@ export function createBlockIndicatorPlugin() {
         }
       }
 
-      editorView.dom.addEventListener("keydown", handleEditorKeyDown)
+      window.addEventListener("keydown", handleEditorKeyDown)
 
       let prevDoc = editorView.state.doc
 
       return {
         update: (view) => {
+          // Claim active view if our DOM is now connected (may not have been
+          // connected when view() ran during React's initial render cycle)
+          if (view.dom.isConnected && _activeEditorView !== editorView) {
+            _activeEditorView = editorView
+          }
+          if (editorView !== _activeEditorView) return
           updateBlockRect()
 
           // If document changed, recalculate selected block positions
@@ -1396,16 +1531,19 @@ export function createBlockIndicatorPlugin() {
           prevDoc = view.state.doc
         },
         destroy: () => {
+          if (_activeEditorView === editorView) {
+            _activeEditorView = null
+          }
           cancelLongPress()
           if (isDragging) {
             cancelDrag()
           }
-          editorView.dom.removeEventListener("mousemove", handleMouseMove)
-          editorView.dom.removeEventListener("mousedown", handleMouseDown, true)
-          editorView.dom.removeEventListener("keydown", handleEditorKeyDown)
+          window.removeEventListener("mousemove", handleMouseMove)
+          window.removeEventListener("mousedown", handleMouseDown, true)
+          window.removeEventListener("keydown", handleEditorKeyDown)
           window.removeEventListener("mousedown", handleGlobalMouseDown)
           window.removeEventListener("mouseup", handleMouseUp)
-          document.removeEventListener("mousemove", handleGlobalMouseMove)
+          window.removeEventListener("mousemove", handleGlobalMouseMove)
           window.removeEventListener("scroll", handleScroll, true)
           window.removeEventListener("keydown", handleKeyDown)
           window.removeEventListener("keyup", handleKeyUp)
